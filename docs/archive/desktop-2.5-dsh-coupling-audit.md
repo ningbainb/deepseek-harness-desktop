@@ -744,6 +744,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 112 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 112 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 113 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/scripts/verify-installer-lifecycle.mjs | 145 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-large-legacy-history.mjs | 14 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/verify-large-legacy-history.mjs | 41 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/verify-large-legacy-history.mjs | 221 | DSH_HOME |
@@ -1192,7 +1193,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/background-scheduler-runtime.test.mjs | 67 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs | 26 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/browser-component-preflight-carrier.test.mjs | 75 | DSH_HOME |
-| profile-home | apps/dsh-desktop/test/browser-preflight-installer.test.mjs | 22 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/browser-preflight-installer.test.mjs | 25 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 14 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 14 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/test/custom-presets-runtime.test.mjs | 14 | resolveRuntimePackages |
@@ -1263,11 +1264,16 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/installer-finish-paths.test.mjs | 21 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-finish-paths.test.mjs | 48 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-finish-paths.test.mjs | 65 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-hardening-native.test.mjs | 109 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 25 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 56 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 57 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 70 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 199 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 211 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 212 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 231 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/installer-target-payload.test.mjs | 236 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/isolated-linker-fixtures.test.mjs | 23 | profileDir |
 | profile-home | apps/dsh-desktop/test/isolated-linker-fixtures.test.mjs | 25 | profileDir |
 | profile-home | apps/dsh-desktop/test/isolated-linker-fixtures.test.mjs | 29 | profileDir |

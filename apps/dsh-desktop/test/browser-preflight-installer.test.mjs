@@ -8,13 +8,16 @@ import test from 'node:test'
 import { prepareBrowserPreflightFixtureResources, registerBrowserPreflightFixture, assertBrowserPreflightFixtureCalled } from './fixtures/browser-preflight-resources.mjs'
 const exec = promisify(execFile)
 const desktop = resolve(import.meta.dirname, '..')
-test('installer resource preparation runs before process cleanup and refuses a failed preflight', async () => {
+test('Setup and the in-app updater install core without preparing the optional browser', async () => {
  const source = await readFile(join(desktop, 'build/installer.nsh'), 'utf8')
  const body = source.slice(source.indexOf('!macro customCheckAppRunning'), source.indexOf('; Supported builder hook'))
- assert.ok(body.indexOf('installer-browser-preflight.ps1') < body.indexOf('cleanup_retry:'))
- assert.ok(body.indexOf('browser_preflight_ready:') < body.indexOf('cleanup-stale-processes.ps1" -InstallDirectory'))
- assert.match(body, /browser-component-preflight" "\$0"/u)
- assert.match(body, /StrCmp \$0 "0" browser_preflight_ready[\s\S]*?Abort\s*browser_preflight_ready:/u)
+ assert.match(body, /cleanup-stale-processes\.ps1" -InstallDirectory/u)
+ assert.doesNotMatch(source, /browser-component-preflight|installer-browser-preflight/u)
+ const app = await readFile(join(desktop, 'src/electron-app.mjs'), 'utf8')
+ assert.match(app, /createDesktopInstallPreparation\(\{/u)
+ assert.doesNotMatch(app, /prepareInstalledBrowserUpgrade|browser-upgrade-preflight/u)
+ const pack = await readFile(join(desktop, 'scripts/package-win.mjs'), 'utf8')
+ assert.doesNotMatch(pack, /prepareBrowserComponentPreflight/u)
 })
 test('production preflight skips genuinely fresh install without requiring a Home or starting a carrier', { skip: process.platform !== 'win32' }, async t => {
  const root = await mkdtemp(join(tmpdir(), 'dsh-fresh-browser-preflight-')); t.after(() => rm(root, { recursive: true, force: true }))

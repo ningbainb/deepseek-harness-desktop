@@ -600,6 +600,7 @@ function Begin-Transaction {
       backup = Join-Path $parent ".dsh-desktop-update-old-$transactionId-$([System.Guid]::NewGuid().ToString('N'))"
     }
   })
+  Assert-InstallerDataSeparate (@($normalizedInstallDirectory) + @($installPlans | ForEach-Object { $_.root }))
 
   $presentRegistryCount = @($registryEntries | Where-Object {
     $null -ne (Get-RegistryState $_)
@@ -762,18 +763,44 @@ function Write-PayloadReceipt([string] $path, [string] $token) {
   try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
 }
 
-function Assert-TargetPayloadAvailable([switch] $RecoverInterrupted) {
-  Assert-PlainPayloadPath $normalizedInstallDirectory
-  if ([IO.File]::Exists($normalizedInstallDirectory)) { throw 'installer payload target is a file' }
-  $volumeRoot = [IO.Path]::GetPathRoot($normalizedInstallDirectory)
-  if ($volumeRoot -notmatch '^[a-zA-Z]:\\$') { throw 'target payload requires a local Windows drive' }
+function Resolve-ExistingDataLinks([string] $path) {
+  $current = [IO.Path]::GetFullPath($path)
+  $visited = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+  while ($visited.Count -lt 32 -and $visited.Add($current)) {
+    $next = $null
+    for ($ancestor = $current; $ancestor; $ancestor = [IO.Path]::GetDirectoryName($ancestor)) {
+      try { $attributes = [IO.File]::GetAttributes($ancestor) }
+      catch [IO.FileNotFoundException] { continue }
+      catch [IO.DirectoryNotFoundException] { continue }
+      if (-not ($attributes -band [IO.FileAttributes]::ReparsePoint)) { continue }
+      $item = Get-Item -LiteralPath $ancestor -Force
+      if ($item.LinkType -notin @('Junction', 'SymbolicLink')) { continue }
+      $targets = @($item.Target)
+      if ($targets.Count -ne 1 -or -not $targets[0]) { throw 'installer cannot resolve the configured data directory link' }
+      $target = [string] $targets[0]
+      if (-not [IO.Path]::IsPathRooted($target)) {
+        $target = [IO.Path]::Combine([IO.Path]::GetDirectoryName($ancestor), $target)
+      }
+      $suffix = $current.Substring($ancestor.Length).TrimStart([char[]]@('\', '/'))
+      $next = [IO.Path]::GetFullPath([IO.Path]::Combine($target, $suffix))
+      break
+    }
+    if ($null -eq $next) { return $current.TrimEnd([char[]]@('\', '/')) }
+    $current = $next
+  }
+  throw 'installer cannot resolve the configured data directory links'
+}
+
+function Assert-InstallerDataSeparate([string[]] $programDirectories) {
   $userData = if ($env:DSH_DESKTOP_USER_DATA) { $env:DSH_DESKTOP_USER_DATA } else { Join-Path $env:APPDATA 'DeepSeek Harness Desktop' }
   $desktopDataHome = $env:DSH_HOME
   if (-not $desktopDataHome) {
     $desktopDataHome = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.dsh-community'
     $location = Join-Path $userData 'desktop-data-location.json'
     if ([IO.File]::Exists($location)) {
-      Assert-PlainPayloadPath $location
+      if ([IO.File]::GetAttributes($location) -band [IO.FileAttributes]::ReparsePoint) {
+        throw 'installer cannot verify a linked Desktop data location file'
+      }
       $saved = [IO.File]::ReadAllText($location, [Text.Encoding]::UTF8) | ConvertFrom-Json
       if ($saved.schemaVersion -ne 1 -or $saved.owner -cne 'deepseek-harness-community-desktop' -or $saved.home -isnot [string]) {
         throw 'installer payload cannot verify the persisted Desktop data directory'
@@ -781,15 +808,29 @@ function Assert-TargetPayloadAvailable([switch] $RecoverInterrupted) {
       $desktopDataHome = $saved.home
     }
   }
+  $protectedPaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
   foreach ($path in @($desktopDataHome, $userData, $env:DSH_DESKTOP_BROWSER_COMPONENT_ROOT, $env:DSH_DESKTOP_BROWSER_COMPONENT_CACHE)) {
     if (-not $path) { continue }
-    $protectedPath = [IO.Path]::GetFullPath($path).TrimEnd('\')
-    if ($protectedPath.Equals($normalizedInstallDirectory, [StringComparison]::OrdinalIgnoreCase) -or
-        $protectedPath.StartsWith($normalizedInstallDirectory + '\', [StringComparison]::OrdinalIgnoreCase) -or
-        $normalizedInstallDirectory.StartsWith($protectedPath + '\', [StringComparison]::OrdinalIgnoreCase)) {
-      throw 'installer payload target overlaps a configured data directory'
+    [void] $protectedPaths.Add([IO.Path]::GetFullPath($path).TrimEnd([char[]]@('\', '/')))
+    [void] $protectedPaths.Add((Resolve-ExistingDataLinks $path))
+  }
+  foreach ($program in $programDirectories | Select-Object -Unique) {
+    Assert-PlainPayloadPath $program
+    foreach ($protectedPath in $protectedPaths) {
+      if ($protectedPath.Equals($program, [StringComparison]::OrdinalIgnoreCase) -or
+          $protectedPath.StartsWith($program + '\', [StringComparison]::OrdinalIgnoreCase) -or
+          $program.StartsWith($protectedPath + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'installer program directory overlaps a configured data directory'
+      }
     }
   }
+}
+
+function Assert-TargetPayloadAvailable([switch] $RecoverInterrupted) {
+  Assert-InstallerDataSeparate @($normalizedInstallDirectory)
+  if ([IO.File]::Exists($normalizedInstallDirectory)) { throw 'installer payload target is a file' }
+  $volumeRoot = [IO.Path]::GetPathRoot($normalizedInstallDirectory)
+  if ($volumeRoot -notmatch '^[a-zA-Z]:\\$') { throw 'target payload requires a local Windows drive' }
   if ($PayloadArchiveBytes -le 0 -or $PayloadInstalledBytes -le 0) { throw 'invalid installer payload size' }
   if ($RecoverInterrupted) {
     # A previous Setup process can leave the old app in its backup and an

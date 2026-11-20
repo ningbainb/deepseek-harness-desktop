@@ -57,11 +57,12 @@ export function BrowserComponentCard({ active = true }: { active?: boolean }) {
   }
   return <section data-browser-component-card>
     <h1>共享浏览器</h1>
-    <p>首次使用需下载独立浏览器组件；下载、校验和激活完成后可用。现有浏览器数据和动作权限沿用原配置。</p>
+    <p>使用时检查独立浏览器组件，缺失时再下载。浏览器数据和动作权限沿用原配置。</p>
     <p role="status" aria-live="polite">{status ? phases[status.phase] : '正在读取状态'}{status?.version && ` (${status.version})`}</p>
     {status && <p>组件大小：{status.totalBytes > 0 ? size(status.totalBytes) : '读取中'}；已接收 {size(status.receivedBytes)}</p>}
     {status?.phase === 'downloading' && status.totalBytes > 0 && <progress aria-label="浏览器组件下载进度" value={status.receivedBytes} max={status.totalBytes} />}
     {(error || status?.error) && <p role="alert">{error || status?.error}</p>}
+    {status?.phase === 'error' && <p>可稍后重试，聊天和项目仍可使用。</p>}
     {pending(status)
       ? <button type="button" disabled={acting} onClick={() => { void act('cancel') }}>取消下载</button>
       : status?.phase !== 'ready' && <button type="button" disabled={acting} onClick={() => { void act('prepare') }}>{status?.phase === 'error' || status?.phase === 'cancelled' ? '重试下载' : '准备浏览器组件'}</button>}

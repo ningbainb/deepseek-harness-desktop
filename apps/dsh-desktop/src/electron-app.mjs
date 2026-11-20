@@ -3212,10 +3212,6 @@ export async function startElectronApp(metadata) {
   }) : undefined
   const installPreparation = createDesktopInstallPreparation({
     lifecycle: shutdownLifecycle,
-    prepareComponents: async ({ signal, onProgress }) => {
-      const { prepareInstalledBrowserUpgrade } = await import('./browser-upgrade-preflight.mjs')
-      await prepareInstalledBrowserUpgrade({ home: dshHome, signal, onProgress })
-    },
     isQuitRequested: () => appQuitStarted || updateShutdownCoordinator.requested,
     setPreparing: value => {
       setQuitInProgress(value)

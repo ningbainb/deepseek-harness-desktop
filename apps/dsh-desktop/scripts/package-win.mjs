@@ -14,7 +14,6 @@ import { verifyAsarIntegrity } from './verify-asar-integrity.mjs'
 import { verifyBrandingAssets } from './verify-branding-assets.mjs'
 import { defaultReleaseChannel } from '../src/release-manifest.mjs'
 import { assertPackagedUpdateIdentity } from '../src/update-identity.mjs'
-import { prepareBrowserComponentPreflight } from './prepare-browser-component-preflight.mjs'
 
 const APP_DIRECTORY = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PNPM_COMMAND = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
@@ -84,7 +83,6 @@ await run(process.execPath, [
 ])
 await verifyBrandingAssets(APP_DIRECTORY)
 if (!INSTALLER_ONLY) await prepareReleaseDirectory()
-await prepareBrowserComponentPreflight()
 // prepare:bundled-git
 const prepareGitScript = resolve(APP_DIRECTORY, 'scripts/prepare-bundled-git.mjs')
 if (!INSTALLER_ONLY) await run(process.execPath, [prepareGitScript])

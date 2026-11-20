@@ -1,7 +1,3 @@
-!ifndef BUILD_UNINSTALLER
-!include "${BUILD_RESOURCES_DIR}\browser-component-preflight.nsh"
-!endif
-
 !define DSH_UPGRADE_HELPER_DIR "$TEMP\dsh-desktop-installer-support"
 !include "FileFunc.nsh"
 !define DSH_UPGRADE_HELPER_SCRIPT "${DSH_UPGRADE_HELPER_DIR}\installer-upgrade-transaction.ps1"
@@ -367,26 +363,8 @@ payload_promoted:
       Abort
     target_volume_preflight_ready:
     !endif
-    ; Prepare browser resources while the previous application and profile remain untouched.
-    File /oname=$PLUGINSDIR\installer-browser-preflight.ps1 "${BUILD_RESOURCES_DIR}\installer-browser-preflight.ps1"
-    SetOutPath "$PLUGINSDIR\browser-component-preflight\bin"
-    File /oname=preflight.mjs "${BUILD_RESOURCES_DIR}\browser-component-preflight\bin\preflight.mjs"
-    SetOutPath "$PLUGINSDIR\browser-component-preflight\runtime-support"
-    File /oname=browser-component.json "${BUILD_RESOURCES_DIR}\browser-component-preflight\runtime-support\browser-component.json"
-    !insertmacro DshTiming "browser-preflight-start"
-    System::Call 'kernel32::GetCurrentProcessId() i .r2'
-    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\installer-browser-preflight.ps1" -InstallDirectory "$INSTDIR" -PreflightEntry "$PLUGINSDIR\browser-component-preflight\bin\preflight.mjs" -ExpectedEntrySHA256 "${DSH_BROWSER_PREFLIGHT_SHA256}" -ExpectedManifestSHA256 "${DSH_BROWSER_COMPONENT_MANIFEST_SHA256}" -InstallRegistryKey "${INSTALL_REGISTRY_KEY}" -UninstallRegistryKey "${UNINSTALL_REGISTRY_KEY}" -InstallerProcessId $2'
-    Pop $0
-    Pop $1
-    !insertmacro DshTiming "browser-preflight-end"
-    !insertmacro DshLog "browser-component-preflight" "$0" "$1"
-    StrCmp $0 "0" browser_preflight_ready
-    !insertmacro DshStopProgress
-    MessageBox MB_ICONSTOP|MB_OK "共享浏览器组件尚未准备完成，安装已停止，旧程序和配置未被替换。请检查网络和原有 DSH_HOME 后重试。$\r$\n$\r$\n$1" /SD IDOK
-    Abort
-browser_preflight_ready:
-    SetOutPath "$TEMP"
   !endif
+  ; The installed app prepares optional browser resources when requested.
 cleanup_retry:
   !insertmacro DshWorkingProgress "1 / 3  准备安装与保护旧版" "正在检查旧进程并准备可恢复的升级备份。"
   !insertmacro DshTiming "upgrade-preflight-start"

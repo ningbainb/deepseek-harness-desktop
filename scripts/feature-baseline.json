@@ -1385,13 +1385,14 @@
         "independent-cache-and-persistent-activation",
         "sha256-platform-architecture-version-and-file-integrity",
         "cancel-retry-and-coalesced-preparation",
-        "preflight-before-upgrade-shutdown",
-        "previous-public-desktop-electron-carrier-supported-before-browser-component-verification",
+        "setup-and-in-app-update-do-not-prepare-optional-browser",
+        "installer-preserves-redirected-home-and-rejects-program-data-overlap",
+        "windows-download-falls-back-to-the-pinned-mirror-on-transport-failure",
         "complete-core-nsis-archive-without-nested-electron",
         "electron-original-fs-preserves-component-asar-as-ordinary-files"
       ],
       "e2eScript": "scripts/verify-packaged-browser-component.mjs",
-      "unitTests": ["test/runtime-nsis-archive.test.mjs", "test/browser-component-preflight-carrier.test.mjs"]
+      "unitTests": ["test/runtime-nsis-archive.test.mjs", "test/installer-target-payload.test.mjs", "test/browser-component.test.mjs", "test/browser-preflight-installer.test.mjs", "test/browser-component-preflight-carrier.test.mjs"]
     }
   ],
   "skinCatalog": [

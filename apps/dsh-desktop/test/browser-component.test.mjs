@@ -17,7 +17,7 @@ async function fixture(t, options = {}) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-browser-component-'))
   t.after(() => rm(root, { recursive: true, force: true }))
   const bytes = Buffer.from(zipSync(options.files ?? { 'electron.exe': Buffer.from('electron fixture'), version: Buffer.from('44.7.0'), 'resources/default_app.asar': Buffer.from('app') }))
-  const artifact = { platform: 'win32', arch: 'x64', version: '44.7.0', url: 'https://github.com/electron/electron/releases/download/v44.7.0/test.zip', size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), executable: 'electron.exe', required: ['electron.exe', 'version', 'resources/default_app.asar'] }
+  const artifact = { platform: 'win32', arch: 'x64', version: '44.7.0', url: 'https://github.com/electron/electron/releases/download/v44.7.0/test.zip', size: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'), executable: 'electron.exe', required: ['electron.exe', 'version', 'resources/default_app.asar'], ...options.artifact }
   let downloads = 0
   const manager = createBrowserComponentManager({ componentRoot: join(root, 'components'), cacheRoot: join(root, 'cache'), manifest: { schemaVersion: 1, artifacts: [artifact] }, platform: 'win32', arch: 'x64', fetch: async (...args) => { downloads++; return options.fetch ? options.fetch(bytes, ...args) : new Response(bytes) } })
   return { root, bytes, artifact, manager, downloads: () => downloads, createBrowserComponentManager }
@@ -48,6 +48,33 @@ test('checksum mismatch never activates and explicit retry succeeds', async t =>
   corrupt = false
   await f.manager.prepare()
   assert.equal(f.downloads(), 2)
+})
+const mirrorUrl = 'https://registry.npmmirror.com/-/binary/electron/v44.7.0/test.zip'
+
+test('failure to fetch GitHub tries the pinned mirror and activates verified bytes', async t => {
+  const urls = []
+  const f = await fixture(t, { artifact: { mirrorUrl }, fetch: (bytes, url) => {
+    urls.push(url)
+    if (url !== mirrorUrl) throw Error('fetch failed')
+    return new Response(bytes)
+  } })
+  const result = await f.manager.prepare()
+  assert.deepEqual(urls, [f.artifact.url, mirrorUrl])
+  assert.equal(await readFile(result.executablePath, 'utf8'), 'electron fixture')
+  assert.deepEqual(await readdir(join(f.root, 'cache')), [])
+})
+test('a broken primary response is discarded before fetching the mirror', async t => {
+  const f = await fixture(t, { artifact: { mirrorUrl }, fetch: (bytes, url) => new Response(url === mirrorUrl ? bytes : bytes.subarray(0, 7)) })
+  await f.manager.prepare()
+  assert.equal(f.downloads(), 2)
+  assert.equal(f.manager.status().phase, 'ready')
+})
+test('a corrupted mirror cannot activate or leave a partial component', async t => {
+  const f = await fixture(t, { artifact: { mirrorUrl }, fetch: (bytes, url) =>
+    url === mirrorUrl ? new Response(Buffer.alloc(bytes.length)) : new Response(null, { status: 503 }) })
+  await assert.rejects(f.manager.prepare(), /SHA256 mismatch/)
+  assert.deepEqual(await readdir(join(f.root, 'components')), [])
+  assert.deepEqual(await readdir(join(f.root, 'cache')), [])
 })
 test('cancellation aborts pending download, cleans temporary files and allows retry', async t => {
   let block = true

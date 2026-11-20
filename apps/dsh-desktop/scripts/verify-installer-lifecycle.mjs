@@ -1,21 +1,20 @@
 import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 import { resolveNsisCompiler } from './nsis-compiler.mjs'
 import { prepareInstallerElectronPayload, sha256 } from './installer-electron-payload.mjs'
-import { prepareBrowserPreflightFixtureResources, registerBrowserPreflightFixture, assertBrowserPreflightFixtureCalled } from '../test/fixtures/browser-preflight-resources.mjs'
+import { prepareBrowserPreflightFixtureResources } from '../test/fixtures/browser-preflight-resources.mjs'
 import { tinyPE } from '../test/fixtures/electron-payload.mjs'
 import { createInstallerLifecycleRoot } from '../test/fixtures/installer-lifecycle-root.mjs'
 import { assertInstallerFixtureProcessIsolation } from './installer-fixture-process-guard.mjs'
 
 // Compiles and executes the production NSIS macros with tiny isolated payloads.
 // This exercises callbacks and extraction, not a full Desktop overlay upgrade.
-// Browser resources use a scoped contract-checking service fixture; the actual
-// released Electron/self-contained resource helper has separate integration tests.
+// The old browser helper fails if invoked, so installation must stand alone.
 const exec = promisify(execFile)
 const desktop = resolve(import.meta.dirname, '..')
 if (process.platform !== 'win32') throw new Error('Installer lifecycle verification requires Windows')
@@ -49,7 +48,8 @@ async function collectFailureEvidence({ scenario, exitCode, temporary, install, 
   }, null, 2)
 }
 try {
-  const resources = await prepareBrowserPreflightFixtureResources(root, { controlledService: true })
+  const resources = await prepareBrowserPreflightFixtureResources(root)
+  await writeFile(join(resources, 'installer-browser-preflight.ps1'), 'Write-Output "Browser resource network unavailable"; exit 37\n')
   const scenarios = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'commit-failure', 'section-abort', 'uninstall-failure', 'uninstall-launch-failure', 'stale-registration', 'unwritable-log', 'preflight-lock', 'runtime-fresh', 'runtime-upgrade', 'runtime-corrupt', 'runtime-fresh-corrupt', 'runtime-fresh-complete', 'runtime-fresh-complete-missing', 'runtime-external', 'runtime-external-missing-core']
   const requested = process.argv.slice(2).map(argument => {
     if (!argument.startsWith('--scenario=')) throw Error(`Unknown lifecycle argument: ${argument}`)
@@ -64,9 +64,13 @@ try {
     const temporary = join(directory, '张律师 临时')
     const payload = join(directory, 'payload.txt')
     const installer = join(directory, 'fixture.exe')
-    const sentinel = join(directory, 'session.jsonl')
+    const home = join(directory, 'isolated-home')
+    const homePath = scenario === 'runtime-external' ? join(directory, 'redirected-home') : home
+    const sentinel = join(home, 'session.jsonl')
     const key = `Software\\DeepSeekHarnessDesktopTests\\nsis-${process.pid}-${scenario}-${Date.now()}`
     await mkdir(temporary, { recursive: true })
+    await mkdir(home)
+    if (homePath !== home) await symlink(home, homePath, 'junction')
     await writeFile(payload, 'new')
     await writeFile(sentinel, 'original-session')
     if (!['fresh', 'runtime-fresh', 'runtime-fresh-corrupt', 'runtime-fresh-complete', 'runtime-fresh-complete-missing'].includes(scenario)) {
@@ -105,7 +109,6 @@ try {
         if (scenario.endsWith('complete-missing')) await rm(join(electronDirectory, 'dist/electron.exe'))
         if (scenario === 'runtime-external-missing-core') await rm(join(runtimePayload, 'resources/app.asar.unpacked/package.json'))
       }
-      await registerBrowserPreflightFixture(resources, { key, install, directory })
       await exec(compiler.path, [
         '/V2', `/DBUILD_RESOURCES_DIR=${resources}`,
         `/DTEST_OUTPUT=${installer}`, `/DTEST_INSTALL=${install}`,
@@ -139,7 +142,7 @@ try {
       try {
         await exec(installer, ['/S'], {
           windowsHide: true, timeout: 60_000,
-          env: { ...process.env, TEMP: temporary, TMP: temporary },
+          env: { ...process.env, TEMP: temporary, TMP: temporary, DSH_HOME: homePath },
         })
       } catch (error) {
         if (typeof error.code !== 'number') throw error
@@ -149,12 +152,6 @@ try {
         const exited = once(locker, 'exit')
         locker.kill()
         await exited
-      }
-      try { await assertBrowserPreflightFixtureCalled(resources, key) }
-      catch (error) {
-        console.error('browser preflight fixture failure', await collectFailureEvidence({ scenario, exitCode, temporary, install, key }))
-        console.error('browser preflight contract', await readFile(join(resources, 'preflight-contracts.json'), 'utf8'))
-        throw error
       }
       const success = ['fresh', 'upgrade', 'custom-location', 'conflicting-location', 'stale-registration', 'unwritable-log', 'runtime-fresh', 'runtime-upgrade', 'runtime-fresh-complete', 'runtime-external'].includes(scenario)
       if ((exitCode === 0) !== success) {
@@ -184,6 +181,7 @@ try {
       } else {
         assert.equal(logs.length, 1, 'each attempt must retain one independent log')
         const diagnostic = await readFile(join(temporary, logs[0]), 'utf16le')
+        assert.doesNotMatch(diagnostic, /browser-component-preflight/u)
         assert.match(diagnostic, scenario === 'preflight-lock' ? /stage=preflight code=36/u : /stage=preflight code=0/u)
         if (success) assert.match(diagnostic, /stage=completed code=0/u)
         else {

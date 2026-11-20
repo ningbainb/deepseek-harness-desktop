@@ -414,17 +414,6 @@ export function createUpdateSurfaceScript() {
       } else if (phase === 'installing') {
         title.textContent = '正在启动更新程序';
         status.textContent = '正在安全停止本地 Harness 运行时并启动安装程序，请稍候。';
-        const component = value.componentPreparation;
-        if (component && component.phase !== 'ready') {
-          title.textContent = '正在准备共享浏览器组件';
-          const received = Math.max(0, Number(component.receivedBytes) || 0);
-          const total = Math.max(0, Number(component.totalBytes) || 0);
-          status.textContent = '准备完成后继续安装。' + (total ? ' ' + (received / 1048576).toFixed(1) + ' / ' + (total / 1048576).toFixed(1) + ' MB' : '');
-          const componentPercent = total ? Math.min(100, received / total * 100) : 0;
-          progress.hidden = false;
-          progress.style.setProperty('--dsh-update-progress', componentPercent + '%');
-          progress.setAttribute('aria-valuenow', String(Math.round(componentPercent)));
-        }
       } else if (phase === 'current') {
         title.textContent = '已经是最新版本';
         status.textContent = '当前桌面版无需更新。';

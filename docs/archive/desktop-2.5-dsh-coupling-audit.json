@@ -6123,6 +6123,12 @@
     },
     {
       "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-installer-lifecycle.mjs",
+      "line": 145,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-large-legacy-history.mjs",
       "line": 14,
       "operation": "resolveRuntimePackages"
@@ -8812,7 +8818,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/browser-preflight-installer.test.mjs",
-      "line": 22,
+      "line": 25,
       "operation": "DSH_HOME"
     },
     {
@@ -9237,6 +9243,12 @@
     },
     {
       "category": "profile-home",
+      "path": "apps/dsh-desktop/test/installer-hardening-native.test.mjs",
+      "line": 109,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
       "path": "apps/dsh-desktop/test/installer-target-payload.test.mjs",
       "line": 25,
       "operation": "DSH_HOME"
@@ -9263,6 +9275,30 @@
       "category": "profile-home",
       "path": "apps/dsh-desktop/test/installer-target-payload.test.mjs",
       "line": 199,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/installer-target-payload.test.mjs",
+      "line": 211,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/installer-target-payload.test.mjs",
+      "line": 212,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/installer-target-payload.test.mjs",
+      "line": 231,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/test/installer-target-payload.test.mjs",
+      "line": 236,
       "operation": "DSH_HOME"
     },
     {

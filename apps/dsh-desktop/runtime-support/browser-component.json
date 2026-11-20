@@ -10,6 +10,7 @@
       "platform": "win32",
       "arch": "x64",
       "url": "https://github.com/electron/electron/releases/download/v44.7.0/electron-v44.7.0-win32-x64.zip",
+      "mirrorUrl": "https://registry.npmmirror.com/-/binary/electron/v44.7.0/electron-v44.7.0-win32-x64.zip",
       "size": 158293649,
       "sha256": "eee30dc8fa1f5ea95490e59f44e46ea68dd24c6e93d22facf70fe5c2d4c2665c",
       "executable": "electron.exe",

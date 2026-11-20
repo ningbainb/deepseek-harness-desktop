@@ -122,6 +122,8 @@ export async function extractBrowserComponentArchive(archivePath, destination, {
   } finally { for (const fd of descriptors) closeSync(fd) }
 }
 
+class BrowserDownloadError extends Error {}
+
 /** Persistent activation and disposable downloads must have disjoint roots. */
 export function createBrowserComponentManager({ componentRoot, cacheRoot, manifest = browserComponentManifest, platform = process.platform, arch = process.arch, fetch: fetchArchive = globalThis.fetch } = {}) {
   if (!componentRoot || !cacheRoot) throw Error('browser component requires persistent and cache roots')
@@ -131,7 +133,11 @@ export function createBrowserComponentManager({ componentRoot, cacheRoot, manife
   if (nested(componentRoot, cacheRoot) || nested(cacheRoot, componentRoot)) throw Error('browser component and cache roots must be separate')
   const artifact = manifest.artifacts?.find(item => item.platform === platform && item.arch === arch)
   if (!artifact) throw Error(`unsupported browser component platform/architecture: ${platform}/${arch}`)
-  if (manifest.schemaVersion !== 1 || !/^\d+\.\d+\.\d+$/.test(artifact.version) || !/^[a-f0-9]{64}$/.test(artifact.sha256) || !Number.isSafeInteger(artifact.size) || artifact.size < 1 || !artifact.url.startsWith(`https://github.com/electron/electron/releases/download/v${artifact.version}/`)) throw Error('invalid browser component manifest')
+  const upstream = `https://github.com/electron/electron/releases/download/v${artifact.version}/`
+  if (manifest.schemaVersion !== 1 || !/^\d+\.\d+\.\d+$/.test(artifact.version) || !/^[a-f0-9]{64}$/.test(artifact.sha256) || !Number.isSafeInteger(artifact.size) || artifact.size < 1 || !artifact.url.startsWith(upstream)) throw Error('invalid browser component manifest')
+  const filename = artifact.url.slice(upstream.length)
+  if (artifact.mirrorUrl !== undefined && (!/^[a-zA-Z0-9._-]+\.zip$/u.test(filename) ||
+    artifact.mirrorUrl !== `https://registry.npmmirror.com/-/binary/electron/v${artifact.version}/${filename}`)) throw Error('invalid browser component mirror')
   const key = `${artifact.version}-${platform}-${arch}`
   const componentPath = childPath(componentRoot, key)
   const executablePath = childPath(componentPath, artifact.executable)
@@ -185,6 +191,62 @@ export function createBrowserComponentManager({ componentRoot, cacheRoot, manife
       }
     }
   }
+  async function verifyArchive(body, archive, write, signal) {
+    let receivedBytes = 0
+    const hash = createHash('sha256')
+    const fd = write ? openSync(archive, 'wx') : undefined
+    try {
+      for await (const chunk of body) {
+        signal.throwIfAborted()
+        receivedBytes += chunk.length
+        if (receivedBytes > artifact.size) throw Error('browser component archive size mismatch')
+        hash.update(chunk)
+        if (fd !== undefined) writeSync(fd, chunk)
+        publish({ phase: 'downloading', receivedBytes })
+      }
+    } finally { if (fd !== undefined) closeSync(fd) }
+    if (receivedBytes !== artifact.size) {
+      if (write) throw new BrowserDownloadError('browser component download ended early')
+      throw Error('browser component archive size mismatch')
+    }
+    publish({ phase: 'verifying' })
+    if (hash.digest('hex') !== artifact.sha256) throw Error('browser component SHA256 mismatch')
+  }
+  async function downloadArchive(url, archive, signal) {
+    const stalled = new AbortController()
+    const downloadSignal = AbortSignal.any([signal, stalled.signal])
+    let timer
+    const setBudget = milliseconds => {
+      clearTimeout(timer)
+      timer = setTimeout(() => stalled.abort(Error('browser component download timed out')), milliseconds)
+      timer.unref()
+    }
+    async function* chunks(body) {
+      try {
+        for await (const chunk of body) {
+          setBudget(20000)
+          yield chunk
+        }
+      } catch (error) {
+        throw new BrowserDownloadError(error.message, { cause: error })
+      }
+    }
+    try {
+      setBudget(artifact.mirrorUrl && url === artifact.url ? 8000 : 20000)
+      let response
+      try { response = await fetchArchive(url, { signal: downloadSignal, redirect: 'follow' }) }
+      catch (error) { throw new BrowserDownloadError(error.message, { cause: error }) }
+      if (!response.ok || !response.body) {
+        await response.body?.cancel()
+        throw new BrowserDownloadError(`browser component download failed: HTTP ${response.status}`)
+      }
+      setBudget(20000)
+      await verifyArchive(chunks(response.body), archive, true, downloadSignal)
+    } finally {
+      clearTimeout(timer)
+      stalled.abort()
+    }
+  }
   async function run(signal, archivePath) {
     let unlock
     let stage
@@ -202,29 +264,18 @@ export function createBrowserComponentManager({ componentRoot, cacheRoot, manife
       ownsArchive = !archivePath
       stage = childPath(componentRoot, `${key}-${randomUUID()}.staging`)
       publish({ phase: 'downloading' })
-      let body
-      if (archivePath) body = createReadStream(archive, { signal })
+      if (archivePath) await verifyArchive(createReadStream(archive, { signal }), archive, false, signal)
       else {
-        const response = await fetchArchive(artifact.url, { signal, redirect: 'follow' })
-        if (!response.ok || !response.body) throw Error(`browser component download failed: HTTP ${response.status}`)
-        body = response.body
-      }
-      const fd = ownsArchive ? openSync(archive, 'wx') : undefined
-      let receivedBytes = 0
-      const hash = createHash('sha256')
-      try {
-        for await (const chunk of body) {
+        try {
+          await downloadArchive(artifact.url, archive, signal)
+        } catch (error) {
           signal.throwIfAborted()
-          receivedBytes += chunk.length
-          if (receivedBytes > artifact.size) throw Error('browser component archive size mismatch')
-          hash.update(chunk)
-          if (fd !== undefined) writeSync(fd, chunk)
-          publish({ phase: 'downloading', receivedBytes })
+          if (!(error instanceof BrowserDownloadError) || !artifact.mirrorUrl) throw error
+          await rm(archive, { force: true })
+          publish({ phase: 'downloading', receivedBytes: 0 })
+          await downloadArchive(artifact.mirrorUrl, archive, signal)
         }
-      } finally { if (fd !== undefined) closeSync(fd) }
-      publish({ phase: 'verifying' })
-      if (receivedBytes !== artifact.size) throw Error('browser component archive size mismatch')
-      if (hash.digest('hex') !== artifact.sha256) throw Error('browser component SHA256 mismatch')
+      }
       signal.throwIfAborted()
       publish({ phase: 'extracting' })
       await mkdir(stage)

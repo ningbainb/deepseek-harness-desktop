@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile, spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { createRequire } from 'node:module'
-import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -11,7 +11,7 @@ import test from 'node:test'
 import { resolveNsisCompiler } from '../scripts/nsis-compiler.mjs'
 import { prepareInstallerElectronPayload } from '../scripts/installer-electron-payload.mjs'
 import { assertInstallerFixtureProcessIsolation } from '../scripts/installer-fixture-process-guard.mjs'
-import { prepareBrowserPreflightFixtureResources, registerBrowserPreflightFixture, assertBrowserPreflightFixtureCalled } from './fixtures/browser-preflight-resources.mjs'
+import { prepareBrowserPreflightFixtureResources } from './fixtures/browser-preflight-resources.mjs'
 import { payloadFixture } from './fixtures/electron-payload.mjs'
 import { windowsInstallerTestOptions } from './fixtures/installer-platform.mjs'
 
@@ -45,7 +45,10 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   await mkdir(join(install, 'resources'), { recursive: true }); await mkdir(temporary)
   await writeFile(join(install, 'DeepSeek Harness Desktop.exe'), 'old-exe')
   await writeFile(join(install, 'resources/app.asar'), 'old-asar')
-  await writeFile(join(f.root, 'session.jsonl'), 'original-session')
+  const home = join(f.root, 'data'), redirectedHome = join(f.root, 'redirected-home')
+  await mkdir(home)
+  await symlink(home, redirectedHome, 'junction')
+  await writeFile(join(home, 'session.jsonl'), 'original-session')
   await exec('reg.exe', ['ADD', `HKCU\\${key}\\Install`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', install, '/f'], { windowsHide: true })
   await exec('reg.exe', ['ADD', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion', '/t', 'REG_SZ', '/d', 'old', '/f'], { windowsHide: true })
   let child, exited, staged
@@ -91,8 +94,8 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   })
   staged = await prepareInstallerElectronPayload(f.app)
   const adapter = JSON.parse(await readFile(staged.builderArguments[0].slice(staged.builderArguments[0].indexOf('=') + 1), 'utf8'))
-  const resources = await prepareBrowserPreflightFixtureResources(f.root, { controlledService: true })
-  await registerBrowserPreflightFixture(resources, { key, install, directory: f.root })
+  const resources = await prepareBrowserPreflightFixtureResources(f.root)
+  await writeFile(join(resources, 'installer-browser-preflight.ps1'), 'Write-Output "Browser resource network unavailable"; exit 37\n')
   const templates = resolve(dirname(builderRequire.resolve('app-builder-lib/out/targets/nsis/NsisTarget.js')), '../../../templates/nsis')
   const archive = join(f.root, 'payload.7z'), fixtureExe = join(f.root, 'copy-cancel-fixture.exe')
   const payload = join(f.root, 'payload'); await mkdir(payload); await writeFile(join(payload, 'collision.txt'), 'new-file')
@@ -103,7 +106,7 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
     `/DADAPTED_INSTALLER=${join(adapter.directory, 'installer.nsh')}`, join(desktop, 'test/fixtures/installer-hardening-extract.nsi')],
   { env: compiler.env, windowsHide: true, timeout: 30_000 })
   observe('compiled')
-  child = spawn(fixtureExe, [], { windowsHide: true, stdio: 'ignore', env: { ...process.env, TEMP: temporary, TMP: temporary } })
+  child = spawn(fixtureExe, [], { windowsHide: true, stdio: 'ignore', env: { ...process.env, TEMP: temporary, TMP: temporary, DSH_HOME: redirectedHome } })
   exited = once(child, 'exit')
   child.once('exit', () => observe('target-exit'))
   await once(child, 'spawn')
@@ -136,14 +139,13 @@ test('stock CopyFiles failure followed by its real Cancel button immediately res
   observe('observer-completed')
   console.log('native fixture observation', JSON.stringify({ ...await observation(), stdout }))
   assert.match(stdout, /native-copy-dialog-cancelled/u)
-  await assertBrowserPreflightFixtureCalled(resources, key)
   const [code] = await exited
   assert.notEqual(code, 0, 'native cancellation must report installation failure')
   assert.equal(await readFile(join(install, 'DeepSeek Harness Desktop.exe'), 'utf8'), 'old-exe')
   assert.equal(await readFile(join(install, 'resources/app.asar'), 'utf8'), 'old-asar')
   const registration = await exec('reg.exe', ['QUERY', `HKCU\\${key}\\Uninstall`, '/v', 'DisplayVersion'], { windowsHide: true })
   assert.match(registration.stdout, /REG_SZ\s+old\s/u)
-  assert.equal(await readFile(join(f.root, 'session.jsonl'), 'utf8'), 'original-session')
+  assert.equal(await readFile(join(redirectedHome, 'session.jsonl'), 'utf8'), 'original-session')
   assert.equal(await present(join(install, 'unexpected-success.txt')), false)
 })
 

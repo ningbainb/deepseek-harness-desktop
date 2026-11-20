@@ -204,6 +204,38 @@ test('capacity preflight accepts a missing Unicode parent without creating it an
   await assert.rejects(validate(f.install), /overlaps a configured data directory/u)
 })
 
+test('capacity preflight accepts a redirected userData directory and an independent Home junction', { skip: process.platform !== 'win32' }, async t => {
+  const f = await fixture(t)
+  const actualUserData = join(f.root, 'physical-user-data')
+  const actualHome = join(f.root, 'physical-home')
+  const linkedHome = f.env.DSH_HOME
+  delete f.env.DSH_HOME
+  await mkdir(actualUserData)
+  await mkdir(actualHome)
+  await symlink(actualUserData, f.env.DSH_DESKTOP_USER_DATA, 'junction')
+  await symlink(actualHome, linkedHome, 'junction')
+  const location = JSON.stringify({ schemaVersion: 1, owner: 'deepseek-harness-community-desktop', home: linkedHome })
+  await writeFile(join(actualUserData, 'desktop-data-location.json'), location)
+  await f.run('ValidatePayload', f.install, '-PayloadArchiveBytes', '4096', '-PayloadInstalledBytes', '4096')
+  assert.equal(await readFile(join(actualUserData, 'desktop-data-location.json'), 'utf8'), location)
+})
+
+test('a redirected Home cannot overlap an existing program directory from registry', { skip: process.platform !== 'win32' }, async t => {
+  const f = await fixture(t)
+  const oldHome = join(f.install, 'local-data')
+  await mkdir(join(f.install, 'resources'), { recursive: true })
+  await mkdir(oldHome)
+  await writeFile(join(f.install, 'DeepSeek Harness Desktop.exe'), 'old-exe')
+  await writeFile(join(f.install, 'resources/app.asar'), 'old-asar')
+  await writeFile(join(oldHome, 'session.jsonl'), 'original-session')
+  await symlink(oldHome, f.env.DSH_HOME, 'junction')
+  await exec('reg.exe', ['ADD', `HKCU\\${f.key}\\Install`, '/v', 'InstallLocation', '/t', 'REG_SZ', '/d', f.install, '/f'], { windowsHide: true })
+  await assert.rejects(f.run('Begin', join(f.root, 'different-program-location')), error =>
+    /overlaps a configured data directory/u.test(error.stdout + error.stderr))
+  assert.equal(await readFile(join(f.install, 'DeepSeek Harness Desktop.exe'), 'utf8'), 'old-exe')
+  assert.equal(await readFile(join(f.env.DSH_HOME, 'session.jsonl'), 'utf8'), 'original-session')
+})
+
 test('retry preflight recovers an interrupted upgrade and removes partial payload files before checking space', { skip: process.platform !== 'win32' }, async t => {
   const f = await fixture(t)
   await mkdir(join(f.install, 'resources'), { recursive: true })
