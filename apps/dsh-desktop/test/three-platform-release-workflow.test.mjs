@@ -168,6 +168,25 @@ test('native artifact verification runs on dispatch and publication depends on i
   assert.equal(publication.permissions.contents, 'write')
 })
 
+test('verified promotion downloads the exact preflight assets and publishes the tagged notes after verification', async () => {
+  const { jobs, on } = YAML.parse(await readFile(workflowPath, 'utf8'))
+  assert.equal(on.workflow_dispatch.inputs.verified_run.type, 'string')
+  for (const platform of ['windows', 'macos', 'linux']) {
+    assert.equal(jobs[platform].if, "github.event_name != 'workflow_dispatch' || inputs.verified_run == ''")
+  }
+  const promotion = jobs['promote-verified']
+  assert.match(promotion.if, /github\.ref == 'refs\/heads\/main' && inputs\.verified_run != ''/u)
+  const selection = promotion.steps.findIndex(step => step.id === 'preflight')
+  const downloads = promotion.steps.filter(step => step.uses === 'actions/download-artifact@v4')
+  assert.equal(downloads.length, 2)
+  assert.ok(downloads.every(step => promotion.steps.indexOf(step) > selection && step.with['run-id'] === '${{ inputs.verified_run }}'))
+  const verification = promotion.steps.findIndex(step => step.run?.includes('validate-three-platform-promotion.mjs assets'))
+  const publication = promotion.steps.find(step => step.uses === 'softprops/action-gh-release@v2')
+  assert.ok(verification > promotion.steps.indexOf(downloads[1]) && verification < promotion.steps.indexOf(publication))
+  assert.equal(publication.with.body_path, 'verified-release-source/docs/launch/release-notes.md')
+  assert.equal(publication.with.overwrite_files, false)
+})
+
 const artifactNames = [
   'DeepSeek-Harness-Desktop-Setup-5.2.0-x64.exe',
   'DeepSeek-Harness-Desktop-5.2.0-arm64.dmg',

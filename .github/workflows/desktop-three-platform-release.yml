@@ -2,6 +2,10 @@ name: Desktop Three-Platform Release
 
 on:
   workflow_dispatch:
+    inputs:
+      verified_run:
+        description: Publish artifacts from this successful preflight run ID using the existing stable tag
+        type: string
   push:
     tags:
       - desktop-v*
@@ -29,6 +33,7 @@ jobs:
 
   windows:
     needs: metadata
+    if: github.event_name != 'workflow_dispatch' || inputs.verified_run == ''
     runs-on: windows-latest
     timeout-minutes: 180
     env:
@@ -177,6 +182,7 @@ jobs:
 
   macos:
     needs: metadata
+    if: github.event_name != 'workflow_dispatch' || inputs.verified_run == ''
     runs-on: macos-15
     timeout-minutes: 120
     env:
@@ -231,6 +237,7 @@ jobs:
 
   linux:
     needs: metadata
+    if: github.event_name != 'workflow_dispatch' || inputs.verified_run == ''
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     env:
@@ -390,6 +397,84 @@ jobs:
             preflight-assets/SHA256SUMS-linux.txt
             preflight-assets/SHA256SUMS.txt
             preflight-assets/release-manifest.json
+
+  promote-verified:
+    needs: metadata
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.verified_run != ''
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    env:
+      PREFLIGHT_RUN_ID: ${{ inputs.verified_run }}
+      RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify the preflight run and existing release tag
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$PREFLIGHT_RUN_ID" =~ ^[1-9][0-9]*$ && "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="desktop-v$RELEASE_VERSION"
+          base="repos/$GITHUB_REPOSITORY"
+          export RELEASE_COMMIT="$(gh api "$base/commits/$tag" --jq .sha)"
+          gh api "$base/actions/runs/$PREFLIGHT_RUN_ID" > release-preflight.json
+          attempt="$(jq -er '.run_attempt | numbers' release-preflight.json)"
+          gh api "$base/actions/runs/$PREFLIGHT_RUN_ID/attempts/$attempt/jobs?per_page=100" > release-preflight-jobs.json
+          node scripts/validate-three-platform-promotion.mjs source release-preflight.json release-preflight-jobs.json
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.verified_run }}
+          github-token: ${{ github.token }}
+          pattern: desktop-${{ needs.metadata.outputs.version }}-*
+          path: release-assets
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.verified_run }}
+          github-token: ${{ github.token }}
+          name: desktop-qa-${{ needs.metadata.outputs.version }}-three-platform
+          path: preflight-qa
+      - name: Verify all assets against the preflight receipt
+        env:
+          RELEASE_COMMIT: ${{ steps.preflight.outputs.commit }}
+          PREFLIGHT_ATTEMPT: ${{ steps.preflight.outputs.attempt }}
+        run: node scripts/validate-three-platform-promotion.mjs assets release-assets preflight-qa
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.preflight.outputs.commit }}
+          path: verified-release-source
+          sparse-checkout: docs/launch/release-notes.md
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Check that the release can be created without replacing an existing one
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_COMMIT: ${{ steps.preflight.outputs.commit }}
+        run: |
+          set -euo pipefail
+          tag="desktop-v$RELEASE_VERSION"
+          base="repos/$GITHUB_REPOSITORY"
+          test "$(gh api "$base/commits/$tag" --jq .sha)" = "$RELEASE_COMMIT"
+          release_tags="$(gh api --paginate "$base/releases?per_page=100" --jq '.[].tag_name')"
+          if grep -Fxq "$tag" <<< "$release_tags"; then
+            echo "Release $tag already exists"
+            exit 1
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v${{ needs.metadata.outputs.version }}
+          name: DeepSeek Harness Desktop ${{ needs.metadata.outputs.version }} 正式版
+          body_path: verified-release-source/docs/launch/release-notes.md
+          prerelease: false
+          overwrite_files: false
+          fail_on_unmatched_files: true
+          files: release-assets/*
 
   publish:
     needs: [metadata, windows, macos, linux, verify-artifacts]
