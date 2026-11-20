@@ -6412,7 +6412,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-release-plugins.mjs",
-      "line": 314,
+      "line": 315,
       "operation": "DSH_HOME"
     },
     {

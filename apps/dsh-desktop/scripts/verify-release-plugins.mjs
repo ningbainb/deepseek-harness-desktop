@@ -286,6 +286,7 @@ try {
   origin = `http://127.0.0.1:${server.address().port}`
   await Promise.all([mkdir(home), mkdir(userData), mkdir(workspace)])
   await writeFile(join(home, 'settings.yaml'), JSON.stringify({
+    locale: { preference: 'zh' },
     'ui-onboarding': { welcomeNoticeVersion: '2026-08-13.1' },
     'agent-default-model': { provider: PROVIDER, model: MODEL },
     pet: { enabled: true, visible: true },
@@ -344,6 +345,7 @@ try {
   })
   main.setDefaultTimeout(30_000)
   await main.locator('#dsh-desktop-window-chrome').waitFor({ state: 'visible' })
+  await main.waitForFunction(() => document.documentElement.lang === 'zh-CN', undefined, { timeout: 30_000 })
   await main.waitForFunction(() => typeof globalThis.__releasePluginsFixture?.create === 'function', undefined, { timeout: 30_000 })
   const native = await application.evaluate(({ app }) => ({ ...globalThis.releasePluginsNativeStartup,
     userDataMatches: app.getPath('userData') === process.env.DSH_DESKTOP_USER_DATA,
