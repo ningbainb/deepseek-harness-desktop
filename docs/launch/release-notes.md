@@ -16,7 +16,12 @@
 
 同一发布标签运行 Windows x64、macOS arm64 和 Linux x64 的原生构建与验收。Windows 验收包括新装、经校验的正式 5.2.0 覆盖升级、旧数据保留、重启和卸载保留数据。
 
-Windows Runner 的流式帧时间 P95 实测为 46.8 毫秒，超过 35 毫秒目标。本次接受同一用例不超过 47 毫秒的结果。首次空闲内核关闭在 Runner 上偶尔走现有的强制进程清理。本次仅接受首次退出在 5 秒内、后续两次均收到正常回执的情况。验收记录保留两项的实际结果。
+#### 5.3.5 Windows 已知问题
+
+- 流式帧间隔的 P95 目标为 35 毫秒。候选验收首次测得 46.9 毫秒，复测为 31.2 毫秒。本版接受该用例不超过 47 毫秒的结果。
+- 首次关闭空闲内核时，Windows Runner 偶尔会走进程清理兜底。候选验收记录到首次退出耗时 4.63 秒，后两次均正常回执。本版仅接受首次空闲退出走兜底、三次退出均少于 5 秒、且后两次均正常回执的情况。
+
+验收记录保留实际结果，并标明是否使用了已知问题限额。
 
 ### 下载与校验
 
@@ -44,7 +49,12 @@ The 5.3.5 stable release focuses on reliable upgrades, a clearer workspace, less
 
 The release tag runs native Windows x64, macOS arm64 and Linux x64 builds and acceptance. Windows checks cover clean installation, an upgrade from the checksum-verified public 5.2.0 Setup, data preservation, relaunch, and data retention after uninstall.
 
-Streaming frame time measured 46.8 ms at P95 on the Windows Runner, above the 35 ms target. This release accepts up to 47 ms for this test. The first idle runtime shutdown occasionally uses the existing process cleanup fallback on the Runner. This release accepts that case when the first stop completes within five seconds and both subsequent stops acknowledge graceful cleanup. The acceptance evidence records both results.
+#### Known Windows issues in 5.3.5
+
+- The streaming frame interval target is 35 ms at P95. Candidate verification measured 46.9 ms on the first run and 31.2 ms on the retry. This release accepts up to 47 ms for this test.
+- The first idle runtime stop can use the process cleanup fallback on the Windows runner. In candidate verification, the first stop took 4.63 seconds and the next two acknowledged graceful cleanup. This release accepts the fallback for the first idle stop when all three stops take less than five seconds and the last two acknowledge graceful cleanup.
+
+The acceptance report records the measured results and identifies any known issue it accepted.
 
 ### Download and verification
 

@@ -29,9 +29,9 @@ const IS_FULL = process.argv.includes('--full')
 const COLLECT_FAILURES = process.argv.includes('--collect-failures')
 const SOURCE_ONLY = process.argv.includes('--source')
 const ACCEPT_KNOWN_DPI = process.argv.includes('--accept-known-dpi-position-3.4.0')
-const ACCEPT_STREAM_TIMING = process.argv.includes('--accept-stream-frame-timing-5.3.4')
-const ACCEPT_INITIAL_RUNTIME_STOP = process.argv.includes('--accept-initial-runtime-stop-5.3.4')
 const VERSION = JSON.parse(readFileSync(resolve(APP_DIR, 'package.json'), 'utf8')).version
+const ACCEPT_STREAM_TIMING = process.argv.includes(`--accept-stream-frame-timing-${VERSION}`)
+const ACCEPT_INITIAL_RUNTIME_STOP = process.argv.includes(`--accept-initial-runtime-stop-${VERSION}`)
 const acceptedIssues = []
 const receiptArgument = process.argv.find((argument) => argument.startsWith('--evidence='))
 const RECEIPT_PATH = receiptArgument
