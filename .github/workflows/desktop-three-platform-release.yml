@@ -422,7 +422,8 @@ jobs:
           [[ "$PREFLIGHT_RUN_ID" =~ ^[1-9][0-9]*$ && "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           tag="desktop-v$RELEASE_VERSION"
           base="repos/$GITHUB_REPOSITORY"
-          export RELEASE_COMMIT="$(gh api "$base/commits/$tag" --jq .sha)"
+          RELEASE_COMMIT="$(gh api "$base/commits/$tag" --jq .sha)"
+          export RELEASE_COMMIT
           gh api "$base/actions/runs/$PREFLIGHT_RUN_ID" > release-preflight.json
           attempt="$(jq -er '.run_attempt | numbers' release-preflight.json)"
           gh api "$base/actions/runs/$PREFLIGHT_RUN_ID/attempts/$attempt/jobs?per_page=100" > release-preflight-jobs.json
