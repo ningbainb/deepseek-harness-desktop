@@ -61,7 +61,7 @@ jobs:
       - name: Check native installer cancellation before full verification
         run: node --test apps/dsh-desktop/test/installer-hardening-native.test.mjs
       - run: pnpm verify
-      - run: pnpm desktop:regression:e2e --source --collect-failures --accept-stream-frame-timing-5.3.5 --accept-initial-runtime-stop-5.3.5
+      - run: pnpm desktop:regression:e2e --source --collect-failures
       - name: Configure anonymous product metrics
         shell: pwsh
         env:
@@ -91,25 +91,31 @@ jobs:
           $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.0.0.json'
           New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
           gh release download desktop-v5.0.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.0.1'
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.0.1'
           $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.0.1.json'
           New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
           gh release download desktop-v5.0.1 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.0.1-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.1.0'
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.1.0'
           $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.1.0.json'
           New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
           gh release download desktop-v5.1.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.2.0'
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.2.0'
           $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.2.0.json'
           New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
           gh release download desktop-v5.2.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.2.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.3.5'
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.3.5'
+          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.3.5.json'
+          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
+          gh release download desktop-v5.3.5 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
       - name: Run packaged Windows regression
         shell: pwsh
         run: |
@@ -119,7 +125,7 @@ jobs:
           # The full suite checks the native layout variant of this fixture.
           pnpm --filter @linxin666/dsh-desktop test:directory-picker:e2e
           $env:DSH_DESKTOP_E2E_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/packaged-full.json'
-          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures --accept-stream-frame-timing-5.3.5 --accept-initial-runtime-stop-5.3.5
+          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify
       - run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/win-unpacked/resources --output apps/dsh-desktop/dist/office-runtime-verification
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke

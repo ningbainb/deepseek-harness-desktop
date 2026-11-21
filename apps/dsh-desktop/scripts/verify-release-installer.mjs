@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
-import { access, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, realpath, symlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
@@ -284,7 +284,8 @@ async function main() {
   const contained = relative(resolve(process.env.RUNNER_TEMP), installDirectory)
   assert.ok(contained && contained !== '..' && !contained.startsWith(`..${sep}`) && !isAbsolute(contained))
   try {
-    for (const scenario of ['fresh', 'previous-release-upgrade']) {
+    const scenarios = process.argv.includes('--upgrade-only') ? ['previous-release-upgrade'] : ['fresh', 'previous-release-upgrade']
+    for (const scenario of scenarios) {
       const userData = join(root, scenario, 'user-data')
       const dshHome = join(root, scenario, 'dsh-home')
       // Older installers expand through a MAX_PATH-limited temporary archive.
@@ -330,6 +331,13 @@ async function main() {
           modelFixture = await createInstalledUpgradeFixture()
           oldRuntimeState = await modelFixture.exercise({ appPath: executable, userData, dshHome,
             expectedVersion: previousVersion, phase: 'old-create', evidenceDirectory: stateEvidence })
+          if (previousVersion === '5.3.5') {
+            const redirectedHome = join(root, scenario, 'redirected-home')
+            await symlink(dshHome, redirectedHome, 'junction')
+            assert.equal(await realpath(redirectedHome), await realpath(dshHome))
+            setupEnvironment.DSH_HOME = redirectedHome
+            evidence.setupHomeJunction = true
+          }
         }
         const installCurrent = async () => {
           await install(currentInstaller, version)

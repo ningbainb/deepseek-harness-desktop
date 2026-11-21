@@ -1,51 +1,47 @@
-# DeepSeek Harness Desktop 5.3.5
+# DeepSeek Harness Desktop 5.3.6
 
 ## 中文
 
-5.3.5 正式版带来更稳妥的覆盖升级、更清晰的界面、更流畅的交互和更易管理的记忆，并适配官方 DSH RC5。
+5.3.6 修复了共享浏览器组件下载失败或数据目录使用目录联接时，Windows 安装和覆盖升级被中断的问题。
 
 ### 本次亮点
 
-- **稳定性。** Windows 覆盖安装沿用原程序目录和数据目录，保留已有会话与配置。共享浏览器已启用时，升级先准备所需组件，再替换程序。
-- **界面升级。** 会话侧栏聚焦会话与项目，拓展坞集中常用工具。插件沿用 DSH 的「已安装／发现」结构，创意工坊作为「发现」中的独立来源。模型、权限和个人偏好按用途归组。
-- **性能优化。** 长回复减少重复布局和绘制，列表与资源按需加载。Windows 安装减少跨盘搬运，共享浏览器运行时改为按需准备。
-- **记忆。** 在「个人偏好 → 记忆」集中查看、确认与删除本地记忆。支持全局、项目和会话范围，沿用已有记忆与启停选择。
-- **内核适配。** 随包使用官方 DSH `0.2.2-rc.5`。会话右侧「上下文」可查看当前上下文构成，保留 `/context` 命令。[官方 DSH RC5 发行说明](https://github.com/DeepSeek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.5)
+- **先安装，再准备浏览器。** 安装完成后可直接打开会话和项目。使用共享浏览器时才检查组件，已有且校验通过的组件会直接复用。
+- **保留原有数据。** 覆盖升级沿用已有程序目录和数据目录，保留会话、项目、模型配置、浏览器数据与动作权限。
+- **下载可重试。** Windows 在主下载源不可用时尝试备用源。下载后须通过相同的完整性校验才会启用。
 
 ### 验证
 
-三端构建与验证记录可在 GitHub Actions 查看。[发布工作流](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
+三端构建记录可在 GitHub Actions 查看。[发布工作流](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
 
 ### 下载与校验
 
-在 Release 资产中选择所在平台的安装包，用同一发行页的 `SHA256SUMS.txt` 校验。更新前正在运行的任务可先保存。共享浏览器第一次启用时需要准备独立组件，Office 保留在主包。
+安装包与 `SHA256SUMS.txt` 均在本发行页。5.3.5 如果在应用内更新时卡在浏览器准备，下载本版安装包覆盖安装即可。
 
 ### 说明
 
-DeepSeek Harness Desktop 是社区维护的开源桌面应用。macOS arm64（macOS 13+）和 Linux x64 仍为 Preview。签名状态、文件大小与校验信息见同一发行页的 `release-manifest.json`。
+继续使用官方 DSH `0.2.2-rc.5`。macOS arm64（macOS 13+）和 Linux x64 为 Preview。签名与文件信息见 `release-manifest.json`。
 
 [项目官网](https://1521003.xyz/) · [QQ 二群（1129522514）](https://qm.qq.com/q/9hrcdaEYPC)
 
 ## English
 
-The 5.3.5 stable release focuses on reliable upgrades, a clearer workspace, less work during everyday interactions, easier memory management, and compatibility with the official DSH RC5 runtime.
+5.3.6 fixes a Windows installation and upgrade failure that occurred when the Shared Browser component could not download or the existing data directory used a junction.
 
 ### Highlights
 
-- **Stability.** Windows in-place upgrades retain the existing installation and data directories, conversations and configuration. If Shared Browser is enabled, its required component is prepared before the installer replaces the application.
-- **Interface.** The conversation sidebar focuses on chats and projects, with desktop tools in the Extension Dock. The DSH plugin interface organizes installed plugins and discovery, with Community Workshop as a discovery source. Model settings, permissions and personal preferences are grouped by purpose.
-- **Performance.** Long replies require fewer redundant layout and paint passes. Lists and resources load when needed, Windows installation reduces cross-drive copies, and the Shared Browser runtime is prepared on demand.
-- **Memory.** Personal Preferences now brings local memory review, confirmation and deletion together. Existing memories and enablement choices carry forward, with global, project and session scopes.
-- **Runtime.** Includes official DSH `0.2.2-rc.5`. Open Context beside a conversation to inspect its context, or use `/context`. [Official DSH RC5 release notes](https://github.com/DeepSeek-ai/deepseek-harness/releases/tag/dsh-v0.2.2-rc.5)
+- **Install first.** Conversations and projects are available after installation. Shared Browser checks its component on first use and reuses an existing component that passes verification.
+- **Keep your data.** In-place upgrades preserve the existing installation and data locations, conversations, projects, model configuration, browser data, and permissions.
+- **Retry the download.** Windows can try a fallback source. Both sources must pass the same integrity checks before the component is activated.
 
 ### Verification
 
-Build and verification results for all three platforms are available on GitHub Actions. [Release workflow](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
+Build records are available in GitHub Actions. [Release workflow](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
 
 ### Download and verification
 
-Choose your platform's installer under Assets and compare it with `SHA256SUMS.txt` from this release. Shared Browser prepares a separate component on first use. Office remains part of the base installer.
+If 5.3.5 gets stuck preparing Shared Browser during an in-app update, run this release's installer over the existing installation. Verify the download with `SHA256SUMS.txt`.
 
 ### Notice
 
-DeepSeek Harness Desktop is an open-source community project. macOS arm64 (macOS 13+) and Linux x64 remain previews. See `release-manifest.json` for signature status, file sizes and checksums.
+Includes official DSH `0.2.2-rc.5`. macOS arm64 (macOS 13+) and Linux x64 remain previews. See `release-manifest.json` for signing status and file details.

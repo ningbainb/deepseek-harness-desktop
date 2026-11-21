@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "5.3.5",
+  "desktopVersion": "5.3.6",
   "upstreamVersion": "0.2.2-rc.5",
   "lockfileSha256": "afaab805bfff8055ea34407cf07f7131df5ec9935ac07fde432dac001787ed96",
   "policy": {
@@ -6400,7 +6400,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-release-installer.mjs",
-      "line": 293,
+      "line": 294,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/scripts/verify-release-installer.mjs",
+      "line": 338,
       "operation": "DSH_HOME"
     },
     {

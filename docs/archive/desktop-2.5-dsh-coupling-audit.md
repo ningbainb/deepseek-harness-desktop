@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.3.5.
+Authoritative Desktop version: 5.3.6.
 
 Stable DSH package version: 0.2.2-rc.5.
 
@@ -790,7 +790,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-profile-migration.mjs | 202 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-profile-migration.mjs | 245 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-proxy-routing.mjs | 91 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-release-installer.mjs | 293 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-release-installer.mjs | 294 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-release-installer.mjs | 338 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 12 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 160 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-release-plugins.mjs | 315 | DSH_HOME |

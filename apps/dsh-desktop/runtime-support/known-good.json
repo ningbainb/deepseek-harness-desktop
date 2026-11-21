@@ -10,8 +10,8 @@
     "clientSlotScan": "scripts/audit-dsh-coupling.mjs"
   },
   "desktop": {
-    "version": "5.3.5",
-    "rootVersion": "5.3.5",
+    "version": "5.3.6",
+    "rootVersion": "5.3.6",
     "nodeEngine": ">=24.9.0",
     "packageManager": "pnpm@11.22.0"
   },
