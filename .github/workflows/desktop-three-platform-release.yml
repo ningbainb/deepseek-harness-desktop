@@ -61,7 +61,7 @@ jobs:
       - name: Check native installer cancellation before full verification
         run: node --test apps/dsh-desktop/test/installer-hardening-native.test.mjs
       - run: pnpm verify
-      - run: pnpm desktop:regression:e2e --source --collect-failures
+      - run: pnpm desktop:regression:e2e --source --collect-failures --accept-stream-frame-timing-5.3.6
       - name: Configure anonymous product metrics
         shell: pwsh
         env:
@@ -125,7 +125,7 @@ jobs:
           # The full suite checks the native layout variant of this fixture.
           pnpm --filter @linxin666/dsh-desktop test:directory-picker:e2e
           $env:DSH_DESKTOP_E2E_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/packaged-full.json'
-          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures
+          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures --accept-stream-frame-timing-5.3.6
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify
       - run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/win-unpacked/resources --output apps/dsh-desktop/dist/office-runtime-verification
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke

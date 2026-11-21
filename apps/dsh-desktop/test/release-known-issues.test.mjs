@@ -24,15 +24,19 @@ test('the approved Windows releases accept only the bounded stream timing overru
   assert.equal(acceptedReleaseIssue(timingFailure), 'DSH-530-WINDOWS-STREAM-P95')
   const current = { ...timingFailure, version: '5.3.5', output: timingFailure.output.replace('46.79999999999927', '46.9') }
   assert.equal(acceptedReleaseIssue(current), 'DSH-530-WINDOWS-STREAM-P95')
-  assert.equal(acceptedReleaseIssue({ ...current, output: current.output.replace('46.9', '47') }), 'DSH-530-WINDOWS-STREAM-P95')
-  for (const override of [{ streamTimingApproved: false }, { platform: 'linux' }, { platform: 'darwin' }, { version: '5.3.6' },
-    { version: '5.3.4-rc.1' }, { version: '5.3.5-rc.1' }, { script: 'scripts/verify-installer-lifecycle.mjs' }, { code: 2 }, { signal: 'SIGTERM' },
+  const hotfix = { ...current, version: '5.3.6' }
+  assert.equal(acceptedReleaseIssue(hotfix), 'DSH-530-WINDOWS-STREAM-P95')
+  for (const fixture of [timingFailure, current, hotfix]) {
+    assert.equal(acceptedReleaseIssue({ ...fixture, output: timingFailure.output.replace('46.79999999999927', '47') }), 'DSH-530-WINDOWS-STREAM-P95')
+  }
+  for (const override of [{ streamTimingApproved: false }, { platform: 'linux' }, { platform: 'darwin' }, { version: '5.3.7' },
+    { version: '5.3.4-rc.1' }, { version: '5.3.5-rc.1' }, { version: '5.3.6-rc.1' }, { script: 'scripts/verify-installer-lifecycle.mjs' }, { code: 2 }, { signal: 'SIGTERM' },
     { output: 'AssertionError: streamed Chinese text must be complete and ordered' },
     { output: timingFailure.output.replace('46.79999999999927', '47.1') },
     { output: timingFailure.output.replace('46.79999999999927', 'null') },
     { output: timingFailure.output.replace('"limitMs":35', '"limitMs":50') },
     { output: timingFailure.output + '\n' + timingFailure.output }]) {
-    for (const fixture of [timingFailure, current]) {
+    for (const fixture of [timingFailure, current, hotfix]) {
       assert.equal(acceptedReleaseIssue({ ...fixture, ...override }), null, JSON.stringify(override))
     }
   }

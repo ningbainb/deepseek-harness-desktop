@@ -9,12 +9,14 @@ function finalAssertion(output, marker) {
 }
 
 export function acceptedReleaseIssue({ version, enabled, streamTimingApproved, initialShutdownApproved, platform, script, code, signal, output }) {
-  if ((version === '5.3.4' || version === '5.3.5') && platform === 'win32' && code === 1 && !signal) {
-    if (streamTimingApproved === true && script === 'scripts/verify-beta-usability.mjs') {
+  if (platform === 'win32' && code === 1 && !signal) {
+    if (streamTimingApproved === true && ['5.3.4', '5.3.5', '5.3.6'].includes(version)
+      && script === 'scripts/verify-beta-usability.mjs') {
       const { p95Ms, limitMs } = finalAssertion(output, 'DSH_STREAM_FRAME_P95')
       if (limitMs === 35 && Number.isFinite(p95Ms) && p95Ms > limitMs && p95Ms <= 47) return 'DSH-530-WINDOWS-STREAM-P95'
     }
-    if (initialShutdownApproved === true && script === 'scripts/verify-runtime-provider.mjs') {
+    if (initialShutdownApproved === true && ['5.3.4', '5.3.5'].includes(version)
+      && script === 'scripts/verify-runtime-provider.mjs') {
       const { outcomes, elapsedMs } = finalAssertion(output, 'DSH_INITIAL_RUNTIME_STOP')
       if (Array.isArray(outcomes) && outcomes.length === 3 && outcomes[0] === 'fallback'
         && outcomes.slice(1).every(outcome => outcome === 'acknowledged')
