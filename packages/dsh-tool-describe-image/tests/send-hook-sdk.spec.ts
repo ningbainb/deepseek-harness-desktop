@@ -47,7 +47,7 @@ describe('published SDK image admission', () => {
     const ctx = new Context()
     const upload = vi.fn(async () => ({ ok: true, value: { receiptId: 'receipt', file: { attachmentId: 'file-ref', bytes: 4, name: 'notes.txt' } } }))
     ctx.provide('fileUpload', { upload })
-    const controller = new Constructor(ctx, { input: {} as never, blocks: {} as never, maxConcurrentFileUploads: 1 })
+    const controller = new Constructor(ctx, { input: {} as never, blocks: {} as never, maxConcurrentFileUploads: { getSnapshot: () => 1, subscribe: () => () => {} } })
     const drafts = controller.createDrafts('session' as never, [
       new File(['ABC'], 'x.png', { type: 'image/png' }),
       ...withFile ? [new File(['text'], 'notes.txt', { type: 'text/plain' })] : [],

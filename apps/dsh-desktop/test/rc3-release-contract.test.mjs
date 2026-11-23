@@ -7,12 +7,12 @@ import { parse } from 'yaml'
 const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)))
 const rootManifest = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url)))
 
-test('next Desktop has an unambiguous candidate version and exact official rc.5 core', () => {
+test('next Desktop has an unambiguous candidate version and exact official Alpha.2 core', () => {
   assert.equal(manifest.version, '5.3.6')
   assert.equal(rootManifest.version, manifest.version)
-  assert.equal(manifest.dependencies['@deepseek-ai/dsh'], '0.2.2-rc.5')
-  assert.equal(manifest.dependencies['@deepseek-ai/dsh-web-app'], '0.2.2-rc.5')
-  assert.equal(manifest.dependencies['@deepseek-ai/cordis'], '4.1.0')
+  assert.equal(manifest.dependencies['@deepseek-ai/dsh'], '0.2.3-alpha.2')
+  assert.equal(manifest.dependencies['@deepseek-ai/dsh-web-app'], '0.2.3-alpha.2')
+  assert.equal(manifest.dependencies['@deepseek-ai/cordis'], '4.2.0-alpha.1')
 })
 
 test('retired team profile migrates its switch and never returns on repeated composition', () => {

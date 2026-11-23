@@ -36,7 +36,7 @@ export function createDesktopFrontendFetch({ dist, authorizeIndex, renderIndex, 
     }
     return operation
   }
-  return async request => {
+  return async (request, peer) => {
     if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('method not allowed', { status: 405 })
     const { pathname } = new URL(request.url)
     let filePath = pathname === '/' ? indexPath : safeFrontendPath(root, pathname)
@@ -53,7 +53,7 @@ export function createDesktopFrontendFetch({ dist, authorizeIndex, renderIndex, 
     if (isIndex) {
       const authorizationResponse = await authorizeIndex(request)
       if (authorizationResponse !== undefined) return authorizationResponse
-      body = Buffer.from(renderIndex(body.toString('utf8').replace('</head>', `${bootstrap}</head>`)))
+      body = Buffer.from(renderIndex(body.toString('utf8').replace('</head>', `${bootstrap}</head>`), peer))
     }
     return new Response(request.method === 'HEAD' ? null : body, {
       status: 200,

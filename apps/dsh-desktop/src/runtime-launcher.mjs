@@ -27,7 +27,7 @@ import {
   RUNTIME_PIPE_READY_LINE,
   RUNTIME_PIPE_TOKEN_ENV,
 } from './runtime-pipe.mjs'
-import { createDesktopPipeSessionCookie, mergeDesktopPipeCookies, openDesktopPipeWebSocket } from './runtime-cookie.mjs'
+import { createDesktopPipeSessionCookie, installLegacyConnectionAdmission, mergeDesktopPipeCookies, openDesktopPipeWebSocket } from './runtime-cookie.mjs'
 import { desktopLocalPath } from './desktop-remote-path.mjs'
 import { consumeRuntimeShutdownControl, listenRuntimeShutdownControl } from './runtime-shutdown-control.mjs'
 import { createRuntimeEventStreamDrain } from './runtime-stream-drain.mjs'
@@ -96,9 +96,10 @@ function createDesktopPipeFetch(ctx, accountCallbackOrigin, sessionCookie) {
   const frontendFetch = createDesktopFrontendFetch({
     dist: resolveFrontendDist(),
     authorizeIndex: request => ctx.webServer.authorizeIndex(request),
-    renderIndex: html => ctx.webServer.renderIndex(html, ctx.connection.browserPeer),
+    renderIndex: (html, peer) => ctx.webServer.renderIndex(html, peer ?? ctx.connection.browserPeer),
     bootstrap: `<script>${transportBootstrapScript({ accountCallbackOrigin })}</script>`,
   })
+  ctx.effect(() => ctx.webServer.registerFallback({ resource: frontendFetch }), 'desktop: private frontend resources')
   return async (sourceRequest) => {
     const headers = new Headers(sourceRequest.headers)
     const sourceCookie = headers.get('cookie')
@@ -229,6 +230,7 @@ async function run() {
     startedBundles: profile.layers.map(layer => layer.packageName),
     cwd: process.cwd(),
     home: dshHome,
+    overlayPaths: invocation.patchFiles.map(path => resolve(path)),
     overlays: invocation.patchFiles.flatMap(path => loadOverlayPatches(NAME, resolve(path))),
     telemetryDisabledEnv: process.env.DSH_TELEMETRY_DISABLED,
   }
@@ -271,7 +273,6 @@ async function run() {
       { profileName: invocation.profile, enableWorkshop: true, userPatches: [
         ...current.patches,
         ...(loadOptionalPatches(NAME, homePatchPath) ?? []),
-        ...profileContext.overlays,
       ] },
     )
     const mapped = adaptDesktopClientHmrPatches(raw, {
@@ -333,6 +334,7 @@ async function run() {
       hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
       await hostCtx.plugin(PluginPackages, { resolution })
       if (invocation.profile === 'desktop') installDesktopWorkshopInventory(hostCtx, profile.dir)
+      installLegacyConnectionAdmission(hostCtx)
       installDesktopSubagentListCompatibility(hostCtx)
       installDesktopMarketTeamCompatibility(hostCtx)
       installDesktopProfileComposition(hostCtx, {

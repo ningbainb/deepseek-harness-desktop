@@ -660,7 +660,7 @@
       "e2eScript": "scripts/verify-runtime-provider.mjs",
       "features": [
         "official-dsh-runtime-exact-pin",
-        "official-dsh-0.2.2-rc.5-with-aligned-cordis-and-schema-sdk-cohort",
+        "official-dsh-0.2.3-alpha.2-with-aligned-cordis-and-schema-sdk-cohort",
         "official-agent-default-and-repair-reasoning-effort-preserved",
         "async-session-projection-lifecycle-and-batched-mobile-updates",
         "native-tool-executor-real-sdk-batch-coverage",
@@ -1087,6 +1087,7 @@
         "explicit-native-opt-in-before-lan-listen",
         "exact-private-ipv4-bind-never-all-interfaces",
         "authenticated-pipe-runtime-remains-default",
+        "official-alpha-token-exchange-and-resource-routes-use-the-private-pipe",
         "full-api-and-local-admin-routes-denied",
         "persistent-disable-and-clean-listener-stop"
       ]

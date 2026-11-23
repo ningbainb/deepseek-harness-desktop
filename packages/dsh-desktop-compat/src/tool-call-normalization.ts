@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { GenerateOptions, StreamChunk, ToolSchema } from '@deepseek-ai/dsh-llm'
-import type { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
+import type { GenerateOptions, StreamChunk, ToolCallId, ToolSchema } from '@deepseek-ai/dsh-llm'
 import { validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
 
 /**

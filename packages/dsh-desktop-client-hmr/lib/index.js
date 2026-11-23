@@ -108,7 +108,8 @@ const name = "desktop-client-hmr";
 const inject = [
 	"clientModules",
 	"webServer",
-	"connection"
+	"connection",
+	"connection.authentication"
 ];
 const Config = z.object({ pollIntervalMs: z.number().step(1).min(1).default(500).volatile() });
 const EVENTS_ENDPOINT = "/plugins/events";
@@ -201,7 +202,8 @@ function eventChannel(registry, connection, webServer) {
 			}
 			let rejection;
 			try {
-				rejection = connection.requestRejection(request);
+				const admission = connection.admit(request);
+				rejection = "rejection" in admission ? admission.rejection : void 0;
 			} catch {
 				rejection = 503;
 			}

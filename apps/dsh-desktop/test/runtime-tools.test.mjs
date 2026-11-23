@@ -35,7 +35,7 @@ test('bundled pnpm starts from a Unicode Windows install for a legacy command co
   const directory = await ensurePnpmCommandShim({ directory: join(root, 'runtime-bin'), executable: process.execPath, pnpmCli: cli })
   // Use ASCII commands in a fresh shell, matching a Runtime with an OEM code page.
   const { stdout } = await promisify(execFile)(process.env.ComSpec || 'cmd.exe', ['/d', '/c',
-    'chcp 437 >nul & pnpm.cmd view "fixture package" --json'], { cwd: directory, windowsHide: true }).then(
+    'chcp 437 >nul & .\\pnpm.cmd view "fixture package" --json'], { cwd: directory, windowsHide: true }).then(
     () => assert.fail('pnpm exit status was lost'),
     error => { assert.equal(error.code, 7, error.stderr); return error },
   )

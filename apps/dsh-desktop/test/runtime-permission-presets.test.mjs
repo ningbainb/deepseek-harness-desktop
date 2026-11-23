@@ -154,7 +154,7 @@ test('official permission form preserves SDK identity through live reload and a 
   const installAnchor = require.resolve('@deepseek-ai/dsh/package.json')
   const profileContext = {
     name: 'permission-configuration-fixture', dir: profileDir, home: directory,
-    patchPath, installAnchor, startedBundles: [], overlays: [],
+    patchPath, installAnchor, startedBundles: [], overlayPaths: [], overlays: [],
   }
   const adapterUrl = new URL('../src/runtime-permission-presets.mjs', import.meta.url).href
   const start = async sandbox => {

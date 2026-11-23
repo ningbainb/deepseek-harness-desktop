@@ -55,12 +55,15 @@ export async function resolveOfficeRuntime(resources) {
  const dshPath = appRequire.resolve('@deepseek-ai/dsh/package.json')
  await verifyLocation(dshPath)
  const dshRequire = createRequire(dshPath)
- const officePath = dshRequire.resolve('@deepseek-ai/dsh-office-kit/package.json'), officeRequire = createRequire(officePath)
+ const webAppPath = dshRequire.resolve('@deepseek-ai/dsh-web-app/package.json')
+ await verifyLocation(webAppPath)
+ const webAppRequire = createRequire(webAppPath)
+ const officePath = webAppRequire.resolve('@deepseek-ai/dsh-office-kit/package.json'), officeRequire = createRequire(officePath)
  const kitPath = officeRequire.resolve('@deepseek-ai/libreoffice-kit/package.json'), kitRequire = createRequire(kitPath)
  await verifyLocation(officePath); await verifyLocation(kitPath)
  const cordisPath = officeRequire.resolve('@deepseek-ai/cordis/package.json'); await verifyLocation(cordisPath)
  const officeManifest = JSON.parse(await readFile(officePath, 'utf8')), kitManifest = JSON.parse(await readFile(kitPath, 'utf8'))
- assert.equal(officeManifest.version, '0.2.2-rc.5', 'smoke must use the actual rc5 Office service')
+ assert.equal(officeManifest.version, '0.2.3-alpha.2', 'smoke must use the actual Alpha.2 Office service')
  assert.equal(kitManifest.version, '0.2.3', 'smoke must use the selected official engine cohort')
  return { officePath, kitPath, officeManifest, kitManifest,
   office: await import(pathToFileURL(officeRequire.resolve('@deepseek-ai/dsh-office-kit')).href),

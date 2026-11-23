@@ -47,7 +47,7 @@ export function apply(ctx, config) { ctx.provide('configurationFixtureOwner', { 
   const profile = loadProfileDirectory('configuration-fixture', profileDir, installAnchor)
   assert.equal(profile.layers.length, 0)
   const profileContext = { name: 'fixture', dir: profileDir, home: directory, patchPath, installAnchor,
-    startedBundles: [], overlays: [] }
+    startedBundles: [], overlayPaths: [], overlays: [] }
   const guard = createDesktopConfigurationGuard()
   const mapped = raw => {
     const result = adaptDesktopClientHmrPatches(raw, { enabled: true })

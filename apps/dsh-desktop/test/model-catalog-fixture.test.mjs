@@ -10,7 +10,8 @@ const adapterEntry = baseRequire.resolve('@deepseek-ai/dsh-llm-deepseek-api-key'
 const adapterRequire = createRequire(adapterEntry)
 const deepseek = await import(pathToFileURL(adapterEntry).href)
 const { Context } = await import(pathToFileURL(adapterRequire.resolve('@deepseek-ai/cordis')).href)
-const { ModelListingCache } = await import(pathToFileURL(adapterRequire.resolve('@deepseek-ai/dsh-llm-deepseek')).href)
+const { default: DeepSeekAuth } = await import(pathToFileURL(adapterRequire.resolve('@deepseek-ai/dsh-deepseek-auth')).href)
+const { ModelListingCache, plainOptions, resolveAdapterOptions } = await import(pathToFileURL(adapterRequire.resolve('@deepseek-ai/dsh-llm-deepseek')).href)
 
 async function discoverDeepseekModels(context, fixture, withCredential = true) {
   const offlineFetch = context.mock.method(globalThis, 'fetch', () => { throw new Error('fixture catalog discovery must stay offline') })
@@ -22,6 +23,7 @@ async function discoverDeepseekModels(context, fixture, withCredential = true) {
     ? undefined : { value: environment[reference], source: 'env' } }
   const ctx = new Context()
   ctx.provide('credentials', credentials)
+  await ctx.plugin(DeepSeekAuth)
   ctx.provide('llm', {
     registerConfigurableProviders: () => {},
     registerAdapter: (providers, registered) => {
@@ -31,24 +33,28 @@ async function discoverDeepseekModels(context, fixture, withCredential = true) {
     },
   })
   let activated = false
+  let adapterFiber
   try {
-    deepseek.apply(ctx, deepseek.Config(fixture.settings['llm-deepseek'] ?? {}))
+    adapterFiber = await ctx.plugin(deepseek, fixture.settings['llm-deepseek'] ?? {})
+    await adapterFiber.await()
     activated = true
     assert.equal(disposal.mock.callCount(), 0, 'Keep the real listing cache alive until discovery settles')
     return await adapter.listModels('deepseek-official')
   } finally {
-    await ctx.fiber.dispose()
     if (activated) {
+      await adapterFiber.dispose()
       assert.equal(disposal.mock.callCount(), 1, 'Real Context teardown must execute the SDK listing disposer')
       const listing = disposal.mock.calls[0].this
       assert.ok(listing instanceof ModelListingCache)
       const before = listing.current()
-      await ctx.fiber.dispose()
+      await adapterFiber.dispose()
       assert.equal(disposal.mock.callCount(), 1, 'Repeated teardown must not replay the disposer')
-      assert.deepEqual(await listing.view({ url: 'http://127.0.0.1:9/models', timeoutMs: 100, maxAgeMs: 0 }), before,
+      await assert.rejects(listing.view({ url: 'http://127.0.0.1:9/models', timeoutMs: 100, maxAgeMs: 0 }), /inactive context/u)
+      assert.deepEqual(listing.current(), before,
         'A disposed cache must not load or change its last published view')
       assert.equal(offlineFetch.mock.callCount(), 0, 'Discovery and post-disposal access must remain offline')
     }
+    await ctx.fiber.dispose()
   }
 }
 
@@ -94,8 +100,8 @@ test('model-preference fixture retains relay and supplies an isolated DeepSeek c
 test('the official API-key schema accepts the fixture reference and loopback endpoint', () => {
   const fixture = createModelPreferencesFixture()
   const config = deepseek.Config(fixture.settings['llm-deepseek'] ?? {})
-  const options = deepseek.resolveAdapterOptions(deepseek.plainOptions(config), { get: () => undefined })
-  assert.equal(options.apiKeyEnv, 'DSH_MODEL_PREFS_DEEPSEEK_KEY')
+  const options = resolveAdapterOptions(plainOptions(config), { get: () => undefined })
+  assert.equal(config.apiKeyEnv.get(), 'DSH_MODEL_PREFS_DEEPSEEK_KEY')
   assert.equal(options.baseURL, 'http://127.0.0.1:9/anthropic')
   assert.ok(options.models.length > 0)
   assert.equal(Object.hasOwn(fixture.settings['llm-deepseek'] ?? {}, 'apiKey'), false)

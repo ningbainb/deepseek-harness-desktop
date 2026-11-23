@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict'
+﻿import assert from 'node:assert/strict'
 import test from 'node:test'
 import { composeEntries } from '@deepseek-ai/dsh-app-boot'
 import * as clientHmr from '../src/runtime-client-hmr.mjs'
@@ -179,25 +179,26 @@ test('failed group inserts do not introduce targets for later config mapping', (
   assert.match(diagnostics[1], /not found/u)
 })
 
-test('replacing group config does not reindex new children when a later guard targets an old child', () => {
+test('group replacement follows the current SDK child identity and leaves old name guards rejected', () => {
   const business = [{ id: 'client-hmr', name: official }]
   const source = [
     { insert: [{ id: 'client-hmr', name: official },
       { id: 'outer', group: true, config: [{ id: 'inner', name: 'cordis:group', group: true, config: [] }] }] },
     { id: 'client-hmr', name: desktop },
     { id: 'outer', config: [{ id: 'inner', name: '@community/plugin', config: business }] },
+    { id: 'inner', name: 'cordis:group', disabled: true },
     { id: 'inner', name: '@community/plugin', group: true, config: business },
   ]
   const adapted = adaptDesktopClientHmrPatches(source)
   const diagnostics = []
   const entries = composeEntries(adapted, message => diagnostics.push(message))
-  assert.deepEqual(adapted[3].config, business)
-  assert.deepEqual(entries[1].config, [{ id: 'inner', name: '@community/plugin', config: business }])
+  assert.deepEqual(adapted[2].config, source[2].config)
+  assert.deepEqual(entries[1].config, [{ id: 'inner', name: '@community/plugin', group: true, config: [{ id: 'client-hmr', name: desktop }] }])
   assert.equal(diagnostics.length, 1)
   assert.match(diagnostics[0], /name mismatch/u)
 })
 
-test('new children in a group config replacement do not supply group inheritance to subsequent patches', () => {
+test('new children in a group config replacement supply group inheritance to subsequent patches', () => {
   const business = [{ id: 'client-hmr', name: official }]
   const source = [
     { insert: [{ id: 'client-hmr', name: official },
@@ -208,6 +209,6 @@ test('new children in a group config replacement do not supply group inheritance
   ]
   const adapted = adaptDesktopClientHmrPatches(source)
   const entries = composeEntries(adapted)
-  assert.deepEqual(adapted[3].config, business)
-  assert.deepEqual(entries[1].config, [{ id: 'inner', name: 'cordis:group', group: true, config: [] }])
+  assert.deepEqual(adapted[3].config, [{ id: 'client-hmr', name: desktop }])
+  assert.deepEqual(entries[1].config, [{ id: 'inner', name: 'cordis:group', group: true, config: adapted[3].config }])
 })

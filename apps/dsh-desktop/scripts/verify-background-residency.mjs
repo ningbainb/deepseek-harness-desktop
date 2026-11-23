@@ -140,7 +140,7 @@ async function verifyHiddenRuntime(previous) {
     return { status: response.status, body: await response.json() }
   })
   assert.equal(response.status, 200)
-  assert.equal(response.body.result.ok, true)
+  assert.equal(response.body.result.ok, true, JSON.stringify(response.body.result.error))
   assert.equal((await windowState()).destroyed, false)
 }
 

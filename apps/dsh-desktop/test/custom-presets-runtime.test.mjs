@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
+import SessionProjections from '@deepseek-ai/dsh-session-projection'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import * as SubagentListCompatibility from '../src/runtime-subagent-list-compat.mjs'
@@ -18,6 +19,7 @@ async function createToolContext() {
   const ctx = new Context()
   const promptRoot = resolveRuntimePackages().get('@deepseek-ai/dsh-system-prompt')
   const { default: SystemPrompt } = await import(pathToFileURL(join(promptRoot, 'lib', 'index.js')).href)
+  await ctx.plugin(SessionProjections)
   await ctx.plugin(SystemPrompt)
   await ctx.plugin(ToolRuntime)
   return ctx

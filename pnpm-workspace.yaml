@@ -19,26 +19,26 @@ peerDependencyRules:
 # Desktop resolves the aggregate and Desktop-owned plugin fixes from this
 # workspace so the built bundles are the same ones the runtime loads.
 overrides:
-  '@deepseek-ai/cordis': '4.1.0'
-  '@deepseek-ai/cordis-plugin-group': '1.1.0'
-  '@deepseek-ai/cordis-plugin-hmr': '1.1.0'
-  '@deepseek-ai/cordis-plugin-include': '1.1.0'
-  '@deepseek-ai/cordis-plugin-loader': '1.1.0'
-  '@deepseek-ai/cordis-plugin-timer': '1.2.0'
+  '@deepseek-ai/cordis': '4.2.0-alpha.1'
+  '@deepseek-ai/cordis-plugin-group': '1.2.0-alpha.1'
+  '@deepseek-ai/cordis-plugin-hmr': '1.2.0-alpha.1'
+  '@deepseek-ai/cordis-plugin-include': '1.2.0-alpha.1'
+  '@deepseek-ai/cordis-plugin-loader': '1.2.0-alpha.1'
+  '@deepseek-ai/cordis-plugin-timer': '1.3.0-alpha.1'
   'dsh-builtin-browser>electron': '44.7.0'
   '@local/dsh-prompt-pilot>zod': '4.5.4'
-  'dsh-agent-plugins-market>@deepseek-ai/dsh-atomic-write': '0.2.2-rc.5'
-  'dsh-agent-plugins-market>@deepseek-ai/dsh-home-paths': '0.2.2-rc.5'
-  'dsh-agent-plugins-market>@deepseek-ai/dsh-hook-protocol': '0.2.2-rc.5'
-  'dsh-agent-plugins-market>@deepseek-ai/dsh-lsp': '0.2.2-rc.5'
-  'dsh-agent-plugins-market>@deepseek-ai/dsh-lsp-stdio': '0.2.2-rc.5'
-  'dsh-agent-plugins-market>@deepseek-ai/dsh-tool-lsp': '0.2.2-rc.5'
-  '@deepseek-ai/schemastery': '3.19.0'
-  '@deepseek-ai/dsh-client-ui-theme': '0.2.2-rc.5'
+  'dsh-agent-plugins-market>@deepseek-ai/dsh-atomic-write': '0.2.3-alpha.2'
+  'dsh-agent-plugins-market>@deepseek-ai/dsh-home-paths': '0.2.3-alpha.2'
+  'dsh-agent-plugins-market>@deepseek-ai/dsh-hook-protocol': '0.2.3-alpha.2'
+  'dsh-agent-plugins-market>@deepseek-ai/dsh-lsp': '0.2.3-alpha.2'
+  'dsh-agent-plugins-market>@deepseek-ai/dsh-lsp-stdio': '0.2.3-alpha.2'
+  'dsh-agent-plugins-market>@deepseek-ai/dsh-tool-lsp': '0.2.3-alpha.2'
+  '@deepseek-ai/schemastery': '3.20.0-alpha.1'
+  '@deepseek-ai/dsh-client-ui-theme': '0.2.3-alpha.2'
   # DSH projection contracts expose Zod types across package boundaries. Keep
   # the compatible ^4.4.3 range on one reviewed identity instead of allowing a
   # later registry publish to split plugin and Runtime type identities.
-  'zod@^4.4.3': '4.5.4'
+  'zod@^4.4.3': '4.6.6'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-plugin-manager': '0.4.4'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-skill-explorer': '0.4.4'
   '@linxin666/dsh-web-ui-all>@linxin666/dsh-client-ui-community-plugins': '0.4.4'
@@ -312,6 +312,43 @@ packageExtensions:
     peerDependencies:
       react: '^18.2.0'
       react-dom: '^18.2.0'
+
+  '@deepseek-ai/dsh-client-store@0.2.3-alpha.2':
+    dependencies:
+      immer: '^10.1.1'
+      zustand: '~4.5.7'
+
+  '@deepseek-ai/dsh-client-ui-primitives@0.2.3-alpha.2':
+    dependencies:
+      '@shikijs/langs': '^4.4.3'
+      '@deepseek-ai/dsh-client-store': '0.2.3-alpha.2'
+      '@deepseek-ai/dsh-util-code-language': '0.2.3-alpha.2'
+      '@deepseek-ai/dsh-util-workspace-path': '0.2.3-alpha.2'
+      anser: '^2.3.5'
+      clsx: '^2.0.0'
+      diff: '^9.0.0'
+      katex: '^0.18.7'
+      mdast-util-from-markdown: '^2.0.3'
+      mdast-util-gfm: '^3.1.0'
+      mdast-util-math: '^3.0.0'
+      micromark-core-commonmark: '^2.0.3'
+      micromark-extension-gfm: '^3.0.0'
+      micromark-extension-math: '^3.1.0'
+      micromark-factory-space: '^2.0.1'
+      micromark-util-character: '^2.1.1'
+      micromark-util-classify-character: '^2.0.1'
+      micromark-util-decode-string: '^2.0.1'
+      micromark-util-sanitize-uri: '^2.0.1'
+      micromark-util-symbol: '^2.0.1'
+      shiki: '^4.4.3'
+      simple-icons: '16.31.0'
+    peerDependencies:
+      react: '^18.2.0'
+      react-dom: '^18.2.0'
+
+  '@deepseek-ai/dsh-cmdline@0.2.3-alpha.2':
+    dependencies:
+      commander: '^15.0.0'
 
 allowBuilds:
   # The cloudflared postinstall downloads the platform binary (the auto-tunnel

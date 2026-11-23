@@ -26,9 +26,14 @@ test('explicit Desktop background opt-in exposes the durable Task Board Host sch
       environmentProvider: () => ({ DSH_DESKTOP_BACKGROUND_AUTOMATION: '1' }),
     })
     const url = await controller.start()
+    const exchange = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(5_000) })
+    assert.equal(exchange.status, 303)
+    const cookie = exchange.headers.get('set-cookie')?.split(';', 1)[0]
+    assert.ok(cookie, 'the official browser session is required for the scheduler route')
     let status
     for (let attempt = 0; attempt < 50; attempt += 1) {
       const response = await fetch(new URL('/api/dsh-task-board/scheduler', url), {
+        headers: { cookie },
         signal: AbortSignal.timeout(5_000),
       })
       assert.equal(response.ok, true)
@@ -71,7 +76,12 @@ test('Desktop defaults to the browser scheduler when background automation was n
       logStore: logs,
     })
     const url = await controller.start()
+    const exchange = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(5_000) })
+    assert.equal(exchange.status, 303)
+    const cookie = exchange.headers.get('set-cookie')?.split(';', 1)[0]
+    assert.ok(cookie, 'the official browser session is required for the scheduler route')
     const response = await fetch(new URL('/api/dsh-task-board/scheduler', url), {
+      headers: { cookie },
       signal: AbortSignal.timeout(5_000),
     })
     assert.equal(response.ok, true)

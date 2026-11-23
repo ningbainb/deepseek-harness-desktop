@@ -9,8 +9,7 @@
  * plugin must not take the GUI down.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -142,7 +141,8 @@ export function apply(ctx: ClientContext): void {
     mountPending = true
     const generation = mountGeneration
     void (async () => {
-      const sessions = ctx.sessions
+      // Host and client SDKs both augment Context.sessions. This scope is the browser client.
+      const sessions = (ctx.get as (name: string) => unknown)('sessions') as ISessions
       const workspaces = ctx.workspaces
       const ownedSessions = new Set<{ release(): void }>()
 

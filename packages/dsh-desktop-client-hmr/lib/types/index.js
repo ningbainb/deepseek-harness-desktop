@@ -3,7 +3,7 @@ import { setImmediate as yieldImmediate } from 'node:timers/promises';
 import z from '@deepseek-ai/schemastery';
 import { createBundleWatcher } from "./core/scanner.js";
 export const name = 'desktop-client-hmr';
-export const inject = ['clientModules', 'webServer', 'connection'];
+export const inject = ['clientModules', 'webServer', 'connection', 'connection.authentication'];
 export const Config = z.object({ pollIntervalMs: z.number().step(1).min(1).default(500).volatile() });
 export const EVENTS_ENDPOINT = '/plugins/events';
 function eventChannel(registry, connection, webServer) {
@@ -92,7 +92,8 @@ function eventChannel(registry, connection, webServer) {
             }
             let rejection;
             try {
-                rejection = connection.requestRejection(request);
+                const admission = connection.admit(request);
+                rejection = 'rejection' in admission ? admission.rejection : undefined;
             }
             catch {
                 rejection = 503;

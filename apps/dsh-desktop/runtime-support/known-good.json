@@ -17,11 +17,11 @@
   },
   "runtime": {
     "packageName": "@deepseek-ai/dsh",
-    "version": "0.2.2-rc.5",
-    "integrity": "sha512-cNbp12tLYLUTXaVli7zwwMjzmmEVCD1PRldg4oKtXM4+lFYckcaliMS2PU/FoThB4iAN/fKOSID0nrtRZU4Gjw==",
+    "version": "0.2.3-alpha.2",
+    "integrity": "sha512-mi5hq96nk5x6HPU6gkcHSUZEKs0/xoyd8MV7GCTDpULYlcJVIUkfn5JiNv+UAMaV22VO4VQwbLWnjkFBV5b/ig==",
     "files": {
-      "package.json": "2a694f0180a778c1c083fdc0369500d3638fa72457aee882e0aeedf14581f2ff",
-      "lib/bin.js": "36f86742e0c3cc1c3b2dbaa6582ee00b0c37bc4f5a190f7531b5303bf3efb6d9"
+      "package.json": "99dcfb07e68c85dd8a6c6696dec3cc48b1eb3dd07f49fa9fb69e808fe9686e3d",
+      "lib/bin.js": "b293de4609dfd0625b4e5c0a88363fb49efd7d162b41a9ac2e36a1f8e196d133"
     },
     "bin": {
       "dsh": "lib/bin.js"
@@ -38,12 +38,12 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "afaab805bfff8055ea34407cf07f7131df5ec9935ac07fde432dac001787ed96"
+    "sha256": "e232b395791626a0829932bc2f3cd9acd151acc88476eeaf4116dac93e6d091d"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
     "supportStatus": "supported",
-    "upstreamVersion": "0.2.2-rc.5",
+    "upstreamVersion": "0.2.3-alpha.2",
     "capabilities": [
       {
         "id": "runtime.lifecycle",

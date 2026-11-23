@@ -175,7 +175,8 @@ export function apply(ctx: Context, config: PetConfig = {}): void {
       if (namespace === PET_SETTINGS_NAMESPACE) refresh()
     })
     refresh()
-    const loader = (ctx.root as Context & { loader?: { await(): Promise<void> } }).loader
+    const root = ctx[Context.root] ?? (ctx as Context & { root?: Context }).root
+    const loader = (root as (Context & { loader?: { await(): Promise<void> } }) | undefined)?.loader
     void loader?.await().then(refresh).catch((error: unknown) =>
       ctx.logger?.warn?.(`pet: settings initialization failed: ${String(error)}`))
   })

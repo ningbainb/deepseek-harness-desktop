@@ -1194,7 +1194,7 @@ test('retired legacy skins retain the compatible upgrade fallback instead of fre
   }
 })
 
-test('private pipe overlay composes without the disabled Web startup dependency', async () => {
+test('private pipe overlay keeps SDK startup configuration while disabling the HTTP listener', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-desktop-pipe-profile-'))
   try {
     const packageRoots = resolveRuntimePackages()
@@ -1209,15 +1209,19 @@ test('private pipe overlay composes without the disabled Web startup dependency'
     const rows = parse(composed.stdout)
     const connection = rows.find(row => row.id === 'connection')
     assert.equal(connection.name, '@deepseek-ai/dsh-client-connection')
-    assert.deepEqual(connection.inject, [])
-    assert.deepEqual(connection.config, {})
-    for (const id of ['web-startup', 'webserver', 'web-runtime']) {
+    assert.deepEqual(connection.inject, ['webStartup'])
+    assert.equal(rows.find(row => row.id === 'web-startup')?.disabled, undefined)
+    for (const id of ['webserver', 'web-runtime']) {
       assert.equal(rows.find(row => row.id === id)?.disabled, true, id)
     }
     assert.equal(rows.find(row => row.id === 'desktop-pipe-webserver')?.name,
       '@linxin666/dsh-desktop-pipe-webserver')
     const connectionSdk = await import(pathToFileURL(join(packageRoots.get(connection.name), 'lib/index.js')).href)
-    assert.ok(connectionSdk.inject.includes('credentials'), 'The SDK must retain its own credentials dependency')
+    assert.equal(typeof connectionSdk.HostConnectionService.prototype.admit, 'function')
+    const token = rows.find(row => row.id === 'authentication-token')
+    assert.equal(token.name, '@deepseek-ai/dsh-host-authentication-token')
+    const tokenSdk = await import(pathToFileURL(join(packageRoots.get(token.name), 'lib/index.js')).href)
+    assert.ok(tokenSdk.inject.includes('credentials'), 'The SDK authentication provider must retain its credentials dependency')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

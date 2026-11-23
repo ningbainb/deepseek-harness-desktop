@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { PassThrough } from 'node:stream'
+import { DesktopPipeWebServer } from '@linxin666/dsh-desktop-pipe-webserver'
+import { createDesktopPipeSessionCookie, installLegacyConnectionAdmission } from '../../src/runtime-cookie.mjs'
 import { join } from 'node:path'
 import { hostFixture, load, modelText, occurrences } from './context-suite-host.mjs'
 
@@ -8,31 +9,22 @@ import { hostFixture, load, modelText, occurrences } from './context-suite-host.
 const { ctx, directory, projectA, request } = await hostFixture({ after() {} })
 console.log(`CONTEXT_PROBE_ROOT=${directory}`)
 process.env.DSH_AGENTS_HOME = join(directory, 'agents')
-const routes = []
-ctx.provide('webServer', { host: '127.0.0.1', port: 3080, protocol: 'http:', register(route) { routes.push(route); return () => {} } })
+const web = new DesktopPipeWebServer(ctx)
+installLegacyConnectionAdmission(ctx)
 await ctx.plugin((await load('@deepseek-ai/dsh-credentials-local')).default)
 await ctx.plugin(await load('@deepseek-ai/dsh-client-connection'))
-let cookie
-ctx.connection.authorizeIndex({ method: 'GET', url: ctx.connection.authenticatedUrl('http://127.0.0.1/'), headers: { host: '127.0.0.1' } }, {
-  writeHead(code, headers) { assert.equal(code, 303); cookie = headers['set-cookie'].split(';')[0] }, end() {},
-})
-assert.ok(cookie)
+await ctx.plugin(await load('@deepseek-ai/dsh-host-authentication-token'))
+const cookie = await createDesktopPipeSessionCookie(ctx)()
 const fiber = await ctx.plugin(await load('dsh-prompt-customizer'), { dataDir: join(directory, 'p2') })
 
 async function call(path, body) {
-  const route = routes.find(candidate => candidate.path === path.split('?')[0])
-  assert.ok(route, `${path}: route must exist`)
-  const req = new PassThrough()
-  req.method = body === undefined ? 'GET' : 'POST'
-  req.url = path
-  req.headers = { host: '127.0.0.1', origin: 'http://127.0.0.1', cookie }
-  req.socket = { remoteAddress: '127.0.0.1', localAddress: '127.0.0.1' }
-  return new Promise((resolve, reject) => {
-    let status
-    const res = { writeHead(code) { status = code }, end(value) { resolve({ status, body: JSON.parse(value) }) } }
-    Promise.resolve(route.handler(req, res)).catch(reject)
-    req.end(body === undefined ? undefined : JSON.stringify(body))
-  })
+  assert.ok(web.match(path.split('?')[0]), `${path}: route must exist`)
+  const response = await web.fetch(new Request(new URL(path, 'http://127.0.0.1/'), {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { cookie },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  }))
+  return { status: response.status, body: await response.json() }
 }
 
 const backup = await call('/api/prompt-customizer/backup')

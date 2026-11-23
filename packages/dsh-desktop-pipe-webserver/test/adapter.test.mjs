@@ -104,6 +104,30 @@ test('adapter normalizes custom-scheme authority and bridges index authorization
   assert.match(response.headers.get('set-cookie'), /^dsh-auth-test=signed;/u)
 })
 
+test('Alpha.2 index exchanges the official entry token and enforces cookie admission', async () => {
+  const ctx = new Context()
+  const web = new DesktopPipeWebServer(ctx)
+  ctx.provide('connection', {
+    admit: req => req.headers.cookie === 'official=signed' ? { peer: {} } : { rejection: 401 },
+  })
+  ctx.on('webserver/entry-url', (base, entries) => {
+    entries.push({ label: 'dsh web', url: new URL('?token=test', base).href, open: true })
+  })
+  ctx.on('webserver/request', async (req, res, next) => {
+    if (req.url !== '/?token=test') return next()
+    res.writeHead(303, { 'set-cookie': 'official=signed; HttpOnly' })
+    res.end()
+  })
+  const launch = web.authenticatedEntryUrl()
+  const exchange = await web.authorizeIndex(new Request(launch))
+  assert.equal(exchange.status, 303)
+  assert.equal(exchange.headers.get('set-cookie'), 'official=signed; HttpOnly')
+  assert.equal(await web.authorizeIndex(new Request('http://dsh.internal/', {
+    headers: { cookie: 'official=signed' },
+  })), undefined)
+  assert.equal((await web.authorizeIndex(new Request('http://dsh.internal/'))).status, 401)
+})
+
 test('adapter request cancellation cannot emit an unhandled Readable error', async () => {
   const web = server()
   let observedAbort = false
@@ -297,4 +321,27 @@ test('upgrade routes receive only the server-owned browser cookie, not renderer 
   for (const cookie of ['', 'official=value\r\nInjected: bad', {}]) {
     assert.throws(() => web.openDuplex('websocket', payload, input, new AbortController().signal, cookie), /browser cookie/u)
   }
+})
+
+test('Alpha.2 resource routes keep the WebServer authorization and method contracts', async () => {
+  const ctx = new Context()
+  const web = new DesktopPipeWebServer(ctx)
+  const peer = { id: 'authenticated-fixture' }
+  ctx.on('webserver/authorize', (request, policy) => {
+    assert.equal(request.headers.host, '127.0.0.1')
+    assert.equal(policy, 'required')
+    return request.headers.cookie === 'official=signed'
+      ? { kind: 'allow', peer }
+      : { kind: 'deny', status: 401 }
+  })
+  web.register({ kind: 'exact', path: '/resource', async resource(_request, admitted) {
+    assert.equal(admitted, peer)
+    return Response.json({ ok: true })
+  } })
+  const url = 'http://dsh.internal/resource'
+  assert.equal((await web.fetch(new Request(url))).status, 401)
+  const headers = { cookie: 'official=signed' }
+  assert.deepEqual(await (await web.fetch(new Request(url, { headers }))).json(), { ok: true })
+  assert.equal((await web.fetch(new Request(url, { headers, method: 'HEAD' }))).body, null)
+  assert.equal((await web.fetch(new Request(url, { headers, method: 'POST' }))).status, 405)
 })

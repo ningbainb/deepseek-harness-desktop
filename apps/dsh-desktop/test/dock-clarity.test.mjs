@@ -14,8 +14,11 @@ test('dedicated Dock settings stay below the official body-portal overlays', asy
   const sdk = pathToFileURL(require.resolve('@deepseek-ai/dsh-client-ui-primitives/package.json'))
   const zIndex = (css, selector) => Number(css.match(new RegExp(`${selector}\\s*\\{[^}]*z-index:\\s*(\\d+)`, 'u'))?.[1])
   const dockLayer = zIndex(settings, '\\.page')
+  const bundle = await readFile(new URL('lib/index.js', sdk), 'utf8')
   for (const stylesheet of ['Modal.module.css', 'HoverCard.module.css', 'Menu.module.css']) {
-    const overlay = await readFile(new URL(`lib/${stylesheet}`, sdk), 'utf8')
+    const row = bundle.split('\n').find(line => line.includes(`"src/${stylesheet}"`))
+    assert.ok(row, `SDK must include ${stylesheet}`)
+    const overlay = row
     const overlayLayer = Number(overlay.match(/z-index:\s*(\d+)/u)?.[1])
     assert.ok(Number.isFinite(dockLayer) && dockLayer > 0 && dockLayer < overlayLayer,
       `Dock layer ${dockLayer} must remain below ${stylesheet} layer ${overlayLayer}`)

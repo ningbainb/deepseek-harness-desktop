@@ -36,14 +36,14 @@ function fixture(config?: Parameters<typeof apply>[1]) {
   const graph = { rev: 'graph-one', release: { version: '0.2.1-rc.2', commit: 'fixture' }, entries: [], batches: [] }
   let route: { handler: (request: any, response: any) => void; path: string; kind: string } | undefined
   let rejection: number | undefined
-  const rejectionCheck = vi.fn(() => rejection)
+  const rejectionCheck = vi.fn(() => rejection === undefined ? { peer: {} } : { rejection })
   const registry = { graph: () => graph, artifactBaseline: () => undefined, rebuilt: () => undefined,
     onGraphChanged: (listener: () => void) => { events.on('graph', listener); return () => events.off('graph', listener) },
     onRebuilt: (listener: () => void) => { events.on('rebuilt', listener); return () => events.off('rebuilt', listener) } }
   const cleanups: (() => void)[] = []
   const unregister = vi.fn()
   const context = {
-    get: (service: string) => ({ clientModules: registry, connection: { requestRejection: rejectionCheck },
+    get: (service: string) => ({ clientModules: registry, connection: { admit: rejectionCheck },
       webServer: { register: (value: typeof route) => { route = value; return unregister } } })[service],
     effect: (start: () => () => void) => { cleanups.push(start()) },
     logger: { warn: vi.fn() },

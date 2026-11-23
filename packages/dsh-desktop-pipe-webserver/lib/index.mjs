@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto'
+import { once } from 'node:events'
 import { Duplex, Readable, Writable } from 'node:stream'
 
 import { Service } from '@deepseek-ai/cordis'
@@ -237,7 +238,7 @@ export class DesktopPipeWebServer extends Service {
 
   register(route) {
     if (route?.kind !== 'exact' && route?.kind !== 'prefix') throw new TypeError('desktop pipe route kind is invalid')
-    if (typeof route.handler !== 'function') throw new TypeError('desktop pipe route handler is invalid')
+    if (typeof route.handler !== 'function' && typeof route.resource !== 'function') throw new TypeError('desktop pipe route responder is invalid')
     const path = routePath(route.path)
     const table = route.kind === 'exact' ? this.exact : this.prefixes
     if (table.has(path)) throw new Error(`desktop pipe: duplicate ${route.kind} route ${JSON.stringify(path)}`)
@@ -253,10 +254,11 @@ export class DesktopPipeWebServer extends Service {
     return () => { this.upgrades.delete(path) }
   }
 
-  registerFallback(handler) {
-    if (typeof handler !== 'function') throw new TypeError('desktop pipe fallback is invalid')
+  registerFallback(fallback) {
+    const responder = typeof fallback === 'function' ? { handler: fallback } : fallback
+    if (typeof responder?.handler !== 'function' && typeof responder?.resource !== 'function') throw new TypeError('desktop pipe fallback is invalid')
     if (this.fallback !== undefined) throw new Error('desktop pipe: fallback already registered')
-    this.fallback = handler
+    this.fallback = responder
     return () => { this.fallback = undefined }
   }
 
@@ -300,15 +302,65 @@ export class DesktopPipeWebServer extends Service {
     return this.upgrades.get(pathname)
   }
 
+  getOrigin() {
+    return `http://${this.host}`
+  }
+
+  routeAdmission(route, req, url, transport, signal) {
+    const facts = { headers: req.headers, method: req.method, url, transport, signal, socket: req.socket }
+    const policy = typeof route.auth === 'function' ? route.auth(facts) : route.auth ?? 'required'
+    if (policy === 'deny') return { kind: 'deny', status: 403 }
+    return this.ctx.bail(this, 'webserver/authorize', facts, policy)
+      ?? (typeof route.resource === 'function' || typeof this.ctx.get('connection')?.admit === 'function'
+        ? { kind: 'deny', status: 503 }
+        : { kind: 'allow' })
+  }
+
+  async readResource(request, peer) {
+    if (request.method !== 'GET' && request.method !== 'HEAD') return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } })
+    const url = new URL(request.url)
+    const route = this.match(url.pathname) ?? this.fallback
+    if (typeof route?.resource !== 'function') return new Response(null, { status: 404 })
+    const policy = typeof route.auth === 'function' ? route.auth({ url, headers: request.headers, method: request.method, transport: 'http', signal: request.signal }) : route.auth
+    if (policy === 'deny') return new Response(null, { status: 403 })
+    const response = await route.resource(request, peer)
+    if (request.method !== 'HEAD') return response
+    await response.body?.cancel()
+    return new Response(null, response)
+  }
+
   async fetch(request) {
-    const pathname = new URL(request.url).pathname
-    const route = this.match(pathname)
-    const handler = route?.handler ?? this.fallback
-    if (handler === undefined) return new Response('not found', { status: 404 })
+    const url = new URL(request.url)
+    const route = this.match(url.pathname) ?? this.fallback
+    if (route === undefined) return new Response('not found', { status: 404 })
+    if (route.resource !== undefined && request.method !== 'GET' && request.method !== 'HEAD') {
+      return new Response(null, { status: 405, headers: { allow: 'GET, HEAD' } })
+    }
     const req = nodeRequest(request)
     const res = new FetchResponseBridge(request.method)
     Promise.resolve()
-      .then(() => handler(req, res))
+      .then(() => this.ctx.waterfall(this, 'webserver/request', req, res, async () => {
+        const admission = this.routeAdmission(route, req, url, 'http', request.signal)
+        if (admission.kind === 'deny') {
+          res.writeHead(admission.status, { 'cache-control': 'no-store' })
+          res.end()
+          return
+        }
+        if (route.resource === undefined) return route.handler(req, res, admission.peer)
+        const resourceRequest = new Request(request, { headers: req.headers })
+        const response = await route.resource(resourceRequest, admission.peer)
+        const headers = Object.fromEntries(response.headers)
+        const cookies = response.headers.getSetCookie()
+        if (cookies.length > 0) headers['set-cookie'] = cookies
+        res.writeHead(response.status, headers)
+        if (request.method === 'HEAD') await response.body?.cancel()
+        else if (response.body !== null) {
+          for await (const chunk of response.body) {
+            if (!res.write(chunk)) await once(res, 'drain', { signal: request.signal })
+          }
+        }
+        res.end()
+      }))
       .catch(error => {
         safeLogError(this.ctx, error)
         if (res.headersSent) res.destroy(error instanceof Error ? error : undefined)
@@ -321,16 +373,43 @@ export class DesktopPipeWebServer extends Service {
     return res.response
   }
 
+  get protocol() {
+    return 'http:'
+  }
+
+  authenticatedEntryUrl() {
+    const base = `http://${this.host}/`
+    const connection = this.ctx.get('connection')
+    if (typeof connection?.authenticatedUrl === 'function') return connection.authenticatedUrl(base)
+    const entries = []
+    this.ctx.emit('webserver/entry-url', base, entries)
+    const entry = entries.find(candidate => candidate.label === 'dsh web')
+    if (entry === undefined) throw new Error('desktop pipe requires the official browser entry URL')
+    return entry.url
+  }
+
   async authorizeIndex(request) {
     const connection = this.ctx.get('connection')
-    if (connection === undefined || typeof connection.authorizeIndex !== 'function') {
-      throw new Error('desktop pipe index authorization requires Connection')
-    }
+    if (connection === undefined) throw new Error('desktop pipe index authorization requires Connection')
     const req = nodeRequest(request)
     const res = new FetchResponseBridge(request.method)
-    const authorized = connection.authorizeIndex(req, res)
-    if (authorized) return undefined
-    return res.response
+    if (typeof connection.authorizeIndex === 'function') {
+      return connection.authorizeIndex(req, res) ? undefined : res.response
+    }
+    let authorized = false
+    await this.ctx.waterfall(this, 'webserver/request', req, res, async () => {
+      const admission = this.ctx.bail(this, 'webserver/authorize', {
+        headers: req.headers, method: req.method, url: new URL(request.url), transport: 'http', signal: request.signal,
+      }, 'required')
+      const allowed = admission === undefined ? connection.admit(req) : admission
+      if (allowed.kind === 'allow' || 'peer' in allowed) {
+        authorized = true
+        return
+      }
+      res.writeHead(allowed.status ?? allowed.rejection, { 'cache-control': 'no-store' })
+      res.end()
+    })
+    return authorized ? undefined : res.response
   }
 
   openDuplex(endpoint, payload, input, signal, browserCookie) {
@@ -376,7 +455,17 @@ export class DesktopPipeWebServer extends Service {
     const stop = () => socket.destroy(signal.reason instanceof Error ? signal.reason : undefined)
     if (signal.aborted) stop()
     else signal.addEventListener('abort', stop, { once: true })
-    Promise.resolve(route.handler(req, socket, Buffer.alloc(0))).catch(error => socket.destroy(error instanceof Error ? error : undefined))
+    const head = Buffer.alloc(0)
+    Promise.resolve().then(async () => {
+      const admission = this.routeAdmission(route, req, url, 'upgrade', signal)
+      if (admission.kind === 'deny') {
+        socket.end(`HTTP/1.1 ${admission.status} Rejected\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`)
+        return
+      }
+      await this.ctx.waterfall(this, 'webserver/upgrade', req, socket, head, admission.peer, async () => {
+        if (!socket.destroyed) await route.handler(req, socket, head, admission.peer)
+      })
+    }).catch(error => socket.destroy(error instanceof Error ? error : undefined))
     void (async () => {
       try {
         for await (const value of input) {

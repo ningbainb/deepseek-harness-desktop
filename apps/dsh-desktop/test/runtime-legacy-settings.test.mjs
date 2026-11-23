@@ -354,7 +354,8 @@ test('official Loader imports the adapter file URL and re-creates Settings witho
     const exports = await ctx.loader.import(settingsRow.name)
     assert.equal(exports.default, DesktopLegacySettings)
     if (process.platform === 'win32') {
-      await assert.rejects(ctx.loader.import(fileURLToPath(settingsRow.name)), /scheme|protocol/u)
+      const nativePathExports = await ctx.loader.import(fileURLToPath(settingsRow.name))
+      assert.equal(nativePathExports.default, DesktopLegacySettings)
     }
     for (let generation = 0; generation < 2; generation += 1) {
       const id = await ctx.loader.create({ ...settingsRow })

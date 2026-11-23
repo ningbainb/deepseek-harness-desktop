@@ -1,6 +1,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { registerHooks } from 'node:module'
+import { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
+import { PERSONA_PREFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
 import { readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
@@ -70,7 +72,7 @@ export function wrapMarketTeamContext(context) {
     for (const [agent, record] of retainedRoles) {
       if (record.restored || context.get('agents')?.get(agent.id) !== agent) continue
       const prompt = agent.ctx.get('systemPrompt')
-      const offPersona = prompt.section({ name: 'market:retained-role-persona', order: prompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'), text: record.binding.persona, interpolate: false })
+      const offPersona = prompt.section({ name: PERSONA_PREFIX_SECTION, order: prompt.getSectionOrder('DEPLOYMENT_PERSONA_PREFIX'), text: record.binding.persona, interpolate: false })
       Object.assign(agent.options, record.binding.route)
       if (record.binding.route.reasoningEffort === undefined) delete agent.options.reasoningEffort
       const offModel = installModelSelection(agent.ctx, { current: record.binding.route, assembled: undefined })
@@ -179,6 +181,7 @@ export function wrapMarketTeamContext(context) {
     })
     const projected = { agentTeams: teams, subagents, tools, systemPrompt: prompt }
     const proxy = facade(ctx, {
+      root: Context.root === undefined ? ctx.root : ctx[Context.root],
       get(name, ...args) { return projected[name] ? projected[name]() : ctx.get(name, ...args) },
       inject(dependencies, callback) { return ctx.inject(dependencies, (child, ...args) => callback(wrap(child), ...args)) },
       effect(factory, label) {

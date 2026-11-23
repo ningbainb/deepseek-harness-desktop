@@ -80,6 +80,8 @@ test('actual SDK tool registry exposes public feedback only after opt-in and rev
   const context = new Context()
   let namespace
   try {
+    const { default: SessionProjections } = await import('@deepseek-ai/dsh-session-projection')
+    await context.plugin(SessionProjections)
     await context.plugin(SystemPrompt, { includeHarnessIdentity: false, includeRuntimeContext: false })
     await context.plugin(ToolRuntime)
     await context.plugin(NativeExecutor)

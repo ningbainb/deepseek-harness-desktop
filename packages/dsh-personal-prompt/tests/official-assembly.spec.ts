@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import SessionProjections from '@deepseek-ai/dsh-session-projection'
 import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { scopeTarget } from '@deepseek-ai/dsh-scope'
 import type { Session } from '@deepseek-ai/dsh-session'
@@ -27,6 +28,7 @@ it('updates through official assembly without duplicate sections or changing nat
     },
   } as never)
   try {
+    await ctx.plugin(SessionProjections)
     await ctx.plugin(SystemPrompt, { personaPrefix: 'fixture-native-policy' })
     ctx.systemPrompt.context({ name: 'fixture:context', order: 1, text: 'fixture-runtime-context' })
     ctx.systemPrompt.tools(() => ({ schemas: [{ name: 'fixture_tool', description: 'fixture', parameters: { type: 'object' } }] }))

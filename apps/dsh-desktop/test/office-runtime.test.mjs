@@ -14,9 +14,9 @@ test('the Office workbook fixture starts with stale zeros and the verification r
  entries['xl/worksheets/sheet1.xml'] = strToU8(strFromU8(entries['xl/worksheets/sheet1.xml']).replace('<f>SUM(A1:A2)</f><v>0</v>', '<f>SUM(A1:A2)</f><v>13</v>').replace('<f>B1+B2</f><v>0</v>', '<f>B1+B2</f><v>55</v>').replace('<f>A1*A2</f><v>0</v>', '<f>A1*A2</f><v>42</v>'))
  assert.deepEqual(assertRecalculatedWorkbook(zipSync(entries)), { B1: 13, B2: 42, C1: 55 })
 })
-test('Office runtime resolution uses the installed official rc3 service and 0.2.3 engine cohort', async () => {
+test('Office runtime resolution uses the installed official Alpha.2 service and 0.2.3 engine cohort', async () => {
  const runtime = await resolveOfficeRuntime()
- assert.equal(runtime.officeManifest.version, '0.2.2-rc.5'); assert.equal(runtime.kitManifest.version, '0.2.3')
+ assert.equal(runtime.officeManifest.version, '0.2.3-alpha.2'); assert.equal(runtime.kitManifest.version, '0.2.3')
  assert.equal(typeof runtime.office.OfficeKit, 'function'); assert.equal(typeof runtime.kit.createConverter, 'function')
 })
 

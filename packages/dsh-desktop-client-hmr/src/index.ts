@@ -10,7 +10,7 @@ import { createBundleWatcher } from './core/scanner.ts'
 import type { BundleBaseline } from './core/scanner.ts'
 
 export const name = 'desktop-client-hmr'
-export const inject = ['clientModules', 'webServer', 'connection']
+export const inject = ['clientModules', 'webServer', 'connection', 'connection.authentication']
 export interface Config { pollIntervalMs?: number | { get(): number } }
 export const Config = z.object({ pollIntervalMs: z.number().step(1).min(1).default(500).volatile() })
 export const EVENTS_ENDPOINT = '/plugins/events'
@@ -75,7 +75,10 @@ function eventChannel(registry: ClientModuleRegistry, connection: HostConnection
       response.writeHead(405, { allow: 'GET, HEAD' }); response.end(); return
     }
     let rejection
-    try { rejection = connection.requestRejection(request) } catch { rejection = 503 }
+    try {
+      const admission = connection.admit(request)
+      rejection = 'rejection' in admission ? admission.rejection : undefined
+    } catch { rejection = 503 }
     if (rejection !== undefined) { response.writeHead(rejection); response.end(); return }
     if (request.method === 'HEAD') {
       response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
