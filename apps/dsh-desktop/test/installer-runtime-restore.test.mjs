@@ -36,12 +36,22 @@ async function editManifest(f, edit) {
 test('the offline installation restoration helper exists', async () => {
   assert.equal(await exists(helper), true, 'Installer commit must restore compacted Electron before success')
 })
+
+test('the compact installer logs subprocess output and retries an interrupted restoration once', async () => {
+  const source = await readFile(new URL('../build/installer.nsh', import.meta.url), 'utf8')
+  const hook = source.match(/!macro customRestoreRuntime[\s\S]*?!macroend/u)?.[0] ?? ''
+  assert.match(hook, /nsExec::ExecToStack \/TIMEOUT=300000 .*installer-runtime-restore\.ps1/u)
+  assert.match(hook, /Pop \$0\s+Pop \$1\s+!insertmacro DshLog "runtime-restore" "\$0" "\$1"/u)
+  assert.match(hook, /StrCmp \$0 "-1" runtime_restore_retry_check/u)
+  assert.match(hook, /runtime_restore_retry_check:\s+StrCmp \$2 "1" runtime_restore_failed\s+StrCpy \$2 "1"\s+Goto runtime_restore_run/u)
+})
 nativeTest('Windows installation reconstructs independent Electron exactly, including fresh and repeat invocation', async t => {
   const f = await compactFixture(t)
   await restore(f.install)
   assert.deepEqual(await readFile(f.target), tinyPE())
   assert.equal(await readFile(join(f.install, 'resources/app.asar.unpacked/node_modules/electron/dist/icudtl.dat'), 'utf8'), 'same-data')
-  await restore(f.install)
+  const repeated = await restore(f.install)
+  assert.match(repeated.stdout, /runtime-reconstruction-complete files=0 validated=[1-9]\d*/u)
   assert.deepEqual(await readFile(f.target), tinyPE())
 })
 nativeTest('a changed application executable cannot produce a committed runtime', async t => {

@@ -1350,6 +1350,8 @@
         "packaged-runtime-sdk-module-identity-preserved",
         "packed-and-unpacked-asar-integrity-gated-before-windows-installer-compression",
         "windows-offline-electron-dedup-restores-byte-exact-runtime-before-transaction-commit",
+        "windows-compact-runtime-restore-logs-subprocess-output-and-retries-interruption-once",
+        "windows-upgrade-stages-owned-legacy-scoped-install-for-rollback",
         "windows-installer-compaction-restores-verified-full-directory-even-on-compression-failure",
         "windows-native-office-preview-conversion-and-recalculation-without-duplicate-wasm-engine",
         "windows-installer-timing-separates-preflight-extraction-promotion-and-cache",

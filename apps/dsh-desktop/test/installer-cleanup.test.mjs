@@ -21,6 +21,7 @@ async function runUpgradeTransactionFrom(
   installDirectory,
   installRegistryKey = '',
   uninstallRegistryKey = '',
+  env = process.env,
 ) {
   return execFileAsync('powershell.exe', [
     '-NoLogo',
@@ -38,7 +39,7 @@ async function runUpgradeTransactionFrom(
     installRegistryKey,
     '-UninstallRegistryKey',
     uninstallRegistryKey,
-  ], { timeout: 15_000, windowsHide: true })
+  ], { timeout: 15_000, windowsHide: true, env })
 }
 
 async function runUpgradeTransaction(mode, installDirectory, installRegistryKey = '', uninstallRegistryKey = '') {
@@ -50,6 +51,36 @@ async function runUpgradeTransaction(mode, installDirectory, installRegistryKey 
     uninstallRegistryKey,
   )
 }
+
+test('Windows upgrade stages only a proven legacy scoped install and restores it on rollback', windowsOnly, async () => {
+  const temporary = await mkdtemp(join(tmpdir(), 'dsh-installer-scoped-'))
+  const localAppData = join(temporary, 'local')
+  const legacy = join(localAppData, 'Programs', '@deepseek-aidsh-desktop', 'DeepSeek Harness Desktop')
+  const resources = join(legacy, 'resources')
+  const target = join(temporary, 'new-install')
+  const run = mode => runUpgradeTransactionFrom(upgradeTransactionScript, mode, target, '', '', {
+    ...process.env, LOCALAPPDATA: localAppData,
+  })
+  try {
+    await mkdir(resources, { recursive: true })
+    await writeFile(join(legacy, 'DeepSeek Harness Desktop.exe'), 'legacy executable')
+    await writeFile(join(resources, 'app.asar'), 'legacy application archive')
+    const marker = join(resources, 'app-update.yml')
+    await writeFile(marker, 'updaterCacheDirName: unrelated-updater\n')
+    await run('Begin')
+    assert.equal(await readFile(marker, 'utf8'), 'updaterCacheDirName: unrelated-updater\n')
+    await run('Rollback')
+    await writeFile(marker, "updaterCacheDirName: '@deepseek-aidsh-desktop-updater'\n")
+    const { stdout } = await run('Begin')
+    assert.ok(stdout.includes(`upgrade-install-staged root=${legacy}`))
+    await assert.rejects(readFile(marker), { code: 'ENOENT' })
+    await run('Rollback')
+    assert.equal(await readFile(marker, 'utf8'), "updaterCacheDirName: '@deepseek-aidsh-desktop-updater'\n")
+  } finally {
+    await run('Rollback')
+    await rm(temporary, { recursive: true, force: true })
+  }
+})
 
 async function settleWithin(promise, timeoutMs, message) {
   let timer

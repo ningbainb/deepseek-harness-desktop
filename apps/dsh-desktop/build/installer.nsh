@@ -469,14 +469,27 @@ runtime_full_payload_present:
   Call StageUpgradeTransactionScript
   Pop $0
   SetOutPath "$0"
-  nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_DIR}\installer-runtime-restore.ps1" -InstallDirectory "$INSTDIR" -ExpectedManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
+  Push $2
+  StrCpy $2 "0"
+runtime_restore_run:
+  ; nsExec captures both output streams and reports launch errors and timeouts separately.
+  nsExec::ExecToStack /TIMEOUT=300000 '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${DSH_UPGRADE_HELPER_DIR}\installer-runtime-restore.ps1" -InstallDirectory "$INSTDIR" -ExpectedManifestSHA256 "${DSH_RUNTIME_MANIFEST_SHA256}"'
   Pop $0
   Pop $1
   !insertmacro DshLog "runtime-restore" "$0" "$1"
   StrCmp $0 "0" runtime_restore_done
+  StrCmp $0 "-1" runtime_restore_retry_check
+  StrCmp $0 "4294967295" runtime_restore_retry_check runtime_restore_failed
+runtime_restore_retry_check:
+  StrCmp $2 "1" runtime_restore_failed
+  StrCpy $2 "1"
+  Goto runtime_restore_run
+runtime_restore_failed:
+  Pop $2
   SetErrorLevel 2
   Abort
 runtime_restore_done:
+  Pop $2
   !endif
 !macroend
 

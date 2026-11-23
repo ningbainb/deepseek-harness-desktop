@@ -251,6 +251,25 @@ function Test-ProductInstall([string] $root) {
     (Test-Path -LiteralPath (Join-Path $root $appArchiveRelativePath) -PathType Leaf)
 }
 
+function Get-LegacyScopedInstall {
+  if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { return }
+  $root = Join-Path $env:LOCALAPPDATA 'Programs\@deepseek-aidsh-desktop\DeepSeek Harness Desktop'
+  $marker = Join-Path $root 'resources\app-update.yml'
+  if (-not (Test-ProductInstall $root) -or -not (Test-Path -LiteralPath $marker -PathType Leaf)) { return }
+  try {
+    foreach ($path in @($marker, (Join-Path $root $mainExecutableName), (Join-Path $root $appArchiveRelativePath))) {
+      Assert-PlainPayloadPath $path
+    }
+    $configuration = [IO.File]::ReadAllText($marker)
+    if ($configuration -cnotmatch '(?m)^updaterCacheDirName:[ \t]*(?:''@deepseek-aidsh-desktop-updater''|"@deepseek-aidsh-desktop-updater"|@deepseek-aidsh-desktop-updater)[ \t]*\r?$') { return }
+    Assert-PlainPayloadTree $root
+  } catch {
+    Write-Verbose 'upgrade-legacy-scoped-install-skipped reason=identity-or-tree-unverified'
+    return
+  }
+  Get-NormalizedPath $root
+}
+
 function Assert-InstallBackup([object] $install) {
   $root = Get-NormalizedPath ([string] $install.root)
   $backup = Get-NormalizedPath ([string] $install.backup)
@@ -578,6 +597,8 @@ function Begin-Transaction {
     [System.StringComparer]::OrdinalIgnoreCase
   )
   [void] $roots.Add($normalizedInstallDirectory)
+  $legacyScopedInstall = Get-LegacyScopedInstall
+  if ($legacyScopedInstall) { [void] $roots.Add($legacyScopedInstall) }
 
   foreach ($entry in $registryEntries) {
     $state = Get-RegistryState $entry
