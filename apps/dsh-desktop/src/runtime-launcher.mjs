@@ -339,6 +339,7 @@ async function run() {
       ctx = hostCtx
       hostCtx.provide('profileContext', profileContext)
       hostCtx.provide('desktopConfigurationGuard', configurationGuard)
+      if (pipeIdentity !== undefined) hostCtx.provide('desktopAgentInbox', true)
       hostCtx.provide(DSH_LAUNCH_ENVIRONMENT_KEY, environment)
       await hostCtx.plugin(PluginPackages, { resolution })
       if (invocation.profile === 'desktop') installDesktopWorkshopInventory(hostCtx, profile.dir)

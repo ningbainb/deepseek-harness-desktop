@@ -37,6 +37,7 @@ it('preserves the official answerer while accepting a local decision at most onc
   let route!: WebRoute
   const cleanup: (() => void)[] = []
   apply({
+    get: (key: string) => key === 'desktopAgentInbox' ? true : undefined,
     on: (_event: string, handler: typeof onApproval) => { onApproval = handler },
     effect: (callback: () => () => void) => { cleanup.push(callback()) },
     sessions: { list: () => [session] },

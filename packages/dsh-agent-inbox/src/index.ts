@@ -9,6 +9,10 @@ import { asSessionId, asWorkspaceId } from '@ningbainb/dsh-user-scope'
 import type { ApprovalItem, WorkspaceChanges } from './core/types.ts'
 import { changes, preview } from './host/git.ts'
 
+declare module '@deepseek-ai/cordis' {
+  interface Context { desktopAgentInbox?: true }
+}
+
 export const inject = ['approval', 'sessions', 'workspaceRegistry', 'userScope', 'webServer']
 const route = '/api/dsh-agent-inbox'
 
@@ -21,6 +25,7 @@ export function argumentCount(raw: string): number | undefined {
 }
 
 export function apply(ctx: Context) {
+  if (ctx.get('desktopAgentInbox') !== true) return
   const pending = new Map<string, { item: ApprovalItem; answer: (decision: ApprovalOutcome) => void }>()
   ctx.on('approval/request', async (request, next) => {
     const session = request.agent.session
