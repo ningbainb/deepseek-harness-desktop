@@ -40,7 +40,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.5",
+    "@deepseek-ai/cordis": "^4.0.5 || 4.2.0-alpha.1",
     "@deepseek-ai/schemastery": "3.20.0-alpha.1",
     "@deepseek-ai/dsh-client-connection": "0.2.3-alpha.2",
     "@deepseek-ai/dsh-client-modules": "0.2.3-alpha.2",
