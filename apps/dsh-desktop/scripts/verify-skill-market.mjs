@@ -58,6 +58,7 @@ let sharedMcp
 let sessionId
 const installRequests = []
 const marketRequests = []
+const skillRendererErrors = []
 
 function markStage(next) {
   stage = next
@@ -259,6 +260,19 @@ try {
   app = await electron.launch(launch)
   await useChineseFixtureLocale(app)
   page = await app.firstWindow()
+  page.on('console', message => {
+    if (message.type() === 'error' && /\[ui-(?:skill|input-trigger)\]/u.test(message.text())) {
+      skillRendererErrors.push(message.text())
+    }
+  })
+  page.on('response', async response => {
+    const path = new URL(response.url()).pathname
+    if (path !== '/api/skills/list') return
+    const payload = await response.json().catch(() => undefined)
+    const sessionId = response.request().postDataJSON()?.payload?.args?.request?.sessionId
+    marketRequests.push({ event: 'response', at: Date.now(), path, sessionId, status: response.status(),
+      skills: payload?.result?.value?.skills?.length, error: payload?.result?.error?.code })
+  })
   page.on('request', request => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/agent-plugins/install') installRequests.push(request.postDataJSON())
   })
@@ -437,6 +451,9 @@ try {
   const menu = page.locator('[data-trigger-menu] [role="listbox"]')
   await menu.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
   await menu.getByText(localName, { exact: true }).waitFor({ state: 'visible' })
+  await editor.fill('/dmc')
+  await menu.getByText(localName, { exact: true }).waitFor({ state: 'hidden' })
+  await menu.getByText(skillName, { exact: true }).waitFor({ state: 'visible' })
   await page.keyboard.press('Escape')
   await editor.fill('')
 
@@ -474,6 +491,7 @@ try {
   console.error(`Skill market failed at ${stage}; isolated fixture: ${temporary}`)
   console.error('Skill market primary failure', error.stack ?? error.message)
   console.error('Skill market HTTP timeline', JSON.stringify(marketRequests.slice(-80)))
+  console.error('Skill market renderer errors', JSON.stringify(skillRendererErrors.slice(-10)))
   for (const candidate of app?.windows() ?? []) {
     if (!candidate.url().includes('desktop-dock-setting=')) continue
     console.error('Market settings diagnostics', JSON.stringify(await candidate.evaluate(() => ({

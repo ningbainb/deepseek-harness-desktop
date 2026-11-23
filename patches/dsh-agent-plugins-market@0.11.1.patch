@@ -17,7 +17,45 @@ diff --git a/lib/packages/market-contracts/src/contracts/settings.js b/lib/packa
 diff --git a/client/client.js b/client/client.js
 --- a/client/client.js
 +++ b/client/client.js
-@@ -875,9 +875,9 @@
+@@ -530,7 +530,36 @@
+ 			rebind(session.sessionId, source);
+ 			const rows = await load(session.sessionId, request.signal);
+ 			if (!rows || request.signal.aborted) return [];
+-			return (0, _deepseek_ai_dsh_client_ui_primitives.rankByName)(rows, request.query).map((row) => ({
++			// Alpha.2 removed the primitive used by this market's merged skill catalog.
++			const rankByName = _deepseek_ai_dsh_client_ui_primitives.rankByName ?? ((items, query) => {
++				const fold = (text) => text.normalize("NFKC").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/gu, "");
++				const terms = fold(query).trim().split(/\s+/u).filter(Boolean);
++				if (terms.length === 0) return items;
++				const ranked = [];
++				for (const row of items) {
++					const name = fold(row.name);
++					const starts = [0, ...Array.from(name.matchAll(/[\s\p{P}\p{S}]+/gu), (separator) => separator.index + separator[0].length)];
++					const fuzzyMatch = (term) => starts.some((start) => {
++						let next = start;
++						for (const character of term) {
++							const found = name.indexOf(character, next);
++							if (found === -1 || (next === start && found !== start)) return false;
++							next = found + character.length;
++						}
++						return true;
++					});
++					let score = 0;
++					for (const term of terms) {
++						if (name.startsWith(term)) score += 3;
++						else if (name.includes(term)) score += 2;
++						else if (fuzzyMatch(term)) score += 1;
++						else { score = 0; break; }
++					}
++					if (score > 0) ranked.push({ row, score });
++				}
++				return ranked.sort((left, right) => right.score - left.score).map(({ row }) => row);
++			});
++			return rankByName(rows, request.query).map((row) => ({
+ 				name: row.name,
+ 				description: row.modelInvocable ? row.description : options.userOnlyLabel() + " · " + row.description
+ 			}));
+@@ -875,9 +904,9 @@
  const MARKET_SETTINGS_DEFAULTS = {
  	mcpEnhanced: true,
  	scanProjectLayouts: false,

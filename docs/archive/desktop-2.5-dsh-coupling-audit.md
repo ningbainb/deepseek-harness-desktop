@@ -4,7 +4,7 @@ Authoritative Desktop version: 5.3.6.
 
 Stable DSH package version: 0.2.3-alpha.2.
 
-Lockfile SHA-256: `05a20e54d73861ca8bc04a842b66c13422152eaf8e0d2d5e8cbef8c189a2155a`.
+Lockfile SHA-256: `3e39784c7b1a19961ffc04847064f8afd6753c377d7ccaaf1f8bec4b165895e3`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 

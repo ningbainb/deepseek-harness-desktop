@@ -67,7 +67,7 @@ patchedDependencies:
   '@linxin666/dsh-pet@0.4.4': bbb56dbf46859f28f9dc6f51d37d0179a5ed596f1a338d040c51030cb38ab2cd
   '@linxin666/dsh-usage@0.4.10': d3227af845d85c781a0be4028906e13ffb1ef77ca71abc46ef1ab78a931c0f46
   '@local/dsh-prompt-pilot@1.2.3': e97059ce3c1c794e02aa086b01a5cae5513448c0519bfdda3c1d57315be831af
-  dsh-agent-plugins-market@0.11.1: d0d874cf5271513412975479f077ece626b0022367c64b44a69431fbffb6d8c0
+  dsh-agent-plugins-market@0.11.1: 1a433029a195ea716f858b14672a041631034bc01967e3785552e38611c4c95f
   dsh-better-sidebar@0.24.1: 723b3671adcb7d1b9ef9d7a197ffee9f04581c9d61ddd1dead1f25e70a500439
   dsh-dafeiyu-pet@0.2.0: b84af98ebe49446bd072b5d2acfafb719e95b39dd7154b8ae9f753290651348a
 
@@ -509,7 +509,7 @@ importers:
         version: 6.0.0
       dsh-agent-plugins-market:
         specifier: 0.11.1
-        version: 0.11.1(patch_hash=d0d874cf5271513412975479f077ece626b0022367c64b44a69431fbffb6d8c0)(ba323d7fb0af810da9f5124feb81e751)
+        version: 0.11.1(patch_hash=1a433029a195ea716f858b14672a041631034bc01967e3785552e38611c4c95f)(ba323d7fb0af810da9f5124feb81e751)
       dsh-better-sidebar:
         specifier: 0.24.1
         version: 0.24.1(patch_hash=723b3671adcb7d1b9ef9d7a197ffee9f04581c9d61ddd1dead1f25e70a500439)(6507a8381882d8b68b8dec65404f2839)
@@ -20042,7 +20042,7 @@ snapshots:
 
   dotenv@16.6.1: {}
 
-  dsh-agent-plugins-market@0.11.1(patch_hash=d0d874cf5271513412975479f077ece626b0022367c64b44a69431fbffb6d8c0)(ba323d7fb0af810da9f5124feb81e751):
+  dsh-agent-plugins-market@0.11.1(patch_hash=1a433029a195ea716f858b14672a041631034bc01967e3785552e38611c4c95f)(ba323d7fb0af810da9f5124feb81e751):
     dependencies:
       '@deepseek-ai/cordis': 4.2.0-alpha.1(@deepseek-ai/cordis-plugin-include@1.2.0-alpha.1)(@deepseek-ai/cordis-plugin-loader@1.2.0-alpha.1)
       '@deepseek-ai/dsh-agent': 0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a)
