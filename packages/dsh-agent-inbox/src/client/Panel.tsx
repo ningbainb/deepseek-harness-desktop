@@ -66,7 +66,8 @@ function FileDiff({ t, workspaceId, path }: Locale & { workspaceId: string; path
   const [result, setResult] = useState<DiffPreview>()
   const [failed, setFailed] = useState(false)
   return <details onToggle={event => {
-    if (!event.currentTarget.open || result) return
+    if (!event.currentTarget.open) return
+    setResult(undefined)
     setFailed(false)
     const params = new URLSearchParams({ workspaceId, path })
     void request<DiffPreview>('diff?' + params).then(setResult, () => setFailed(true))
@@ -143,6 +144,7 @@ function Inbox({ t, openSession, sessionTitle }: EntryProps) {
       </nav>
       {failed && <p role="alert">{t('error')}</p>}
       {tab === 'approvals' ? <>
+        <p><Settings t={t} /></p>
         {items.length === 0 && <p>{t('empty')}</p>}
         <ul>{items.map(item => <li key={item.id}>
           <p><strong>{item.toolName}</strong> · {sessionTitle(item.sessionId)} · {Math.max(0, Math.floor((Date.now() - item.waitingSince) / 1000))} {t('seconds')}</p>
