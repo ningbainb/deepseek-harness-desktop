@@ -50,7 +50,7 @@ export type DesktopContract = {
 }
 type DesktopRuntimeContract = NonNullable<DesktopContract['runtime']>
 export type DesktopNotificationRequest = {
-  category: 'plugin-recovery' | 'preset' | 'task' | 'run' | 'update'
+  category: 'approval' | 'plugin-recovery' | 'preset' | 'task' | 'run' | 'update'
   id: string
   title: string
   body: string
@@ -81,8 +81,25 @@ export class DesktopClientError extends Error {
   }
 }
 
+export type DataMigrationStatus = {
+  home: string
+  cachePath: string
+  source: string
+  phase: string
+  cleanupIncomplete?: boolean
+  bytes?: number
+  canMigrate: boolean
+  reason?: string
+}
+export type DataMigrationPlan = { source: string; target: string; bytes: number; freeBytes: number }
+
 type Unsubscribe = () => void
 type Bridge = {
+  statusDataMigration?: () => Promise<DataMigrationStatus>
+  chooseDataMigration?: () => Promise<string | null>
+  preflightDataMigration?: () => Promise<DataMigrationPlan>
+  executeDataMigration?: () => Promise<{ accepted: boolean }>
+
   getInfo?: () => Promise<unknown>
   getContract?: () => Promise<unknown>
   getStatus?: () => Promise<unknown>
@@ -104,6 +121,10 @@ type Bridge = {
 export type PluginInstallRequestResult = { accepted: boolean } | DesktopAvailability
 
 export type DesktopClient = Readonly<{
+  statusDataMigration: () => Promise<DataMigrationStatus | DesktopAvailability>
+  chooseDataMigration: () => Promise<string | null>
+  preflightDataMigration: () => Promise<DataMigrationPlan | DesktopAvailability>
+  executeDataMigration: () => Promise<{ accepted: boolean } | DesktopAvailability>
   getDesktopInfo: () => Promise<DesktopInfo | DesktopAvailability>
   getContract: () => Promise<DesktopContract | DesktopAvailability>
   hasCapability: (name: string, version?: number) => Promise<boolean>
@@ -304,6 +325,22 @@ export function createDesktopClient({ globalObject = globalThis }: { globalObjec
     return !('available' in contract) && contract.capabilities.includes(name)
   }
   return Object.freeze({
+    async statusDataMigration() {
+      return await hasBridgeCapability('data-migration.manage') && bridge?.statusDataMigration
+        ? bridge.statusDataMigration() : unavailable()
+    },
+    async chooseDataMigration() {
+      return await hasBridgeCapability('data-migration.manage') && bridge?.chooseDataMigration
+        ? bridge.chooseDataMigration() : null
+    },
+    async preflightDataMigration() {
+      return await hasBridgeCapability('data-migration.manage') && bridge?.preflightDataMigration
+        ? bridge.preflightDataMigration() : unavailable()
+    },
+    async executeDataMigration() {
+      return await hasBridgeCapability('data-migration.manage') && bridge?.executeDataMigration
+        ? bridge.executeDataMigration() : unavailable()
+    },
     getDesktopInfo,
     getContract,
     async hasCapability(name, version = 1) {

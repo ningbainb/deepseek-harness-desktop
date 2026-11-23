@@ -26,7 +26,7 @@ async function existingLaunchPath(path) {
 }
 
 /** Check existing ancestors too: selecting a missing child of a junction is unsafe. */
-async function validatePath(path, forbidden) {
+export async function validateDesktopDataPath(path, forbidden) {
   if (typeof path !== 'string' || path.trim() === '' || !isAbsolute(path) || path.includes('\0')) throw Error('Desktop data Home must be an absolute directory')
   path = resolve(path)
   if (path === parse(path).root) throw Error('Desktop data Home cannot be a root directory')
@@ -45,16 +45,25 @@ async function validatePath(path, forbidden) {
   return path
 }
 
-async function checkOwnership(home, { selected = false } = {}) {
+export async function checkDesktopDataOwnership(home, { selected = false } = {}) {
   const classification = await classifyLegacyHome(home)
   if (classification === 'official' || classification === 'mixed') throw Error('Desktop data Home ownership belongs to another installation or third-party Web Home')
   if (selected && classification === 'unknown' && (await readdir(home)).length !== 0) throw Error('Desktop data Home ownership is unknown; choose an empty directory or an existing Community Home')
 }
 
+export async function writeDesktopDataLocation(userData, home, migration) {
+  const selectionPath = join(userData, DESKTOP_DATA_LOCATION_FILE)
+  const temporary = join(userData, `${DESKTOP_DATA_LOCATION_FILE}.${randomUUID()}.tmp`)
+  try {
+    await writeFile(temporary, `${JSON.stringify({ schemaVersion: 1, owner, home, migration }, null, 2)}\n`, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
+    await rename(temporary, selectionPath)
+  } finally { await rm(temporary, { force: true }).catch(() => {}) }
+}
+
 /** Resolve only; existing data is never moved, deleted, created or adopted here. */
 export async function resolveDesktopDataLocation({ env = process.env, userData, defaultHome, legacyHome, chooseDirectory, isPackaged = false, programDirectory, resourcesPath = isPackaged ? process.resourcesPath : undefined } = {}) {
   const forbidden = [programDirectory, resourcesPath]
-  const result = (home, source) => Object.freeze({ home, source, cachePath: join(home, 'cache') })
+  const result = (home, source, relocated = false) => Object.freeze({ home, source, cachePath: join(home, 'cache'), ...(relocated ? { relocated } : {}) })
   if (typeof env.DSH_HOME === 'string' && env.DSH_HOME !== '') {
     // Explicit existing launch contracts outrank saved defaults. Ownership is
     // intentional on this path; no automatic Community adoption is performed.
@@ -69,15 +78,15 @@ export async function resolveDesktopDataLocation({ env = process.env, userData, 
     try { saved = JSON.parse(await readFile(selectionPath, 'utf8')) } catch { throw Error('Invalid persisted Desktop data location metadata') }
     if (saved.schemaVersion !== 1 || saved.owner !== owner || typeof saved.home !== 'string') throw Error('Invalid persisted Desktop data location metadata')
     const home = await existingLaunchPath(saved.home)
-    await checkOwnership(home)
-    return result(home, 'persisted')
+    await checkDesktopDataOwnership(home)
+    return result(home, 'persisted', typeof saved.migration?.id === 'string')
   }
   const existingDefault = await existingLaunchPath(defaultHome)
   if (await exists(existingDefault)) {
-    await checkOwnership(existingDefault)
+    await checkDesktopDataOwnership(existingDefault)
     return result(existingDefault, 'existing-default')
   }
-  const home = await validatePath(defaultHome, forbidden)
+  const home = await validateDesktopDataPath(defaultHome, forbidden)
   // Do not select legacy Home directly: the established migration must still
   // classify Community, official, mixed and unknown ownership before adoption.
   if (legacyHome && await exists(legacyHome)) return result(home, 'legacy-migration')
@@ -89,13 +98,9 @@ export async function resolveDesktopDataLocation({ env = process.env, userData, 
     error.code = 'DESKTOP_DATA_LOCATION_CANCELLED'
     throw error
   }
-  const chosen = await validatePath(selected, forbidden)
-  await checkOwnership(chosen, { selected: true })
+  const chosen = await validateDesktopDataPath(selected, forbidden)
+  if (await exists(chosen)) await checkDesktopDataOwnership(chosen, { selected: true })
   await mkdir(userData, { recursive: true })
-  const temporary = join(userData, `${DESKTOP_DATA_LOCATION_FILE}.${randomUUID()}.tmp`)
-  try {
-    await writeFile(temporary, `${JSON.stringify({ schemaVersion: 1, owner, home: chosen }, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' })
-    await rename(temporary, selectionPath)
-  } finally { await rm(temporary, { force: true }).catch(() => {}) }
+  await writeDesktopDataLocation(userData, chosen)
   return result(chosen, 'selected')
 }

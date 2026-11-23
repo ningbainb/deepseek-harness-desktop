@@ -481,6 +481,7 @@ export function registerDesktopIpc({
   getUpdateController,
   getRepairStatus = async () => undefined,
   retryRepair = async () => ({ accepted: false }),
+  dataMigration,
   getLanGatewayStatus = () => undefined,
   configureLanGateway = async () => undefined,
   getUpdateChannel = () => 'stable',
@@ -544,6 +545,10 @@ export function registerDesktopIpc({
     'desktop:update-status',
     'desktop:repair-status',
     'desktop:repair-retry',
+    'desktop:data-migration-status',
+    'desktop:data-migration-choose',
+    'desktop:data-migration-preflight',
+    'desktop:data-migration-execute',
     'desktop:lan-gateway-status-get',
     'desktop:lan-gateway-configure',
     'desktop:update-channel-get',
@@ -709,6 +714,9 @@ export function registerDesktopIpc({
     const event = normalizeValueModeProductEvent(rawEvent)
     return recordValueModeEvent(event)
   })
+  for (const action of ['status', 'choose', 'preflight', 'execute']) {
+    handle('desktop:data-migration-' + action, main, () => dataMigration?.[action]())
+  }
   handle('desktop:lan-gateway-status-get', main, () => publicLanGatewayStatus(getLanGatewayStatus()))
   handle('desktop:lan-gateway-configure', main, async (_event, _surface, request) => {
     return publicLanGatewayStatus(await configureLanGateway(request))

@@ -191,6 +191,22 @@ export function createDesktopClient({ globalObject = globalThis } = {}) {
         return !('available' in contract) && contract.capabilities.includes(name);
     };
     return Object.freeze({
+        async statusDataMigration() {
+            return await hasBridgeCapability('data-migration.manage') && bridge?.statusDataMigration
+                ? bridge.statusDataMigration() : unavailable();
+        },
+        async chooseDataMigration() {
+            return await hasBridgeCapability('data-migration.manage') && bridge?.chooseDataMigration
+                ? bridge.chooseDataMigration() : null;
+        },
+        async preflightDataMigration() {
+            return await hasBridgeCapability('data-migration.manage') && bridge?.preflightDataMigration
+                ? bridge.preflightDataMigration() : unavailable();
+        },
+        async executeDataMigration() {
+            return await hasBridgeCapability('data-migration.manage') && bridge?.executeDataMigration
+                ? bridge.executeDataMigration() : unavailable();
+        },
         getDesktopInfo,
         getContract,
         async hasCapability(name, version = 1) {

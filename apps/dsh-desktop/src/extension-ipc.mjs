@@ -208,6 +208,10 @@ const CHANNELS = [
   'extensions:preset-export',
   'extensions:preset-select',
   'extensions:preset-import',
+  'extensions:data-migration-status',
+  'extensions:data-migration-choose',
+  'extensions:data-migration-preflight',
+  'extensions:data-migration-execute',
   'extensions:runtime-restart',
   'extensions:migration-preview',
   'extensions:migration-apply',
@@ -224,6 +228,7 @@ export function registerExtensionIpc({
   getWindow,
   pluginManager,
   controller,
+  dataMigration,
   ensureProfile,
   preflightFeatureMutation = async () => {},
   projectRoot,
@@ -1333,6 +1338,9 @@ export function registerExtensionIpc({
     try { recordFeatureEvent({ feature: 'control-permission', outcome: opened ? 'opened' : 'unavailable', detail: kind }) } catch {}
     return opened
   })
+  for (const action of ['status', 'choose', 'preflight', 'execute']) {
+    handleExtension('extensions:data-migration-' + action, () => dataMigration?.[action]())
+  }
   handleExtension('extensions:runtime-restart', () => enqueuePluginMutation(async () => {
     await controller.stop()
     await ensureProfile()

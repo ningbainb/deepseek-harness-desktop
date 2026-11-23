@@ -1,0 +1,3 @@
+- insert:
+    - id: data-location
+      name: '@ningbainb/dsh-data-location'

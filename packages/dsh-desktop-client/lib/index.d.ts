@@ -60,7 +60,7 @@ export type DesktopContract = {
     };
 };
 export type DesktopNotificationRequest = {
-    category: 'plugin-recovery' | 'preset' | 'task' | 'run' | 'update';
+    category: 'approval' | 'plugin-recovery' | 'preset' | 'task' | 'run' | 'update';
     id: string;
     title: string;
     body: string;
@@ -97,11 +97,33 @@ export declare class DesktopClientError extends Error {
     readonly code: 'desktop-invalid-argument' | 'desktop-operation-failed';
     constructor(code: DesktopClientError['code'], message: string);
 }
+export type DataMigrationStatus = {
+    home: string;
+    cachePath: string;
+    source: string;
+    phase: string;
+    cleanupIncomplete?: boolean;
+    bytes?: number;
+    canMigrate: boolean;
+    reason?: string;
+};
+export type DataMigrationPlan = {
+    source: string;
+    target: string;
+    bytes: number;
+    freeBytes: number;
+};
 type Unsubscribe = () => void;
 export type PluginInstallRequestResult = {
     accepted: boolean;
 } | DesktopAvailability;
 export type DesktopClient = Readonly<{
+    statusDataMigration: () => Promise<DataMigrationStatus | DesktopAvailability>;
+    chooseDataMigration: () => Promise<string | null>;
+    preflightDataMigration: () => Promise<DataMigrationPlan | DesktopAvailability>;
+    executeDataMigration: () => Promise<{
+        accepted: boolean;
+    } | DesktopAvailability>;
     getDesktopInfo: () => Promise<DesktopInfo | DesktopAvailability>;
     getContract: () => Promise<DesktopContract | DesktopAvailability>;
     hasCapability: (name: string, version?: number) => Promise<boolean>;

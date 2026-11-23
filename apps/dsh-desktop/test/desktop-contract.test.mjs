@@ -21,6 +21,7 @@ test('Desktop Contract v1 capability snapshots stay exact', () => {
       'extensions.open',
       'plugins.install.request',
       'skills.read',
+      'data-migration.manage',
       'notifications.show',
       'deep-links.subscribe',
       'workspace-files.open',
@@ -34,6 +35,7 @@ test('Desktop Contract v1 capability snapshots stay exact', () => {
       'runtime.read',
       'extensions.manage',
       'skills.import',
+      'data-migration.manage',
       'notifications.show',
     ],
   })

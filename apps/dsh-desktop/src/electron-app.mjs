@@ -8,6 +8,7 @@ import { cp, lstat, mkdir, readFile, rename, rm, symlink, writeFile } from 'node
 
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
+import { createDesktopDataMigration } from './desktop-data-migration.mjs'
 import { resolveDesktopDataLocation } from './desktop-data-location.mjs'
 import {
   CLOSE_BEHAVIORS,
@@ -707,6 +708,35 @@ export async function startElectronApp(metadata) {
   const logsDirectory = join(userData, 'logs')
   const logStore = new BoundedLogStore({ directory: logsDirectory })
   const legacyHome = join(homedir(), '.dsh')
+  const dataMigration = createDesktopDataMigration({
+    userData,
+    forbidden: app.isPackaged ? [dirname(app.getPath('exe')), process.resourcesPath] : [dirname(SOURCE_DIR)],
+    available: () => runtimeProvider?.status?.state === 'ready',
+    choose: async home => {
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: '选择数据迁移目录', defaultPath: home, properties: ['openDirectory', 'createDirectory'],
+      })
+      return result.canceled ? undefined : result.filePaths[0]
+    },
+    confirm: async ({ source, target }) => (await dialog.showMessageBox(mainWindow, {
+      type: 'question', title: '迁移数据目录',
+      message: '迁移期间将停止运行时，完成复制后桌面应用会重新启动。',
+      detail: source + '\n' + target + '\n旧目录将保留。',
+      buttons: ['取消', '开始迁移'], defaultId: 0, cancelId: 0,
+    })).response === 1,
+    stop: async () => {
+      await unregisterExtensionIpc.quiesce()
+      extensionRuntimeMaintenance = true
+      await runtimeProvider.stop()
+    },
+    restart: async () => {
+      extensionRuntimeMaintenance = false
+      await unregisterExtensionIpc.resume()
+      await runtimeProvider.start()
+    },
+    relaunch: async () => { app.relaunch(); app.quit() },
+  })
+  const verifyingDataMigration = await dataMigration.prepareBoot()
   let dataLocation
   try {
     dataLocation = await resolveDesktopDataLocation({
@@ -729,9 +759,11 @@ export async function startElectronApp(metadata) {
     if (error?.code === 'DESKTOP_DATA_LOCATION_CANCELLED') { app.quit(); return }
     throw error
   }
+  const dataMigrationActions = Object.fromEntries(['status', 'choose', 'preflight', 'execute']
+    .map(action => [action, () => dataMigration[action](dataLocation)]))
   const dshHome = dataLocation.home
   const legacyHomeExists = await lstat(legacyHome).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error })
-  const explicitlySelectedHome = ['selected', 'persisted'].includes(dataLocation.source) && !legacyHomeExists
+  const explicitlySelectedHome = dataLocation.relocated || (['selected', 'persisted'].includes(dataLocation.source) && !legacyHomeExists)
   const communityHomeMigration = process.env.DSH_HOME || explicitlySelectedHome
     ? undefined
     : new CommunityHomeMigration({
@@ -2021,6 +2053,7 @@ export async function startElectronApp(metadata) {
       data: dshHome,
       cache: [join(userData, 'Cache'), join(dshHome, 'cache'), process.env.DSH_DESKTOP_BROWSER_COMPONENT_CACHE].filter(Boolean).join('\n'),
     },
+    dataMigration: dataMigrationActions,
     conversationImportService,
     openConversationImport: () => createHandoffWindow(),
     pickProjectDirectory: () => pickProjectDirectory(),
@@ -2374,6 +2407,7 @@ export async function startElectronApp(metadata) {
     getWindow: () => desktopWindowFactory.extensionWindow ?? mainWindow,
     pluginManager,
     controller: runtimeProvider,
+    dataMigration: dataMigrationActions,
     ensureProfile,
     preflightFeatureMutation,
     projectRoot,
@@ -3015,9 +3049,15 @@ export async function startElectronApp(metadata) {
   })
   const startup = beginDesktopStartup({
     loadShell: loadStartup,
-    startRuntime: () => startupCoordinator.start({
-      builtinsOnly: blockedPluginArchiveRecovery !== undefined,
-    }),
+    startRuntime: async () => {
+      let result
+      try {
+        result = await startupCoordinator.start({ builtinsOnly: blockedPluginArchiveRecovery !== undefined })
+      } finally {
+        if (verifyingDataMigration) await dataMigration.finishBoot(result?.state === 'ready-full' || result?.state === 'ready-builtins')
+      }
+      return result
+    },
     holdRuntime,
   })
   startupRuntimePromise = startup.runtimePromise
