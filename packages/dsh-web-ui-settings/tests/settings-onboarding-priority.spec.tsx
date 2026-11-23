@@ -162,16 +162,19 @@ function registryFixture() {
   const store = defineStore({ init: () => ({ open: false }), actions: { close: draft => { draft.open = false } } })
   const create = vi.spyOn(store, 'create')
   const inject = vi.fn(() => ({ hooks: { onboardingSteps: observable([]) } }))
-  const mount = (component: unknown = OfficialShell) => register({ name: 'sidebar.settings', store, inject, locale: 'settings', registrant: 'ui-settings-general', children: {
+  const mount = (component: unknown = OfficialShell, factory = false) => register({ name: 'sidebar.settings', store, inject, locale: 'settings', registrant: 'ui-settings-general', children: {
     'settings.onboarding': { kind: 'list', scope: 'root' },
-    'settings.section': { kind: 'list', scope: 'root' },
+    ...(factory ? {
+      'settings.trigger': { kind: 'single', scope: 'root' },
+      'settings.section.icon': { kind: 'list', scope: 'root' },
+    } : { 'settings.section': { kind: 'list', scope: 'root' } }),
   } }, component)
   return { core, slots, register, mount, store, create, inject, listeners, offMutation }
 }
 
-it('preserves the real SDK declarations, store and injection while aliasing authorized child rendering', () => {
+it.each([false, true])('preserves SDK declarations, store and injection while aliasing authorized child rendering (factory: %s)', factory => {
   const fixture = registryFixture()
-  const unmount = fixture.mount()
+  const unmount = fixture.mount(undefined, factory)
   const original = fixture.core.entriesOfSlot('sidebar.settings')[0]!
   const topology = fixture.core.snapshot('settings.onboarding')
   const dispose = installSettingsOnboardingPriority(fixture.slots as unknown as Parameters<typeof installSettingsOnboardingPriority>[0])
@@ -184,7 +187,7 @@ it('preserves the real SDK declarations, store and injection while aliasing auth
   expect(selected.locale).toBe(original.locale)
   expect(fixture.create).not.toHaveBeenCalled()
   expect(fixture.inject).not.toHaveBeenCalled()
-  expect(Object.keys(selected.children ?? {})).toHaveLength(2)
+  expect(Object.keys(selected.children ?? {})).toHaveLength(factory ? 3 : 2)
   expect(selected.children).not.toHaveProperty('settings.onboarding')
   dispose()
   dispose()

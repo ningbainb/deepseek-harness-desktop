@@ -1,5 +1,5 @@
-import { createElement, useCallback, useMemo, type ComponentType } from 'react'
-import type { SnapshotSelectorHook, SlotEntryDef, SlotSpec, StoredEntry, SlotRegistry } from './settings-sdk-adapter.ts'
+import { createElement, useCallback, useMemo, type ComponentType, type ReactNode } from 'react'
+import type { RenderFactorySlot, SnapshotSelectorHook, SlotEntryDef, SlotSpec, StoredEntry, SlotRegistry } from './settings-sdk-adapter.ts'
 import { mirrorDockSlot, remapSlotProps } from './dock-slot-mirror.tsx'
 import { canLeaveDesktopNativeSettings, useDesktopNativeSettingsNavigation } from './desktop-native-settings.tsx'
 import { DesktopSettingsGroup, groupDesktopSettings, type SettingsSection } from './desktop-settings-groups.tsx'
@@ -10,6 +10,7 @@ type SettingsProps = {
   useOnboardingSteps: SnapshotSelectorHook<OnboardingStep[]>
   useSections?: SnapshotSelectorHook<readonly SettingsSection[]>
   renderSlot?: unknown
+  renderFactorySlot?: unknown
   actions?: { openSection?: (id: string) => void; select?: (id: string) => void; close?: () => void }
 }
 type DynamicOptions = StoredEntry['options'] & Omit<StoredEntry, 'component' | 'options'> & { name: string }
@@ -48,17 +49,33 @@ export function withSettingsOnboardingPriority<Props extends SettingsProps>(Comp
       steps => select(settingsOpen ? deferredSteps : steps), equal,
     )
     const renderNative = props.renderSlot as Parameters<typeof remapSlotProps>[0]['renderSlot']
-    const grouped = rows !== undefined && typeof renderNative === 'function'
+    const renderNativeFactory = props.renderFactorySlot as RenderFactorySlot | undefined
+    const grouped = rows !== undefined && (typeof renderNative === 'function' || typeof renderNativeFactory === 'function')
     const useSections: SettingsProps['useSections'] = select => select(groups)
     const useStore: SettingsProps['useStore'] = select => select({
       ...nativeState, activeId: activeGroup?.id ?? activeId,
     })
-    const renderSlot: NonNullable<typeof renderNative> = (key, owner, options) => {
-      const only = (options as { only?: string } | undefined)?.only
-      const group = key === 'settings.section' && groups.find(item => item.id === only)
-      if (!group) return renderNative?.(key, owner, options)
+    const renderGroup = (groupId: string | undefined, renderSection: (id: string) => ReactNode) => {
+      const group = groups.find(item => item.id === groupId)
+      if (!group) return undefined
       return <DesktopSettingsGroup key={group.id} group={group} activeId={activeId} onSelect={selectSection}
-        renderSection={id => renderNative?.(key, owner, { ...options as object, only: id })} />
+        renderSection={renderSection} />
+    }
+    const renderSlot: NonNullable<typeof renderNative> = (key, owner, options) => {
+      if (key === 'settings.section') {
+        const only = (options as { only?: string } | undefined)?.only
+        const group = renderGroup(only, id => renderNative?.(key, owner, { ...options as object, only: id }))
+        if (group) return group
+      }
+      return renderNative?.(key, owner, options)
+    }
+    const renderFactorySlot: RenderFactorySlot = (key, owner, options) => {
+      if (key === 'settings.section.view') {
+        const { id } = owner as { id: string }
+        const group = renderGroup(id, section => renderNativeFactory?.(key, { ...owner, id: section }, options))
+        if (group) return group
+      }
+      return renderNativeFactory?.(key, owner, options)
     }
     const actions = props.actions && {
       ...props.actions,
@@ -69,7 +86,10 @@ export function withSettingsOnboardingPriority<Props extends SettingsProps>(Comp
       },
       close: () => { if (canLeaveDesktopNativeSettings(document)) props.actions?.close?.() },
     }
-    return createElement(Component, { ...props, actions, useOnboardingSteps, ...(grouped && { useStore, useSections, renderSlot }) })
+    return createElement(Component, {
+      ...props, actions, useOnboardingSteps,
+      ...(grouped && { useStore, useSections, renderSlot, ...(renderNativeFactory && { renderFactorySlot }) }),
+    })
   }
 }
 
@@ -129,7 +149,10 @@ export function installSettingsOnboardingPriority(slots: Registry, getLanguage?:
         const previous = active
         active = undefined
         previous?.dispose()
-        if (source?.store && source.children?.['settings.onboarding'] && source.children['settings.section']) active = decorate(source)
+        const children = source?.children
+        // Alpha.2 moved the section declaration from the shell to a Factory.
+        if (source?.store && children?.['settings.onboarding']
+          && (children['settings.section'] || (children['settings.trigger'] && children['settings.section.icon']))) active = decorate(source)
       } while (dirty && !stopped)
     } finally {
       updating = false

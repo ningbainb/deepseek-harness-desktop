@@ -69,7 +69,7 @@ it('retains dirty native edits when closing Settings or choosing another destina
   expect(actions.openSection).toHaveBeenCalledExactlyOnceWith('desktop-model-advanced')
 })
 
-it('groups the official navigation while opening old links at the exact mounted section', () => {
+it.each(['slot', 'factory'])('groups the official %s navigation while opening old links at the exact mounted section', dispatch => {
   const rows = [
     ['general', 'General'], ['models', 'Models'], ['chatgpt-auth', 'ChatGPT sign-in'], ['dsh-usage', 'Usage'],
     ['desktop-personal-preferences', 'Personal preferences'], ['agent-presets', 'Agent presets'],
@@ -82,13 +82,17 @@ it('groups the official navigation while opening old links at the exact mounted 
     useSections: SnapshotSelectorHook<typeof rows>
     useOnboardingSteps: SnapshotSelectorHook<Array<{ id: string; order: number }>>
     renderSlot: (key: string, owner: unknown, options: { only?: string }) => ReactNode
+    renderFactorySlot?: (key: 'settings.section.view', owner: { id: string; close(): void }) => ReactNode
   }
-  const NativeShell = withSettingsOnboardingPriority<Shell>(({ actions, useStore, useSections, renderSlot }) => {
+  const NativeShell = withSettingsOnboardingPriority<Shell>(({ actions, useStore, useSections, renderSlot, renderFactorySlot }) => {
     const selected = useStore(state => state.activeId)
     const sections = useSections(value => value)
+    const close = () => {}
     return <div data-shortcut-modal="settings">
       <nav>{sections.map(row => <button key={row.id} aria-current={row.id === selected} onClick={() => actions.select(row.id)}>{row.label}</button>)}</nav>
-      {renderSlot('settings.section', { close: () => {} }, selected === undefined ? {} : { only: selected })}
+      {selected !== undefined && (renderFactorySlot
+        ? renderFactorySlot('settings.section.view', { id: selected, close })
+        : renderSlot('settings.section', { close }, { only: selected }))}
     </div>
   })
   function Fixture() {
@@ -96,7 +100,8 @@ it('groups the official navigation while opening old links at the exact mounted 
     return <NativeShell actions={{ openSection: setId, select: setId }}
       useStore={selector => selector({ open: true, activeId: id })} useSections={selector => selector(rows)}
       useOnboardingSteps={selector => selector([])}
-      renderSlot={(_key, _owner, options) => <div data-testid="official-form">{options.only}</div>} />
+      renderSlot={(_key, _owner, options) => <div data-testid="official-form">{options.only}</div>}
+      renderFactorySlot={dispatch === 'factory' ? (_key, { id }) => <div data-testid="official-form">{id}</div> : undefined} />
   }
   render(<Fixture />)
   expect(screen.getByRole('navigation').querySelectorAll('button')).toHaveLength(6)

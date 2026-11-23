@@ -1376,6 +1376,7 @@
       "features": [
         "five-groups-preserve-all-legacy-entries",
         "six-native-settings-groups-with-direct-links-to-original-sections",
+        "official-section-factory-preserves-settings-navigation-and-editors",
         "single-value-mode-editor-through-models-advanced",
         "conversation-team-operations-and-compatible-settings-switch",
         "agent-team-and-shared-browser-settings-routes",
