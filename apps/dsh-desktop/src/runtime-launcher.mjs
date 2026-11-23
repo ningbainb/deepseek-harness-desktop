@@ -357,7 +357,11 @@ async function run() {
       if (ctx.get('connection') === undefined || ctx.get('clientModules') === undefined || ctx.get('typertGateway') === undefined) {
         throw new Error('desktop pipe mode requires connection, clientModules, and typertGateway services')
       }
-      accountCallback = await createRuntimeAccountCallback({ webServer: ctx.webServer })
+      const webServer = ctx.webServer
+      accountCallback = await createRuntimeAccountCallback({
+        webServer,
+        dispatch: (request, response, next) => ctx.waterfall(webServer, 'webserver/request', request, response, next),
+      })
       const sessionCookie = createDesktopPipeSessionCookie(ctx)
       pipeServer = await createRuntimePipeServer({
         identity: pipeIdentity,

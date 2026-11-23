@@ -518,6 +518,7 @@
         "native-narrow-sidebar-and-dismiss-mask-stay-clickable",
         "skin-title-and-status-bars-reserve-additive-desktop-space",
         "official-account-oauth-callback-only-loopback-bridge",
+        "official-account-callback-reaches-sdk-middleware-after-exact-loopback-validation",
         "official-authorization-popup-exact-origin-and-path",
         "bai-recommendation-below-official-login-with-price-caveat",
         "official-direct-login-is-distinguished-from-the-direct-bai-browser-authorization-entry",

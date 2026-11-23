@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { request } from 'node:http'
 import test from 'node:test'
+import { Context } from '@deepseek-ai/cordis'
 import { createRuntimeAccountCallback } from '../src/runtime-account-callback.mjs'
 
 async function callbackFixture(context) {
@@ -64,4 +65,25 @@ test('expired provider routes and Runtime shutdown revoke callback access', asyn
   await fixture.bridge.close()
   await fixture.bridge.close()
   await assert.rejects(fetch(`${fixture.bridge.origin}/oauth/callback?code=x&state=sdk-owned-state`))
+})
+
+test('Alpha.2 callback middleware receives the original loopback Host and exact validated target', async context => {
+  const ctx = new Context()
+  const webServer = { match: () => undefined }
+  const calls = []
+  ctx.on('webserver/request', async (incoming, response) => {
+    const url = new URL(incoming.url, `http://${incoming.headers.host}`)
+    calls.push(url)
+    response.writeHead(url.searchParams.get('state') === 'sdk-owned-state' ? 302 : 400).end()
+  })
+  const bridge = await createRuntimeAccountCallback({
+    webServer,
+    dispatch: (request, response, next) => ctx.waterfall(webServer, 'webserver/request', request, response, next),
+  })
+  context.after(() => bridge.close())
+  assert.equal((await fetch(bridge.origin + '/api/account/getState')).status, 404)
+  assert.equal((await fetch(bridge.origin + '/oauth/callback?code=x&state=foreign')).status, 400)
+  assert.equal((await fetch(bridge.origin + '/oauth/callback?code=x&state=sdk-owned-state', { redirect: 'manual' })).status, 302)
+  assert.equal(calls.length, 2)
+  assert.ok(calls.every(url => url.origin === bridge.origin && url.pathname === '/oauth/callback'))
 })

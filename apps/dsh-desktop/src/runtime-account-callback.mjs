@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 
-export async function createRuntimeAccountCallback({ webServer }) {
+export async function createRuntimeAccountCallback({ webServer, dispatch }) {
   if (typeof webServer?.match !== 'function') throw new TypeError('account callback requires the official WebRoute service')
   let origin
   const server = createServer((request, response) => {
@@ -21,20 +21,20 @@ export async function createRuntimeAccountCallback({ webServer }) {
       response.writeHead(400).end()
       return
     }
-    const route = webServer.match('/oauth/callback')
-    if (route?.kind !== 'exact' || route.path !== '/oauth/callback' || typeof route.handler !== 'function') {
-      response.writeHead(410).end()
-      return
+    const legacyCallback = async () => {
+      const route = webServer.match('/oauth/callback')
+      if (route?.kind !== 'exact' || route.path !== '/oauth/callback' || typeof route.handler !== 'function') {
+        response.writeHead(410).end()
+        return
+      }
+      await route.handler(request, response)
     }
-    try {
-      Promise.resolve(route.handler(request, response)).catch(() => {
-        if (!response.headersSent) response.writeHead(500).end()
-        else response.destroy()
-      })
-    } catch {
+    Promise.resolve().then(() => dispatch === undefined
+      ? legacyCallback()
+      : dispatch(request, response, legacyCallback)).catch(() => {
       if (!response.headersSent) response.writeHead(500).end()
       else response.destroy()
-    }
+    })
   })
   server.requestTimeout = 10_000
   server.headersTimeout = 10_000
