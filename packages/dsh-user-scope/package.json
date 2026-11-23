@@ -1,6 +1,7 @@
 {
   "name": "@ningbainb/dsh-user-scope",
   "description": "Shared user identity, workspace/session ownership, and device-scoped authorization for DeepSeek Harness plugins",
+  "author": "ningbainb",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

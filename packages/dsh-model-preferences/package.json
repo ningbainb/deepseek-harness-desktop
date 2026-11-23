@@ -1,6 +1,7 @@
 {
   "name": "@linxin666/dsh-client-ui-model-preferences",
   "description": "Persisted model pinning and provider ordering for the official DeepSeek Harness model selector.",
+  "author": "ningbainb",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

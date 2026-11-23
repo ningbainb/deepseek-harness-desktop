@@ -1,6 +1,7 @@
 {
   "name": "@ningbainb/dsh-chat-artifacts",
   "description": "Chat Artifact plugin for DSH: renders safe HTML/CSS/SVG visualizations inline in conversation tool results.",
+  "author": "ningbainb",
   "version": "0.1.0",
   "type": "module",
   "engines": {

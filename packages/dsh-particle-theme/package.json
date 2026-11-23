@@ -2,6 +2,7 @@
   "name": "@linxin666/dsh-particle-theme",
   "version": "0.1.15",
   "description": "Page-aware whale particle theme for DeepSeek Harness Web UI",
+  "author": "ningbainb",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

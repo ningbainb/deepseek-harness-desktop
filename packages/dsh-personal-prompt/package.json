@@ -1,6 +1,7 @@
 {
   "name": "@ningbainb/dsh-personal-prompt",
   "description": "Owner-safe Personal Prompt profiles for DeepSeek Harness using the official SystemPrompt section and variable contracts.",
+  "author": "ningbainb",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

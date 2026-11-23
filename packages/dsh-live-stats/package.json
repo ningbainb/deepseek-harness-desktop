@@ -2,6 +2,7 @@
   "name": "@linxin666/dsh-live-stats",
   "version": "0.1.15",
   "description": "Live token estimates and generation throughput for DSH Web",
+  "author": "ningbainb",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

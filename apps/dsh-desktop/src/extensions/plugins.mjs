@@ -198,6 +198,23 @@ function gitPrepareAllowBuildFromError(error, installSpec) {
   return allowedBuild
 }
 
+const NINGBAINB_AUTHORED_PACKAGES = new Set([
+  '@linxin666/dsh-value-mode',
+  '@ningbainb/dsh-memory',
+  '@ningbainb/dsh-personal-prompt',
+  '@ningbainb/dsh-user-scope',
+  '@ningbainb/dsh-chat-artifacts',
+  '@linxin666/dsh-client-ui-model-preferences',
+  '@linxin666/dsh-desktop-compat',
+  '@linxin666/dsh-desktop-repair',
+  '@linxin666/dsh-live-stats',
+  '@linxin666/dsh-particle-theme',
+  '@linxin666/dsh-client-ui-mode-switcher',
+  '@linxin666/dsh-mode-switcher',
+  '@linxin666/dsh-liangshen',
+  '@linxin666/dsh-desktop',
+])
+
 export function createPluginInventory(manifest, {
   installedManifests = new Map(),
   hostCompatibility,
@@ -227,13 +244,18 @@ export function createPluginInventory(manifest, {
               ? localizedDescription.en
               : undefined
       const author = installed?.author
-      const publisher = typeof author === 'string'
+      const rawPublisher = typeof author === 'string'
         ? author
         : typeof author?.name === 'string'
           ? author.name
           : typeof installed?.publisher === 'string'
             ? installed.publisher
             : undefined
+      const publisher = NINGBAINB_AUTHORED_PACKAGES.has(name)
+        ? 'ningbainb'
+        : typeof rawPublisher === 'string' && /666/i.test(rawPublisher)
+          ? undefined
+          : rawPublisher
       const declaredPermissions = installed?.dsh?.permissions
       return {
         name,

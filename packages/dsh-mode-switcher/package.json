@@ -1,6 +1,7 @@
 {
   "name": "@linxin666/dsh-client-ui-mode-switcher",
   "description": "A session-header agent mode switcher that applies in place for blank sessions and starts a safe same-workspace session after conversation history exists.",
+  "author": "ningbainb",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

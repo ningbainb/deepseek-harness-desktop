@@ -1,6 +1,7 @@
 {
   "name": "@ningbainb/dsh-memory",
   "description": "Owner-isolated, local-only memory with explicit confirmation and bounded SystemPrompt injection.",
+  "author": "ningbainb",
   "version": "0.1.0",
   "type": "module",
   "main": "lib/index.js",

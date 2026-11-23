@@ -9,7 +9,7 @@
     "url": "https://github.com/ningbainb/deepseek-harness-desktop.git"
   },
   "desktopName": "com.ningbainb.deepseek-harness.desktop",
-  "author": "ningbai牛逼",
+  "author": "ningbainb",
   "type": "module",
   "main": "src/main.mjs",
   "license": "BSD-3-Clause",

@@ -1,6 +1,7 @@
 {
   "name": "@linxin666/dsh-desktop-compat",
   "description": "Desktop-only compatibility fixes for DeepSeek Harness queue continuation and cancellation presentation.",
+  "author": "ningbainb",
   "version": "2.0.0",
   "type": "module",
   "packageManager": "pnpm@11.7.0",

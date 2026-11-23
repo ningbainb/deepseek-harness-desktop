@@ -344,8 +344,24 @@ function pluginStatusMarkup(plugin) {
   return `<span class="plugin-status ${presentation.tone}">${escapeHtml(presentation.label)}</span>`
 }
 
+function formatInstalledPublisher(plugin) {
+  const raw = typeof plugin?.publisher === 'string' ? plugin.publisher.trim() : ''
+  if (raw && !/666/i.test(raw)) {
+    if (raw === '社区作者' && typeof plugin?.name === 'string' && /666/i.test(plugin.name)) {
+      return ''
+    }
+    return raw
+  }
+  if (typeof plugin?.name === 'string' && /666/i.test(plugin.name)) {
+    return ''
+  }
+  return '社区作者'
+}
+
 function pluginMarkup(plugin) {
-  return `<article class="plugin-card" data-plugin-status="${escapeHtml(plugin.status ?? 'normal')}"><button type="button" class="plugin-card-main" data-open-plugin="${escapeHtml(plugin.name)}" aria-label="查看 ${escapeHtml(plugin.displayName ?? plugin.name)}"><span class="plugin-card-icon">${nativeIconSvg('sparkles')}</span><span class="plugin-card-copy"><span class="plugin-card-title-row"><strong>${escapeHtml(plugin.displayName ?? plugin.name)}</strong>${pluginStatusMarkup(plugin)}</span><span class="plugin-card-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</span><span class="plugin-card-publisher">${escapeHtml(plugin.publisher ?? '社区作者')}</span></span></button></article>`
+  const publisher = formatInstalledPublisher(plugin)
+  const publisherHtml = publisher ? `<span class="plugin-card-publisher">${escapeHtml(publisher)}</span>` : ''
+  return `<article class="plugin-card" data-plugin-status="${escapeHtml(plugin.status ?? 'normal')}"><button type="button" class="plugin-card-main" data-open-plugin="${escapeHtml(plugin.name)}" aria-label="查看 ${escapeHtml(plugin.displayName ?? plugin.name)}"><span class="plugin-card-icon">${nativeIconSvg('sparkles')}</span><span class="plugin-card-copy"><span class="plugin-card-title-row"><strong>${escapeHtml(plugin.displayName ?? plugin.name)}</strong>${pluginStatusMarkup(plugin)}</span><span class="plugin-card-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</span>${publisherHtml}</span></button></article>`
 }
 
 function pluginDetailMarkup(plugin) {
@@ -367,7 +383,9 @@ function pluginDetailMarkup(plugin) {
   const settingsAction = plugin.enabled
     ? `<section class="plugin-native-settings"><div><strong>插件自带设置</strong><p>在主界面的原生插件详情中配置此插件提供的选项。</p></div><button type="button" class="primary" data-open-plugin-settings="${escapeHtml(plugin.name)}">打开插件设置</button></section>`
     : '<section class="plugin-native-settings"><div><strong>插件自带设置</strong><p>启用插件后可打开它提供的详细设置。</p></div></section>'
-  return `<button type="button" class="plugin-detail-back" data-close-plugin-detail aria-label="返回已安装插件">返回</button><header class="plugin-detail-header"><span class="plugin-detail-icon">${nativeIconSvg('sparkles')}</span><div><h2>${escapeHtml(plugin.displayName ?? plugin.name)}</h2><p>${escapeHtml(plugin.publisher ?? '社区作者')}</p></div></header><p class="plugin-detail-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</p>${attention}<label class="plugin-enable-row"><span><strong>启用插件</strong><small>${plugin.enabled ? '插件当前已启用' : '插件当前已停用'}</small></span><input type="checkbox" role="switch" data-toggle-plugin="${escapeHtml(plugin.name)}"${plugin.enabled ? ' checked' : ''} data-mutation-control></label>${settingsAction}<dl class="plugin-detail-facts"><div><dt>版本</dt><dd>${escapeHtml(plugin.version ? `v${plugin.version}` : '未知')}</dd></div><div><dt>更新</dt><dd>${updateLine}</dd></div><div><dt>权限</dt><dd><ul>${permissions}</ul></dd></div></dl><button type="button" class="plugin-uninstall" data-remove-plugin="${escapeHtml(plugin.name)}" data-mutation-control>卸载插件</button><details class="plugin-advanced-information"><summary>高级信息</summary><dl><div><dt>Compatibility</dt><dd>${escapeHtml(compatibilityText)}</dd></div><div><dt>Runtime Range</dt><dd>${escapeHtml(plugin.advanced?.runtimeRange ?? '未声明')}</dd></div><div><dt>Source</dt><dd>${escapeHtml(plugin.advanced?.source ?? plugin.requested ?? '未知')}</dd></div><div><dt>Package Name</dt><dd>${escapeHtml(plugin.name)}</dd></div><div><dt>Integrity</dt><dd>${escapeHtml(plugin.advanced?.integrity ?? '由安装事务校验')}</dd></div></dl>${facts.length ? `<p>${escapeHtml(facts.join(' · '))}</p>` : ''}</details>`
+  const publisher = formatInstalledPublisher(plugin)
+  const publisherHtml = publisher ? `<p>${escapeHtml(publisher)}</p>` : ''
+  return `<button type="button" class="plugin-detail-back" data-close-plugin-detail aria-label="返回已安装插件">返回</button><header class="plugin-detail-header"><span class="plugin-detail-icon">${nativeIconSvg('sparkles')}</span><div><h2>${escapeHtml(plugin.displayName ?? plugin.name)}</h2>${publisherHtml}</div></header><p class="plugin-detail-description">${escapeHtml(plugin.description ?? '此插件暂未提供说明。')}</p>${attention}<label class="plugin-enable-row"><span><strong>启用插件</strong><small>${plugin.enabled ? '插件当前已启用' : '插件当前已停用'}</small></span><input type="checkbox" role="switch" data-toggle-plugin="${escapeHtml(plugin.name)}"${plugin.enabled ? ' checked' : ''} data-mutation-control></label>${settingsAction}<dl class="plugin-detail-facts"><div><dt>版本</dt><dd>${escapeHtml(plugin.version ? `v${plugin.version}` : '未知')}</dd></div><div><dt>更新</dt><dd>${updateLine}</dd></div><div><dt>权限</dt><dd><ul>${permissions}</ul></dd></div></dl><button type="button" class="plugin-uninstall" data-remove-plugin="${escapeHtml(plugin.name)}" data-mutation-control>卸载插件</button><details class="plugin-advanced-information"><summary>高级信息</summary><dl><div><dt>Compatibility</dt><dd>${escapeHtml(compatibilityText)}</dd></div><div><dt>Runtime Range</dt><dd>${escapeHtml(plugin.advanced?.runtimeRange ?? '未声明')}</dd></div><div><dt>Source</dt><dd>${escapeHtml(plugin.advanced?.source ?? plugin.requested ?? '未知')}</dd></div><div><dt>Package Name</dt><dd>${escapeHtml(plugin.name)}</dd></div><div><dt>Integrity</dt><dd>${escapeHtml(plugin.advanced?.integrity ?? '由安装事务校验')}</dd></div></dl>${facts.length ? `<p>${escapeHtml(facts.join(' · '))}</p>` : ''}</details>`
 }
 
 const NATIVE_PLUGINS = [
@@ -421,6 +439,7 @@ const NATIVE_PLUGINS = [
     id: 'value-mode',
     name: '性价比模式 (Value Mode)',
     packageName: '@linxin666/dsh-value-mode',
+    author: 'ningbainb',
     category: 'ai',
     categoryLabel: 'AI 核心',
     description: '智能专家主控与副模型子代理分流调度，在保证深度思考质量的同时显著降低 Token 消耗。',
@@ -431,6 +450,7 @@ const NATIVE_PLUGINS = [
     id: 'memory',
     name: '长期记忆持久化 (Memory)',
     packageName: '@ningbainb/dsh-memory',
+    author: 'ningbainb',
     category: 'ai',
     categoryLabel: 'AI 核心',
     description: '当前用户本机长期事实与偏好记忆持久化，支持跨会话语义注入与敏感信息自动拦截。',
@@ -441,6 +461,7 @@ const NATIVE_PLUGINS = [
     id: 'personal-prompt',
     name: '回复偏好',
     packageName: '@ningbainb/dsh-personal-prompt',
+    author: 'ningbainb',
     category: 'ai',
     categoryLabel: 'AI 核心',
     description: '本地多 Profile 提示词配置管理，按工作区与全局作用域自动注入模型请求上下文。',
@@ -451,6 +472,7 @@ const NATIVE_PLUGINS = [
     id: 'model-preferences',
     name: '模型偏好与选择器',
     packageName: '@linxin666/dsh-client-ui-model-preferences',
+    author: 'ningbainb',
     category: 'ai',
     categoryLabel: 'AI 核心',
     description: '自定义供应商排序、模型自定义钉选与一键模型切换器。',
@@ -481,6 +503,7 @@ const NATIVE_PLUGINS = [
     id: 'desktop-compat',
     name: '桌面原生兼容层',
     packageName: '@linxin666/dsh-desktop-compat',
+    author: 'ningbainb',
     category: 'system',
     categoryLabel: '运行守护',
     description: '深度对接 Windows/macOS 系统原生文件、受信任工作区打开与后台排程服务。',
@@ -491,6 +514,7 @@ const NATIVE_PLUGINS = [
     id: 'desktop-repair',
     name: '环境自愈与故障隔离',
     packageName: '@linxin666/dsh-desktop-repair',
+    author: 'ningbainb',
     category: 'system',
     categoryLabel: '运行守护',
     description: '三层启动防死锁与配置自愈引擎，异常时自动安全隔离并支持配置快照一键回滚。',
@@ -501,6 +525,7 @@ const NATIVE_PLUGINS = [
     id: 'user-scope',
     name: '用户作用域与安全守卫',
     packageName: '@ningbainb/dsh-user-scope',
+    author: 'ningbainb',
     category: 'system',
     categoryLabel: '运行守护',
     description: '本地回环通信身份校验，保障多用户配置隔离、敏感 Token 与工作区私密安全。',
@@ -521,6 +546,7 @@ const NATIVE_PLUGINS = [
     id: 'live-stats',
     name: '实时监控看板',
     packageName: '@linxin666/dsh-live-stats',
+    author: 'ningbainb',
     category: 'system',
     categoryLabel: '运行守护',
     description: '毫秒级跟踪模型请求延迟、Token 吞吐速度与会话开销分析。',
@@ -591,6 +617,7 @@ const NATIVE_PLUGINS = [
     id: 'particle-theme',
     name: '动态粒子交互背景',
     packageName: '@linxin666/dsh-particle-theme',
+    author: 'ningbainb',
     category: 'ui',
     categoryLabel: '界面主题',
     description: '基于 Canvas 与 WebGL 的流体交互粒子背景，鼠标引力跟随与主题色系联动。',
@@ -621,6 +648,7 @@ const NATIVE_PLUGINS = [
     id: 'mode-switcher',
     name: '交互模式切换器',
     packageName: '@linxin666/dsh-mode-switcher',
+    author: 'ningbainb',
     category: 'ui',
     categoryLabel: '界面主题',
     description: '桌面通过设置中的原生 Agent 预设管理工作方式；保留当前会话、历史预设与 Web 模式切换。',
@@ -631,6 +659,7 @@ const NATIVE_PLUGINS = [
     id: 'liangshen',
     name: '量身定制体验',
     packageName: '@linxin666/dsh-liangshen',
+    author: 'ningbainb',
     category: 'ui',
     categoryLabel: '界面主题',
     description: '支持个人按需定制快捷操作与交互行为注入。',
@@ -676,7 +705,13 @@ function nativePluginMarkup(item, installedPlugin) {
     ? `<button type="button" class="secondary" data-open-native-plugin-options="${escapeHtml(item.settingsOwner)}">打开设置</button>`
     : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
   const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
-  return `<article class="native-card" data-category="${escapeHtml(item.category)}" data-id="${escapeHtml(item.id)}"><div class="native-card-header"><div class="native-card-icon-wrap">${nativeIconSvg(item.icon)}</div><div class="native-card-title-group"><div class="native-card-name-row"><h3 class="native-card-title">${escapeHtml(item.name)}</h3><span class="badge builtin">原生内置</span></div><span class="native-package-name">${escapeHtml(item.packageName)}</span></div></div><p class="native-card-desc">${escapeHtml(item.description)}</p><div class="native-features-row">${featuresHtml}</div><div class="native-card-footer"><div class="native-status-pill"><span class="status-dot"></span><span>随桌面版维护 (${escapeHtml(version)})</span></div>${settingsLink}<span class="native-safe-badge" title="受保护的桌面级原生能力">内置</span></div></article>`
+  const subtitle = item.author
+    ? `作者：${item.author}`
+    : /666/i.test(item.packageName)
+      ? ''
+      : item.packageName
+  const subtitleHtml = subtitle ? `<span class="native-package-name">${escapeHtml(subtitle)}</span>` : ''
+  return `<article class="native-card" data-category="${escapeHtml(item.category)}" data-id="${escapeHtml(item.id)}"><div class="native-card-header"><div class="native-card-icon-wrap">${nativeIconSvg(item.icon)}</div><div class="native-card-title-group"><div class="native-card-name-row"><h3 class="native-card-title">${escapeHtml(item.name)}</h3><span class="badge builtin">原生内置</span></div>${subtitleHtml}</div></div><p class="native-card-desc">${escapeHtml(item.description)}</p><div class="native-features-row">${featuresHtml}</div><div class="native-card-footer"><div class="native-status-pill"><span class="status-dot"></span><span>随桌面版维护 (${escapeHtml(version)})</span></div>${settingsLink}<span class="native-safe-badge" title="受保护的桌面级原生能力">内置</span></div></article>`
 }
 
 let currentNativeCategory = 'all'
@@ -754,9 +789,18 @@ function marketPluginMarkup(plugin) {
     : ''
   const downloads = Number.isSafeInteger(plugin.downloads) ? compactNumber.format(plugin.downloads) : '--'
   const stars = Number.isSafeInteger(plugin.stars) ? compactNumber.format(plugin.stars) : '--'
-  const author = plugin.owner ? `by ${plugin.owner}` : '社区作者'
+  const hiddenOwner = typeof plugin.owner === 'string' && /666/i.test(plugin.owner)
+  const hiddenSpec = typeof plugin.installSpec === 'string' && /666/i.test(plugin.installSpec)
+  const author = hiddenOwner
+    ? ''
+    : plugin.owner
+      ? `by ${plugin.owner}`
+      : hiddenSpec
+        ? ''
+        : '社区作者'
+  const authorHtml = author ? `<p>${escapeHtml(author)}</p>` : ''
   const failure = plugin.failureCategory ? `<p class="market-operation-state error" role="status">失败分类：${escapeHtml(plugin.failureCategory)}</p>` : ''
-  return `<article class="market-card"><div class="market-card-head"><div class="market-card-title"><h3 title="${escapeHtml(plugin.name)}">${escapeHtml(plugin.displayName)}</h3><p>${escapeHtml(author)}</p></div><div class="name-row"><span class="badge">${sourceBadge}</span>${verificationBadge}${deprecatedBadge}</div></div><p class="description">${escapeHtml(marketDescription(plugin))}</p><div class="market-source" title="${escapeHtml(plugin.installSpec)}">${escapeHtml(plugin.installSpec)}</div>${operationState}${failure}<div class="market-card-foot"><div class="market-stats"><span>DL ${escapeHtml(downloads)}</span><span>STAR ${escapeHtml(stars)}</span><span>${escapeHtml(plugin.category)}</span></div>${action}</div></article>`
+  return `<article class="market-card"><div class="market-card-head"><div class="market-card-title"><h3 title="${escapeHtml(plugin.name)}">${escapeHtml(plugin.displayName)}</h3>${authorHtml}</div><div class="name-row"><span class="badge">${sourceBadge}</span>${verificationBadge}${deprecatedBadge}</div></div><p class="description">${escapeHtml(marketDescription(plugin))}</p><div class="market-source" title="${escapeHtml(plugin.installSpec)}">${escapeHtml(plugin.installSpec)}</div>${operationState}${failure}<div class="market-card-foot"><div class="market-stats"><span>DL ${escapeHtml(downloads)}</span><span>STAR ${escapeHtml(stars)}</span><span>${escapeHtml(plugin.category)}</span></div>${action}</div></article>`
 }
 
 function renderLegacyPluginRestore(state) {

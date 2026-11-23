@@ -1,6 +1,7 @@
 {
   "name": "@linxin666/dsh-desktop-repair",
   "description": "Host-only bounded repair agent used by DeepSeek Harness Desktop to fix staged plugin candidates with the user's configured model.",
+  "author": "ningbainb",
   "version": "0.1.0",
   "private": true,
   "type": "module",

@@ -1,6 +1,7 @@
 {
   "name": "@linxin666/dsh-liangshen",
   "description": "LiangShen (梁神) agent preset for the dsh web GUI: a two-phase anchored-standard preset — the first model request exposes only the builtin Minimal exact two-tool surface (persistent bash plus str_replace_editor), the one-line persona, and the host sandbox policy needed for valid shell calls; promotion is gated on the first minimal-like reasoning block with a fallback, and the wire then switches to Code Mode (PTC, a single run_code tool over the full registry) with the ordinary injections returning afterwards. The preset files are synced into ~/.dsh/.agent-presets on host startup. Hot-pluggable — mounted via cordis.patch.yml + a profile node_modules symlink, no dsh source changes.",
+  "author": "ningbainb",
   "version": "0.1.15",
   "type": "module",
   "packageManager": "pnpm@11.7.0",
