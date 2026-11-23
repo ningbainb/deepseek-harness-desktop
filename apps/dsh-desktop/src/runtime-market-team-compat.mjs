@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { registerHooks } from 'node:module'
-import { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import { PERSONA_PREFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
 import { readFileSync } from 'node:fs'
@@ -181,7 +180,6 @@ export function wrapMarketTeamContext(context) {
     })
     const projected = { agentTeams: teams, subagents, tools, systemPrompt: prompt }
     const proxy = facade(ctx, {
-      root: Context.root === undefined ? ctx.root : ctx[Context.root],
       get(name, ...args) { return projected[name] ? projected[name]() : ctx.get(name, ...args) },
       inject(dependencies, callback) { return ctx.inject(dependencies, (child, ...args) => callback(wrap(child), ...args)) },
       effect(factory, label) {

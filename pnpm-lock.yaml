@@ -65,9 +65,9 @@ patchedDependencies:
   '@linxin666/dsh-client-ui-skin-center': 3a637c147386a367ea49224fe78322b810e2475e659bf17f3a2566a1977696c9
   '@linxin666/dsh-desktop-launcher@0.3.13': a2d8080ff8fd7e9480adbfbcd25f967db526048a3e9d8cdcae82faf3d483d3c0
   '@linxin666/dsh-pet@0.4.4': bbb56dbf46859f28f9dc6f51d37d0179a5ed596f1a338d040c51030cb38ab2cd
-  '@linxin666/dsh-usage@0.4.10': fa9b3e27295095d2ef4efcca8f2988647a70564afe5afc0ac430d1eef722be32
+  '@linxin666/dsh-usage@0.4.10': d3227af845d85c781a0be4028906e13ffb1ef77ca71abc46ef1ab78a931c0f46
   '@local/dsh-prompt-pilot@1.2.3': e97059ce3c1c794e02aa086b01a5cae5513448c0519bfdda3c1d57315be831af
-  dsh-agent-plugins-market@0.11.1: 407bb88b4f383e53b61a66aab396a09b7877d31cf1084f0f7e329f656959d4eb
+  dsh-agent-plugins-market@0.11.1: d0d874cf5271513412975479f077ece626b0022367c64b44a69431fbffb6d8c0
   dsh-better-sidebar@0.24.1: 723b3671adcb7d1b9ef9d7a197ffee9f04581c9d61ddd1dead1f25e70a500439
   dsh-dafeiyu-pet@0.2.0: b84af98ebe49446bd072b5d2acfafb719e95b39dd7154b8ae9f753290651348a
 
@@ -470,7 +470,7 @@ importers:
         version: link:../../packages/dsh-tool-describe-image
       '@linxin666/dsh-usage':
         specifier: 0.4.10
-        version: 0.4.10(patch_hash=fa9b3e27295095d2ef4efcca8f2988647a70564afe5afc0ac430d1eef722be32)(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react@18.3.1)
+        version: 0.4.10(patch_hash=d3227af845d85c781a0be4028906e13ffb1ef77ca71abc46ef1ab78a931c0f46)(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react@18.3.1)
       '@linxin666/dsh-value-mode':
         specifier: workspace:*
         version: link:../../packages/dsh-value-mode
@@ -509,7 +509,7 @@ importers:
         version: 6.0.0
       dsh-agent-plugins-market:
         specifier: 0.11.1
-        version: 0.11.1(patch_hash=407bb88b4f383e53b61a66aab396a09b7877d31cf1084f0f7e329f656959d4eb)(ba323d7fb0af810da9f5124feb81e751)
+        version: 0.11.1(patch_hash=d0d874cf5271513412975479f077ece626b0022367c64b44a69431fbffb6d8c0)(ba323d7fb0af810da9f5124feb81e751)
       dsh-better-sidebar:
         specifier: 0.24.1
         version: 0.24.1(patch_hash=723b3671adcb7d1b9ef9d7a197ffee9f04581c9d61ddd1dead1f25e70a500439)(6507a8381882d8b68b8dec65404f2839)
@@ -18271,7 +18271,7 @@ snapshots:
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
 
-  '@linxin666/dsh-usage@0.4.10(patch_hash=fa9b3e27295095d2ef4efcca8f2988647a70564afe5afc0ac430d1eef722be32)(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react@18.3.1)':
+  '@linxin666/dsh-usage@0.4.10(patch_hash=d3227af845d85c781a0be4028906e13ffb1ef77ca71abc46ef1ab78a931c0f46)(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react@18.3.1)':
     dependencies:
       '@deepseek-ai/dsh': 0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563)
       '@deepseek-ai/schemastery': 3.20.0-alpha.1
@@ -18297,7 +18297,7 @@ snapshots:
       '@linxin666/dsh-session-archive': 0.4.4(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react@18.3.1)
       '@linxin666/dsh-ssh': link:packages/dsh-ssh
       '@linxin666/dsh-update': 0.4.4(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@linxin666/dsh-usage': 0.4.10(patch_hash=fa9b3e27295095d2ef4efcca8f2988647a70564afe5afc0ac430d1eef722be32)(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react@18.3.1)
+      '@linxin666/dsh-usage': 0.4.10(patch_hash=d3227af845d85c781a0be4028906e13ffb1ef77ca71abc46ef1ab78a931c0f46)(@deepseek-ai/dsh@0.2.3-alpha.2(03f0d4bab2f351da397453fa2ed9d563))(react@18.3.1)
     transitivePeerDependencies:
       - react
       - react-dom
@@ -20042,7 +20042,7 @@ snapshots:
 
   dotenv@16.6.1: {}
 
-  dsh-agent-plugins-market@0.11.1(patch_hash=407bb88b4f383e53b61a66aab396a09b7877d31cf1084f0f7e329f656959d4eb)(ba323d7fb0af810da9f5124feb81e751):
+  dsh-agent-plugins-market@0.11.1(patch_hash=d0d874cf5271513412975479f077ece626b0022367c64b44a69431fbffb6d8c0)(ba323d7fb0af810da9f5124feb81e751):
     dependencies:
       '@deepseek-ai/cordis': 4.2.0-alpha.1(@deepseek-ai/cordis-plugin-include@1.2.0-alpha.1)(@deepseek-ai/cordis-plugin-loader@1.2.0-alpha.1)
       '@deepseek-ai/dsh-agent': 0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a)

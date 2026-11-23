@@ -485,3 +485,44 @@ new file mode 100644
 +    }
 +  })
 +}
+diff --git a/lib/packages/market-mcp/src/runtime/mcp/bridge/tool-ownership.js b/lib/packages/market-mcp/src/runtime/mcp/bridge/tool-ownership.js
+index 04ce7d5..a89cd49 100644
+--- a/lib/packages/market-mcp/src/runtime/mcp/bridge/tool-ownership.js
++++ b/lib/packages/market-mcp/src/runtime/mcp/bridge/tool-ownership.js
+@@ -1,9 +1,11 @@
++import { Context } from '@deepseek-ai/cordis';
+ import { scopeOf } from '@deepseek-ai/dsh-scope';
+ const registrations = new WeakMap();
++const rootContext = ctx => Context.root === undefined ? ctx.root : ctx[Context.root];
+ /** Publish identity before tools/change can expose a new definition; remove it after unregistering. */
+ export function registerOwnedBridgeTool(ctx, serverName, definition, register) {
+-    let entries = registrations.get(ctx.root);
++    let entries = registrations.get(rootContext(ctx));
+     if (entries === undefined)
+-        registrations.set(ctx.root, (entries = new Set()));
++        registrations.set(rootContext(ctx), (entries = new Set()));
+     const entry = { definition, serverName, scope: scopeOf(ctx) };
+     entries.add(entry);
+@@ -23,4 +25,4 @@ export function registerOwnedBridgeTool(ctx, serverName, definition, register) {
+ export function bridgeToolRegistrations(ctx) {
+     const scope = scopeOf(ctx);
+-    return [...(registrations.get(ctx.root) ?? [])].filter(entry => entry.scope === scope);
++    return [...(registrations.get(rootContext(ctx)) ?? [])].filter(entry => entry.scope === scope);
+ }
+diff --git a/lib/packages/market-mcp/src/runtime/mcp/bridge/bridge.js b/lib/packages/market-mcp/src/runtime/mcp/bridge/bridge.js
+index 762cfa6..4a349a4 100644
+--- a/lib/packages/market-mcp/src/runtime/mcp/bridge/bridge.js
++++ b/lib/packages/market-mcp/src/runtime/mcp/bridge/bridge.js
+@@ -21,4 +21,5 @@
+  */
+ import { scopeOf } from '@deepseek-ai/dsh-scope';
++import { Context } from '@deepseek-ai/cordis';
+ import { registerOwnedBridgeTool } from './tool-ownership.js';
+ import { resolveReconnectPolicy, startConnection } from './connection.js';
+@@ -111,5 +112,5 @@ export async function apply(ctx, config) {
+     // at load with an actionable error and leaves the earlier instance intact.
+     ctx.effect(() => {
+-        const owner = scopeOf(ctx) ?? ctx.root;
++        const owner = scopeOf(ctx) ?? (Context.root === undefined ? ctx.root : ctx[Context.root]);
+         let names = activeServerNames.get(owner);
+         if (!names) {

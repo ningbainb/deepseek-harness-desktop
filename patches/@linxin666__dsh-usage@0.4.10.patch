@@ -40,3 +40,22 @@ diff --git a/lib/client.js b/lib/client.js
  				const settings = foot.querySelector(SETTINGS_AREA_SELECTOR);
  				if (settings !== null) {
  					if (container.nextElementSibling !== settings) foot.insertBefore(container, settings);
+diff --git a/lib/index.js b/lib/index.js
+index fac2d82..0451ffc 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -2,5 +2,5 @@ import z from "@deepseek-ai/schemastery";
+ import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
+ import { dirname, isAbsolute, join } from "node:path";
+-import "@deepseek-ai/cordis";
++import { Context } from "@deepseek-ai/cordis";
+ import { homedir } from "node:os";
+ import { isAbsolute as isAbsolute$1, join as join$1 } from "node:path/posix";
+@@ -1464,5 +1464,6 @@ function readNamespace(ctx, ns) {
+ 			}
+ 		}
+-		const loader = ctx.root?.loader ?? ctx.loader;
++		const root = Context.root === void 0 ? ctx.root : ctx[Context.root];
++		const loader = root?.loader ?? ctx.loader;
+ 		if (loader !== void 0 && typeof loader.entries === "function") for (const entry of loader.entries()) {
+ 			const id = entry.options?.id;
