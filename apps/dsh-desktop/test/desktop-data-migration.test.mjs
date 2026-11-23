@@ -42,16 +42,16 @@ test('copies and verifies bytes, records the new home and retains the old direct
   assert.equal((await f.resolve()).home, f.target)
   const startup = createDesktopDataMigration(f.options)
   assert.equal(await startup.prepareBoot({}), true)
-  await startup.finishBoot(true)
+  await startup.finishBoot('ready-full')
   assert.equal((await startup.status(await f.resolve())).phase, 'complete')
 })
 
-test('a failed startup restores the previous selection and removes the copied data', async t => {
+test('a full Runtime that only reaches fallback readiness restores the previous location', async t => {
   const f = await fixture(t)
   await f.execute(createDesktopDataMigration(f.options))
   const startup = createDesktopDataMigration(f.options)
   assert.equal(await startup.prepareBoot({}), true)
-  await startup.finishBoot(false)
+  await startup.finishBoot('ready-builtins')
   assert.equal((await f.resolve()).home, f.home)
   assert.equal((await startup.status(f.location)).phase, 'rolled-back')
   await assert.rejects(readFile(join(f.target, 'cache', 'session')), { code: 'ENOENT' })

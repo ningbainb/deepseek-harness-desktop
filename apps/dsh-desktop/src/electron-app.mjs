@@ -712,6 +712,7 @@ export async function startElectronApp(metadata) {
     userData,
     forbidden: app.isPackaged ? [dirname(app.getPath('exe')), process.resourcesPath] : [dirname(SOURCE_DIR)],
     available: () => runtimeProvider?.status?.state === 'ready',
+    requiredReadiness: () => runtimeProvider.profileName === 'desktop' ? 'ready-full' : 'ready-builtins',
     choose: async home => {
       const result = await dialog.showOpenDialog(mainWindow, {
         title: '选择数据迁移目录', defaultPath: home, properties: ['openDirectory', 'createDirectory'],
@@ -3054,7 +3055,7 @@ export async function startElectronApp(metadata) {
       try {
         result = await startupCoordinator.start({ builtinsOnly: blockedPluginArchiveRecovery !== undefined })
       } finally {
-        if (verifyingDataMigration) await dataMigration.finishBoot(result?.state === 'ready-full' || result?.state === 'ready-builtins')
+        if (verifyingDataMigration) await dataMigration.finishBoot(result?.state)
       }
       return result
     },

@@ -66,7 +66,7 @@ async function scan(home, destination, roots) {
   return bytes
 }
 
-export function createDesktopDataMigration({ userData, forbidden = [], choose, confirm, stop, restart, relaunch, available = () => true }) {
+export function createDesktopDataMigration({ userData, forbidden = [], choose, confirm, stop, restart, relaunch, available = () => true, requiredReadiness = () => 'ready-full' }) {
   const journalPath = join(userData, journalName)
   const metadata = join(userData, DESKTOP_DATA_LOCATION_FILE)
   const excluded = [userData, ...forbidden]
@@ -146,10 +146,10 @@ export function createDesktopDataMigration({ userData, forbidden = [], choose, c
       await persist({ ...record, phase })
       return true
     },
-    async finishBoot(ready) {
+    async finishBoot(state) {
       const record = await read()
       if (record?.phase !== 'booting') return
-      if (!ready) {
+      if (state !== 'ready-full' && !(state === 'ready-builtins' && record.requiredReadiness === state)) {
         await stop()
         await rollback(record)
         await relaunch()
@@ -188,6 +188,7 @@ export function createDesktopDataMigration({ userData, forbidden = [], choose, c
         const plan = await preflight(location, approved)
         if (!await confirm(plan)) return { accepted: false }
         approved = undefined
+        const required = requiredReadiness()
         stopped = true
         phase = 'stopping'
         cleanupIncomplete = false
@@ -195,7 +196,7 @@ export function createDesktopDataMigration({ userData, forbidden = [], choose, c
         const verified = await preflight(location, plan.target)
         const previous = await optional(() => readFile(metadata))
         record = { id: randomUUID(), phase: 'copying', source: verified.source, target: verified.target,
-          existed: verified.existed, previous: previous?.toString('base64') ?? null }
+          existed: verified.existed, previous: previous?.toString('base64') ?? null, requiredReadiness: required }
         await persist(record)
         phase = 'copying'
         const stage = staging(record)
