@@ -8,14 +8,14 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { createDesktopClient } from '@linxin666/dsh-desktop-client'
 import { useEffect, useRef, useState } from 'react'
-import type { ApprovalItem, DiffPreview, WorkspaceChanges } from '../core/types.ts'
+import type { ApprovalItem, ChangesPage, DiffPreview, WorkspaceChanges } from '../core/types.ts'
 
 const zh = {
   title: '审批收件箱', approvals: '待审批', changes: '变更总览', approve: '批准一次', reject: '拒绝',
   session: '打开会话', reminders: '桌面审批提醒', empty: '暂无待审批请求。', close: '关闭',
   error: '操作未完成，请重试。', refresh: '刷新', redacted: '参数值已隐藏', seconds: '秒',
   loading: '正在加载', diff: '查看差异', truncated: '输出超过预览限制。', unavailable: '当前工作区无法读取 Git 状态。',
-  added: '新增', deleted: '删除', modified: '修改',
+  added: '新增', deleted: '删除', modified: '修改', more: '加载更多工作区',
   none: '没有检测到变更。', reminderBody: '有工具调用等待审批。',
 }
 const en: typeof zh = {
@@ -23,7 +23,7 @@ const en: typeof zh = {
   session: 'Open session', reminders: 'Desktop approval reminders', empty: 'No pending approvals.', close: 'Close',
   error: 'The operation could not complete. Try again.', refresh: 'Refresh', redacted: 'Argument values hidden', seconds: 's',
   loading: 'Loading', diff: 'View diff', truncated: 'Output exceeds the preview limit.', unavailable: 'Git status is unavailable for this workspace.',
-  added: 'Added', deleted: 'Deleted', modified: 'Modified',
+  added: 'Added', deleted: 'Deleted', modified: 'Modified', more: 'Load more workspaces',
   none: 'No changes detected.', reminderBody: 'A tool call is waiting for approval.',
 }
 
@@ -86,6 +86,7 @@ function Inbox({ t, openSession, sessionTitle }: EntryProps) {
   const notified = useRef(new Set<string>())
   const [items, setItems] = useState<ApprovalItem[]>([])
   const [workspaces, setWorkspaces] = useState<WorkspaceChanges[]>()
+  const [nextOffset, setNextOffset] = useState<number>()
   const [tab, setTab] = useState<'approvals' | 'changes'>('approvals')
   const [failed, setFailed] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -126,7 +127,11 @@ function Inbox({ t, openSession, sessionTitle }: EntryProps) {
     try { await operation() } catch { setFailed(true) }
     finally { setBusy(false) }
   }
-  const loadChanges = () => run(async () => { setWorkspaces(await request<WorkspaceChanges[]>('changes')) })
+  const loadChanges = (offset = 0) => run(async () => {
+    const page = await request<ChangesPage>('changes?offset=' + offset)
+    setWorkspaces(current => offset ? [...(current ?? []), ...page.workspaces] : page.workspaces)
+    setNextOffset(page.nextOffset)
+  })
 
   if (!desktopAvailable) return null
   return <>
@@ -171,6 +176,7 @@ function Inbox({ t, openSession, sessionTitle }: EntryProps) {
             </li>)}</ul>
           </>}
         </section>)}
+        {nextOffset !== undefined && <button disabled={busy} onClick={() => void loadChanges(nextOffset)}>{t('more')}</button>}
       </>}
     </dialog>
   </>

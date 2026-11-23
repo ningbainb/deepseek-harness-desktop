@@ -115,12 +115,14 @@ export function apply(ctx: Context) {
             send(result ? 200 : 404, result ?? { error: 'diff-unavailable' })
             return
           }
+          const offset = Number(url.searchParams.get('offset') ?? 0)
+          if (!Number.isSafeInteger(offset) || offset < 0) { send(400, { error: 'invalid-offset' }); return }
           const result: WorkspaceChanges[] = []
-          for (const { id, title, path } of workspaces.slice(0, 20)) {
+          for (const { id, title, path } of workspaces.slice(offset, offset + 20)) {
             const state = await changes(path).catch(() => ({ files: [], unavailable: true }))
             result.push({ id, title, ...state })
           }
-          send(200, result)
+          send(200, { workspaces: result, nextOffset: offset + 20 < workspaces.length ? offset + 20 : undefined })
         } finally { gitBusy = false }
       } else send(404, { error: 'not-found' })
     } catch { send(500, { error: 'request-failed' }) }
