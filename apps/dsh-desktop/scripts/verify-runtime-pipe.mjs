@@ -81,6 +81,12 @@ try {
   assert.match(html, /__DSH_TRANSPORT__/u)
   assert.match(html, /__DSH_BOOT__/u)
 
+  const approvalUrl = 'http://dsh.internal/api/dsh-agent-inbox/pending'
+  const inboxResponse = await controller.fetch(approvalUrl, { headers: { 'x-dsh-agent-inbox': '1' } })
+  assert.equal(inboxResponse.status, 200)
+  assert.deepEqual(await inboxResponse.json(), [])
+  assert.equal((await controller.fetch(approvalUrl)).status, 403)
+
   const eventsAbort = new AbortController()
   const eventsTimeout = setTimeout(() => eventsAbort.abort(new Error('Events readiness probe timed out')), 15_000)
   const events = controller.openDuplex('$events', { args: {} }, eventsAbort.signal)

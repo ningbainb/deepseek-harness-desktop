@@ -111,6 +111,14 @@ function createDesktopPipeFetch(ctx, accountCallbackOrigin, sessionCookie) {
     const redirected = localPath !== url.pathname
     if (redirected) url.pathname = localPath
     const localRequest = redirected ? new Request(url, request) : request
+    // Only the authenticated Desktop pipe enters the local owner scope.
+    // The LAN gateway forwards only its paired mobile endpoints.
+    if (!redirected && url.pathname.startsWith('/api/dsh-agent-inbox/')) {
+      const userScope = ctx.get('userScope')
+      const access = userScope?.desktopScope()
+      if (access === undefined) return new Response(null, { status: 403 })
+      return userScope.run(access, () => ctx.webServer.fetch(localRequest))
+    }
     const route = ctx.webServer.match(url.pathname)
     if (route !== undefined && route.path !== '/api' && route.path !== '/plugins') return ctx.webServer.fetch(localRequest)
     if (url.pathname === '/api' || url.pathname.startsWith('/api/')) return fetchDesktopConnectionApi(ctx, api, localRequest)

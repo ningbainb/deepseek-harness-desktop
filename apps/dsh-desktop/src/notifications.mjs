@@ -2,6 +2,7 @@ import { normalizeDeepLink } from './deep-links.mjs'
 
 export const NOTIFICATION_CATEGORIES = Object.freeze([
   'plugin-recovery',
+  'approval',
   'session',
   'preset',
   'task',
