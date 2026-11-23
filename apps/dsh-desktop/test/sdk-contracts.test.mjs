@@ -12,6 +12,23 @@ const appRequire = createRequire(new URL('../package.json', import.meta.url))
 const webAppManifest = appRequire.resolve('@deepseek-ai/dsh-web-app/package.json')
 const webAppRequire = createRequire(webAppManifest)
 
+test('official native reveal delegates Windows selection to a visible Explorer window', async () => {
+  const settingsRequire = createRequire(appRequire.resolve('@deepseek-ai/dsh-api-settings-controller/package.json'))
+  const { revealNativePath } = await import(pathToFileURL(settingsRequire.resolve('@deepseek-ai/dsh-native-command')).href)
+  const signal = new AbortController().signal
+  const calls = []
+  await revealNativePath('C:\\work folder\\报告,=final.txt', signal, {
+    platform: 'win32',
+    run: async (...args) => {
+      calls.push(args)
+      throw Object.assign(new Error('Explorer delegated to the shell'), { code: 1 })
+    },
+  })
+  assert.deepEqual(calls, [
+    ['explorer.exe', ['/select,', 'file:///C:/work%20folder/报告%2C%3Dfinal.txt'], signal, 'visible'],
+  ])
+})
+
 test('every bundled custom persona validates against the installed official SDK', async () => {
   const baseRequire = createRequire(appRequire.resolve('@deepseek-ai/dsh-base/package.json'))
   const { Config } = await import(pathToFileURL(baseRequire.resolve('@deepseek-ai/dsh-persona')).href)
