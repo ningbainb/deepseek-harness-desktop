@@ -12,8 +12,10 @@ import {
   stat,
   symlink,
   unlink,
+  writeFile,
 } from 'node:fs/promises'
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path'
+import { isScalar, parseDocument, visit } from 'yaml'
 
 import { UserPluginArchive } from '../user-plugin-archive.mjs'
 
@@ -93,6 +95,62 @@ async function copyLeafIfPresent(source, destination) {
   }
   await copyFile(source, destination)
   return true
+}
+
+function absoluteLocalPath(baseDirectory, path) {
+  return path === '' || isAbsolute(path) ? path : resolve(baseDirectory, path).split(sep).join('/')
+}
+
+function absoluteFileSpec(baseDirectory, value) {
+  const match = /^((?:@?[^@\s]+@)?file:)(.+)$/u.exec(value)
+  if (!match) return value
+  const [, prefix, reference] = match
+  const suffix = reference.search(/\((?:patch_hash=|[a-f0-9]{32}\)|(?:@[^()/]+\/)?[^()@/]+@[^()]+)/u)
+  const path = suffix === -1 ? reference : reference.slice(0, suffix)
+  return prefix + absoluteLocalPath(baseDirectory, path) + (suffix === -1 ? '' : reference.slice(suffix))
+}
+
+async function normalizeLocalDependencyPaths(directory, baseDirectory) {
+  const manifestPath = join(directory, 'package.json')
+  const lockPath = join(directory, 'pnpm-lock.yaml')
+  const manifestStatus = await lstat(manifestPath)
+  const lockStatus = await lstatIfPresent(lockPath)
+  if (!manifestStatus.isFile() || (lockStatus !== undefined && !lockStatus.isFile())) {
+    throw new Error('plugin staging manifest and lockfile must be regular files')
+  }
+
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  let manifestChanged = false
+  for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+    const dependencies = manifest[section] ?? {}
+    for (const [name, spec] of Object.entries(dependencies)) {
+      if (typeof spec !== 'string' || !spec.startsWith('file:')) continue
+      const normalized = `file:${absoluteLocalPath(baseDirectory, spec.slice(5))}`
+      if (normalized === spec) continue
+      dependencies[name] = normalized
+      manifestChanged = true
+    }
+  }
+  if (manifestChanged) await writeFile(manifestPath, stableJson(manifest), 'utf8')
+
+  if (lockStatus === undefined) return
+  const lock = parseDocument(await readFile(lockPath, 'utf8'))
+  // Leave malformed locks for pnpm to diagnose under its normal install policy.
+  if (lock.errors.length !== 0) return
+  let lockChanged = false
+  visit(lock, {
+    Scalar(key, node, ancestors) {
+      if (typeof node.value !== 'string') return
+      const parent = ancestors.at(-1)
+      const value = key === 'value' && isScalar(parent?.key) && parent.key.value === 'directory'
+        ? absoluteLocalPath(baseDirectory, node.value)
+        : absoluteFileSpec(baseDirectory, node.value)
+      if (value === node.value) return
+      node.value = value
+      lockChanged = true
+    },
+  })
+  if (lockChanged) await writeFile(lockPath, lock.toString({ lineWidth: 0 }), 'utf8')
 }
 
 async function relocateDependencyLinks(sourceRoot, destinationRoot) {
@@ -435,6 +493,7 @@ export class PluginStagingManager {
       if (await lstatIfPresent(join(stageDir, 'package.json')) === undefined) {
         throw new Error('Desktop plugin profile manifest is missing')
       }
+      await normalizeLocalDependencyPaths(stageDir, this.profileDir)
       const staged = await this.#advance(transactionId, 'STAGING_READY')
       return new StagedPluginTransaction(this, staged)
     } catch (error) {
@@ -483,6 +542,8 @@ export class PluginStagingManager {
     await this.#advance(transactionId, 'RUNTIME_STOPPING')
     let archiveTransaction
     try {
+      // pnpm can write fresh relative references using the stage as its base.
+      await normalizeLocalDependencyPaths(stageDir, stageDir)
       const transactionArchive = new UserPluginArchive({
         profileDir: this.profileDir,
         archiveDir: this.backupDirectory(transactionId),

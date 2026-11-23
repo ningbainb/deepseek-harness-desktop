@@ -680,6 +680,7 @@
         "incompatible-plugin-requires-explicit-risk-confirmation",
         "incompatible-plugin-hard-safety-gates-remain-enforced",
         "same-volume-plugin-staging-profile",
+        "plugin-staging-resolves-profile-local-file-and-directory-dependencies",
         "pnpm-absolute-and-transitive-links-rebased-before-plugin-activation-commit",
         "durable-content-addressed-local-plugin-source",
         "persistent-single-writer-plugin-transaction",

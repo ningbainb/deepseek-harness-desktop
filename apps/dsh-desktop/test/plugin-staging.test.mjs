@@ -3,6 +3,7 @@ import { lstat, mkdir, mkdtemp, readFile, readlink, readdir, rm, symlink, writeF
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import test from 'node:test'
+import { parse as parseYaml } from 'yaml'
 
 import { PluginStagingManager } from '../src/extensions/plugin-staging.mjs'
 import { USER_PLUGIN_ARCHIVE_RECOVERY_CODES, UserPluginArchive } from '../src/user-plugin-archive.mjs'
@@ -66,6 +67,61 @@ test('dependency resolution happens in staging without changing the live profile
     assert.equal((await value.manager.list())[0].phase, 'GRAPH_VALIDATED')
     await staged.cancel()
     assert.deepEqual(await value.manager.list(), [])
+  } finally {
+    await rm(value.root, { recursive: true, force: true })
+  }
+})
+
+test('local lockfile dependencies resolve against the live profile while staged', async () => {
+  const value = await fixture()
+  try {
+    const lockPath = join(value.profileDir, 'pnpm-lock.yaml')
+    const local = "../../local plugins/author's plugin"
+    const packageId = `local-plugin@file:${local}`
+    const lock = `lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      local-plugin:
+        specifier: "file:${local}"
+        version: "file:${local}(patch_hash=abc)"
+packages:
+  "${packageId}":
+    resolution: {directory: "${local}", type: directory}
+  remote@1.0.0:
+    resolution: {integrity: sha512-example}
+snapshots:
+  "${packageId}(patch_hash=abc)": {}
+`
+    await writeFile(lockPath, lock)
+    await writeFile(join(value.profileDir, 'package.json'), JSON.stringify({
+      dependencies: { 'local-plugin': `file:${local}` },
+    }))
+    const staged = await value.manager.begin({ operation: 'plugin-install', pluginIds: ['community-plugin'] })
+    const absolute = join(value.root, "local plugins/author's plugin").replaceAll('\\', '/')
+    const parsed = parseYaml(await readFile(join(staged.stageDir, 'pnpm-lock.yaml'), 'utf8'))
+    assert.deepEqual(parsed.importers['.'].dependencies['local-plugin'], {
+      specifier: `file:${absolute}`,
+      version: `file:${absolute}(patch_hash=abc)`,
+    })
+    assert.equal(parsed.packages[`local-plugin@file:${absolute}`].resolution.directory, absolute)
+    assert.equal(parsed.packages['remote@1.0.0'].resolution.integrity, 'sha512-example')
+    assert.ok(Object.hasOwn(parsed.snapshots, `local-plugin@file:${absolute}(patch_hash=abc)`))
+    const manifest = JSON.parse(await readFile(join(staged.stageDir, 'package.json'), 'utf8'))
+    assert.equal(manifest.dependencies['local-plugin'], `file:${absolute}`)
+    assert.equal(await readFile(lockPath, 'utf8'), lock)
+
+    // Simulate pnpm rewriting the locator relative to its current directory.
+    const stageRelative = '../../../../local plugins/author\'s plugin'
+    await writeFile(join(staged.stageDir, 'pnpm-lock.yaml'), lock.replaceAll(local, stageRelative))
+    await mkdir(join(staged.stageDir, 'node_modules'), { recursive: true })
+    await staged.markDependenciesResolved()
+    await staged.markGraphValidated()
+    const activated = await staged.activate()
+    const live = parseYaml(await readFile(lockPath, 'utf8'))
+    assert.equal(live.packages[`local-plugin@file:${absolute}`].resolution.directory, absolute)
+    await activated.rollback()
+    assert.equal(await readFile(lockPath, 'utf8'), lock)
   } finally {
     await rm(value.root, { recursive: true, force: true })
   }
