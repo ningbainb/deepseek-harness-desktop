@@ -1238,6 +1238,61 @@
       }
     },
     {
+      "name": "@ningbainb/dsh-data-location",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-data-location"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-23T20:19:31.093Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-data-location"
+      },
+      "reason": "Ship the Community Desktop workspace implementation.",
+      "desktopContracts": [
+        "Shell-owned verified copy and rollback"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "apps/dsh-desktop/test/desktop-data-migration.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Select a new directory, restart Desktop and verify the data location."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@ningbainb/dsh-agent-inbox",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-agent-inbox"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-23T20:19:31.093Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-agent-inbox"
+      },
+      "reason": "Ship the Community Desktop workspace implementation.",
+      "desktopContracts": [
+        "Scoped approval decisions",
+        "Bounded read-only Git inventory"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-agent-inbox/tests/inbox.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Review and decide a pending approval, then open a workspace diff."
+        ],
+        "results": []
+      }
+    },
+    {
       "name": "@ningbainb/dsh-personal-prompt",
       "selection": {
         "version": "0.1.0",

@@ -201,6 +201,8 @@ function gitPrepareAllowBuildFromError(error, installSpec) {
 const NINGBAINB_AUTHORED_PACKAGES = new Set([
   '@linxin666/dsh-value-mode',
   '@ningbainb/dsh-memory',
+  '@ningbainb/dsh-data-location',
+  '@ningbainb/dsh-agent-inbox',
   '@ningbainb/dsh-personal-prompt',
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-chat-artifacts',

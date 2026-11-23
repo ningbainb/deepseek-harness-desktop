@@ -208,6 +208,8 @@
     "@linxin666/dsh-web-ui-all": "workspace:*",
     "@ningbainb/dsh-chat-artifacts": "workspace:*",
     "@ningbainb/dsh-memory": "workspace:*",
+    "@ningbainb/dsh-data-location": "workspace:*",
+    "@ningbainb/dsh-agent-inbox": "workspace:*",
     "@ningbainb/dsh-personal-prompt": "workspace:*",
     "@ningbainb/dsh-user-scope": "workspace:*",
     "@tencent-connect/dsh-qqbot": "0.5.0",

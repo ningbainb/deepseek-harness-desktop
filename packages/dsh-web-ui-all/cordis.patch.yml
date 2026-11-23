@@ -22,6 +22,16 @@
     - id: ui-model-preferences
       name: '@linxin666/dsh-client-ui-model-preferences'
 
+# from ../dsh-data-location
+- insert:
+    - id: data-location
+      name: '@ningbainb/dsh-data-location'
+
+# from ../dsh-agent-inbox
+- insert:
+    - id: agent-inbox
+      name: '@ningbainb/dsh-agent-inbox'
+
 # from ../dsh-personal-prompt
 - insert:
     - id: personal-prompt

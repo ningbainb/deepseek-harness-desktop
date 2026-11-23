@@ -458,6 +458,26 @@ const NATIVE_PLUGINS = [
     icon: 'brain',
   },
   {
+    id: 'data-location',
+    name: '数据目录迁移',
+    packageName: '@ningbainb/dsh-data-location',
+    author: 'ningbainb',
+    category: 'tools', categoryLabel: '工具协同',
+    description: '把数据复制到新目录，并在运行时启动失败时回滚。',
+    features: ['目录预检', '复制校验', '迁移回滚'],
+    icon: 'git-branch',
+  },
+  {
+    id: 'agent-inbox',
+    name: '审批收件箱',
+    packageName: '@ningbainb/dsh-agent-inbox',
+    author: 'ningbainb',
+    category: 'tools', categoryLabel: '工具协同',
+    description: '集中处理跨会话审批并查看工作区 Git 变更。',
+    features: ['待审批', '工作区变更'],
+    icon: 'message',
+  },
+  {
     id: 'personal-prompt',
     name: '回复偏好',
     packageName: '@ningbainb/dsh-personal-prompt',
@@ -701,6 +721,8 @@ function nativePluginMarkup(item, installedPlugin) {
   const version = installedPlugin?.version ? `v${installedPlugin.version}` : '内置'
   const settingsLink = item.id === 'prompt-customizer'
     ? '<button type="button" class="secondary" data-open-dock-setting="value-mode">打开高级设置</button>'
+    : item.id === 'data-location'
+    ? '<button type="button" class="secondary" data-data-migration>迁移数据目录</button><p role="status" data-data-migration-status></p>'
     : item.settingsOwner
     ? `<button type="button" class="secondary" data-open-native-plugin-options="${escapeHtml(item.settingsOwner)}">打开设置</button>`
     : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
@@ -1596,6 +1618,31 @@ searchItems.addEventListener('keydown', event => {
 })
 
 nativePluginGrid?.addEventListener('click', event => {
+  const migration = event.target.closest('[data-data-migration]')
+  if (migration) {
+    const status = migration.parentElement.querySelector('[data-data-migration-status]')
+    migration.disabled = true
+    void (async () => {
+      try {
+        const current = await window.dshDesktop.statusDataMigration()
+        status.textContent = current.home
+        if (!current.canMigrate) {
+          status.textContent = current.reason ?? '运行时就绪后可以迁移。'
+          return
+        }
+        const target = await window.dshDesktop.chooseDataMigration()
+        if (!target) return
+        status.textContent = '正在预检：' + target
+        await window.dshDesktop.preflightDataMigration()
+        status.textContent = '预检通过：' + target
+        const result = await window.dshDesktop.executeDataMigration()
+        if (!result.accepted) status.textContent = '已取消迁移。'
+      } catch (error) {
+        status.textContent = error.message
+      } finally { migration.disabled = false }
+    })()
+    return
+  }
   const pluginOptions = event.target.closest('[data-open-native-plugin-options]')
   if (pluginOptions) {
     void activateTab(document.getElementById('plugin-options-tab'), true, undefined, pluginOptions.dataset.openNativePluginOptions)

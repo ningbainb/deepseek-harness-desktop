@@ -4,6 +4,43 @@
   "defaultTarget": "desktop-private-pipe",
   "records": [
     {
+      "pluginId": "data-location",
+      "sourcePath": "apps/dsh-desktop/src/desktop-data-migration.mjs",
+      "endpoint": "desktop:data-migration-* and extensions:data-migration-*",
+      "method": "IPC invoke",
+      "requestSchema": "Shell-owned chooser and preflight, no supplied paths",
+      "responseSchema": "Home status, selected path, preflight estimate or restart acknowledgement",
+      "kind": "native IPC",
+      "authPrincipal": "registered main or extensions surface",
+      "workspaceScope": "Desktop data Home",
+      "callerSurfaces": [
+        "main-window",
+        "extensions"
+      ],
+      "cancellationAndLimits": "Native confirmation, a single active migration, disk space check and SHA-256 verification",
+      "v4Target": "Desktop Shell via versioned preload",
+      "migrationTest": "apps/dsh-desktop/test/desktop-data-migration.test.mjs",
+      "owner": "desktop-shell"
+    },
+    {
+      "pluginId": "agent-inbox",
+      "sourcePath": "packages/dsh-agent-inbox/src/index.ts",
+      "endpoint": "/api/dsh-agent-inbox/{pending,decision,changes,diff}",
+      "method": "GET and POST",
+      "requestSchema": "Approval ID and decision or workspace ID and relative Git path",
+      "responseSchema": "Scoped pending metadata, decision receipt, Git file inventory or bounded textual diff",
+      "kind": "JSON",
+      "authPrincipal": "authenticated private pipe and authenticated official owner peer",
+      "workspaceScope": "local Desktop user scope with per-resource access checks",
+      "callerSurfaces": [
+        "main-window"
+      ],
+      "cancellationAndLimits": "Bounded approval queue and argument summaries, serialized Git requests with per-command deadline and output cap",
+      "v4Target": "official WebRoute registry over authenticated OS pipe",
+      "migrationTest": "packages/dsh-agent-inbox/tests/inbox.spec.ts",
+      "owner": "agent-inbox"
+    },
+    {
       "pluginId": "release-plugin-adapter",
       "sourcePath": "packages/dsh-release-plugin-adapter/src/index.ts",
       "endpoint": "/api/desktop-release-plugins",

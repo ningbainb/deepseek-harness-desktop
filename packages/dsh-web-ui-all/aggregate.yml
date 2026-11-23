@@ -12,6 +12,8 @@ patchFrom:
   - ../dsh-web-ui-settings
   - ../dsh-user-scope
   - ../dsh-model-preferences
+  - ../dsh-data-location
+  - ../dsh-agent-inbox
   - ../dsh-personal-prompt
   - ../dsh-memory
   - ../dsh-aionui-panel
@@ -50,6 +52,8 @@ deps:
   - ../dsh-web-ui-settings
   - ../dsh-user-scope
   - ../dsh-model-preferences
+  - ../dsh-data-location
+  - ../dsh-agent-inbox
   - ../dsh-personal-prompt
   - ../dsh-memory
   - ../dsh-skins

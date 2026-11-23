@@ -16,6 +16,7 @@ const DATA_FIELDS = Object.freeze([
 const NATIVE_FIELDS = Object.freeze(['module', 'capability', 'process', 'version', 'abiPolicy', 'acceptance'])
 const ROUTE_PACKAGE_PATHS = Object.freeze([
   'packages/dsh-aionui-panel/',
+  'packages/dsh-agent-inbox/',
   'packages/dsh-desktop-compat/',
   'packages/dsh-git-graph/',
   'packages/dsh-live-stats/',

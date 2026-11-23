@@ -95,6 +95,8 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-pet',
   '@linxin666/dsh-remote-web-ui',
+  '@ningbainb/dsh-data-location',
+  '@ningbainb/dsh-agent-inbox',
   '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-skins',
   '@linxin666/dsh-ssh',
@@ -211,6 +213,8 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-pet',
   '@linxin666/dsh-particle-theme',
   '@linxin666/dsh-remote-web-ui',
+  '@ningbainb/dsh-data-location',
+  '@ningbainb/dsh-agent-inbox',
   '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-skins',
   '@linxin666/dsh-ssh',
@@ -308,6 +312,8 @@ export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-tool-describe-image',
   '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-memory',
+  '@ningbainb/dsh-data-location',
+  '@ningbainb/dsh-agent-inbox',
   '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-ssh',
   '@ningbainb/dsh-user-scope',
@@ -489,6 +495,10 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
       name: '@ningbainb/dsh-user-scope'
     - id: ui-model-preferences
       name: '@linxin666/dsh-client-ui-model-preferences'
+    - id: data-location
+      name: '@ningbainb/dsh-data-location'
+    - id: agent-inbox
+      name: '@ningbainb/dsh-agent-inbox'
     - id: personal-prompt
       name: '@ningbainb/dsh-personal-prompt'
     - id: memory

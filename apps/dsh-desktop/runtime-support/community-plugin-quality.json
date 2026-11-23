@@ -1433,6 +1433,50 @@
       }
     },
     {
+      "packageName": "@ningbainb/dsh-agent-inbox",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-agent-inbox/package.json",
+      "license": "BSD-3-Clause",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "5.3.6",
+        "upstreamVersion": "0.2.3-alpha.2",
+        "commands": [
+          "pnpm --filter @ningbainb/dsh-agent-inbox build",
+          "pnpm --filter @ningbainb/dsh-agent-inbox test",
+          "pnpm --filter @ningbainb/dsh-agent-inbox typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-09-10",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
       "packageName": "@ningbainb/dsh-chat-artifacts",
       "version": "0.1.0",
       "manifestPath": "packages/dsh-chat-artifacts/package.json",
@@ -1455,6 +1499,50 @@
           "pnpm --filter @ningbainb/dsh-chat-artifacts build",
           "pnpm --filter @ningbainb/dsh-chat-artifacts test",
           "pnpm --filter @ningbainb/dsh-chat-artifacts typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-09-10",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
+      "packageName": "@ningbainb/dsh-data-location",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-data-location/package.json",
+      "license": "BSD-3-Clause",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "5.3.6",
+        "upstreamVersion": "0.2.3-alpha.2",
+        "commands": [
+          "pnpm --filter @ningbainb/dsh-data-location build",
+          "pnpm --filter @ningbainb/dsh-data-location test",
+          "pnpm --filter @ningbainb/dsh-data-location typecheck"
         ]
       },
       "ci": {

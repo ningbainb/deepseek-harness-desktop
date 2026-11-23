@@ -44,6 +44,10 @@ The Windows x64 native dependency contract is [native-dependency-inventory.json]
 
 Desktop 5.0.0 targets the official NPM 0.2.0-rc.2 Runtime family. The maintainer explicitly chooses unsigned Windows, macOS and Linux distribution; signatures are an authenticity limitation, not a passing check. Stable promotion requires all three native Runner jobs and final asset validation to pass for this exact version. Local candidate checks do not establish a completed Stable release.
 
+Desktop data-directory changes run through the main-window or Extension Dock bridge. The Shell stops the Runtime, verifies the copied files, records the new location and restarts. The next launch checks Runtime readiness and restores the previous location if startup fails. The Shell keeps the original files.
+
+The approval inbox registers Host routes on the authenticated Desktop pipe. The Shell transport establishes the local user scope for these routes. The Host checks session or workspace access before accepting a decision or issuing read-only Git commands.
+
 ## Acceptance evidence
 
 The rc.2 import inventory records exact public SDK imports for the journaled SettingsForms adapter, isolated legacy-session verification, SDK-identity fixtures, and the community settings form. Existing import allowances remain unchanged; no additional source directory or upstream checkout is permitted. Chat recovery source and declarations are checked against installed official npm types by `apps/dsh-desktop/scripts/verify-chat-recovery-sdk.mjs`; behavioral tests also verify retained-reference release and same-id generation observer cleanup. These checks do not replace real-window or installer acceptance.

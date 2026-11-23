@@ -158,6 +158,34 @@
       ]
     },
     {
+      "id": "data-location",
+      "package": "@ningbainb/dsh-data-location",
+      "path": "packages/dsh-data-location",
+      "description": "桌面数据目录事务迁移",
+      "features": [
+        "verified-copy",
+        "startup-rollback"
+      ],
+      "patchId": "data-location",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "agent-inbox",
+      "package": "@ningbainb/dsh-agent-inbox",
+      "path": "packages/dsh-agent-inbox",
+      "description": "跨会话审批与工作区变更",
+      "features": [
+        "local-owner-approval-decisions",
+        "bounded-workspace-diff"
+      ],
+      "patchId": "agent-inbox",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
       "id": "personal-prompt",
       "package": "@ningbainb/dsh-personal-prompt",
       "path": "packages/dsh-personal-prompt",
@@ -1446,6 +1474,8 @@
       "tray",
       "dsh-context",
       "@ningbainb/dsh-memory",
+      "@ningbainb/dsh-data-location",
+      "@ningbainb/dsh-agent-inbox",
       "@ningbainb/dsh-personal-prompt"
     ],
     "bundledDefaultOff": [
