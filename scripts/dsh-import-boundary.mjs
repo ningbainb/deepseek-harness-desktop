@@ -13,6 +13,8 @@ const IGNORED_SOURCE_PREFIXES = Object.freeze(['.cache/', '.patch-work/', '.pnpm
 const CONTROLLED_PREFIXES = Object.freeze([
   'apps/dsh-desktop/src/atomic-write-adapter.mjs',
   'apps/dsh-desktop/src/skill-market-sdk-adapter.mjs',
+  'apps/dsh-desktop/src/runtime-client-hmr.mjs',
+  'apps/dsh-desktop/src/runtime-market-team-compat.mjs',
   'apps/dsh-desktop/src/runtime-provider.mjs',
   'apps/dsh-desktop/src/runtime-subagent-list-compat.mjs',
   'packages/dsh-desktop-pipe-webserver/lib/',
