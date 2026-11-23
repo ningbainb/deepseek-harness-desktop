@@ -1,0 +1,3 @@
+- insert:
+    - id: llm-antigravity
+      name: '@ningbainb/dsh-llm-antigravity'

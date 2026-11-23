@@ -210,6 +210,7 @@
     "@ningbainb/dsh-memory": "workspace:*",
     "@ningbainb/dsh-data-location": "workspace:*",
     "@ningbainb/dsh-agent-inbox": "workspace:*",
+    "@ningbainb/dsh-llm-antigravity": "workspace:*",
     "@ningbainb/dsh-personal-prompt": "workspace:*",
     "@ningbainb/dsh-user-scope": "workspace:*",
     "@tencent-connect/dsh-qqbot": "0.5.0",

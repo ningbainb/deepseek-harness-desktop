@@ -14,6 +14,7 @@ patchFrom:
   - ../dsh-model-preferences
   - ../dsh-data-location
   - ../dsh-agent-inbox
+  - ../dsh-llm-antigravity
   - ../dsh-personal-prompt
   - ../dsh-memory
   - ../dsh-aionui-panel
@@ -54,6 +55,7 @@ deps:
   - ../dsh-model-preferences
   - ../dsh-data-location
   - ../dsh-agent-inbox
+  - ../dsh-llm-antigravity
   - ../dsh-personal-prompt
   - ../dsh-memory
   - ../dsh-skins

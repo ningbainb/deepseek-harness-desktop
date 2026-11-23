@@ -1565,6 +1565,50 @@
       }
     },
     {
+      "packageName": "@ningbainb/dsh-llm-antigravity",
+      "version": "0.1.0",
+      "manifestPath": "packages/dsh-llm-antigravity/package.json",
+      "license": "BSD-3-Clause",
+      "compatibility": null,
+      "installScripts": [
+        {
+          "name": "prepare",
+          "command": "tsdown"
+        }
+      ],
+      "build": {
+        "declared": true,
+        "status": "not-recorded"
+      },
+      "testCombination": {
+        "desktopVersion": "5.3.6",
+        "upstreamVersion": "0.2.3-alpha.2",
+        "commands": [
+          "pnpm --filter @ningbainb/dsh-llm-antigravity build",
+          "pnpm --filter @ningbainb/dsh-llm-antigravity test",
+          "pnpm --filter @ningbainb/dsh-llm-antigravity typecheck"
+        ]
+      },
+      "ci": {
+        "workflow": ".github/workflows/desktop-ci.yml",
+        "status": "not-recorded"
+      },
+      "smoke": {
+        "date": "2026-09-10",
+        "status": "not-recorded"
+      },
+      "desktopVerified": false,
+      "requirementsSatisfied": {
+        "license": true,
+        "exactVersion": true,
+        "compatibilityDeclared": false,
+        "buildDeclared": true,
+        "testsDeclared": true,
+        "ciPassed": false,
+        "smokePassed": false
+      }
+    },
+    {
       "packageName": "@ningbainb/dsh-memory",
       "version": "0.1.0",
       "manifestPath": "packages/dsh-memory/package.json",

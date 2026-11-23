@@ -1293,6 +1293,35 @@
       }
     },
     {
+      "name": "@ningbainb/dsh-llm-antigravity",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-llm-antigravity"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-23T21:46:55.978Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-llm-antigravity"
+      },
+      "reason": "Ship the Community Desktop workspace implementation.",
+      "desktopContracts": [
+        "Local CLI discovery and sign-in diagnostics",
+        "DSH model catalog and tool approval"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-llm-antigravity/tests/provider.spec.ts",
+          "apps/dsh-desktop/test/profile.test.mjs"
+        ],
+        "desktopAcceptance": [
+          "Sign in to agy, refresh models from Settings and stream a response."
+        ],
+        "results": []
+      }
+    },
+    {
       "name": "@ningbainb/dsh-personal-prompt",
       "selection": {
         "version": "0.1.0",

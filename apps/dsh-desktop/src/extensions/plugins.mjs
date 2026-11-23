@@ -203,6 +203,7 @@ const NINGBAINB_AUTHORED_PACKAGES = new Set([
   '@ningbainb/dsh-memory',
   '@ningbainb/dsh-data-location',
   '@ningbainb/dsh-agent-inbox',
+  '@ningbainb/dsh-llm-antigravity',
   '@ningbainb/dsh-personal-prompt',
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-chat-artifacts',

@@ -478,6 +478,17 @@ const NATIVE_PLUGINS = [
     icon: 'message',
   },
   {
+    id: 'llm-antigravity',
+    name: 'Antigravity CLI (Gemini)',
+    packageName: '@ningbainb/dsh-llm-antigravity',
+    author: 'ningbainb',
+    category: 'ai',
+    categoryLabel: 'AI 核心',
+    description: '通过已登录的 Antigravity CLI 调用模型。',
+    features: ['动态模型目录', '流式输出', 'ACP'],
+    icon: 'message',
+  },
+  {
     id: 'personal-prompt',
     name: '回复偏好',
     packageName: '@ningbainb/dsh-personal-prompt',

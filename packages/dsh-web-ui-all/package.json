@@ -51,6 +51,7 @@
     "@linxin666/dsh-client-ui-model-preferences": "workspace:*",
     "@ningbainb/dsh-data-location": "workspace:*",
     "@ningbainb/dsh-agent-inbox": "workspace:*",
+    "@ningbainb/dsh-llm-antigravity": "workspace:*",
     "@ningbainb/dsh-personal-prompt": "workspace:*",
     "@ningbainb/dsh-memory": "workspace:*",
     "@linxin666/dsh-skins": "workspace:*",

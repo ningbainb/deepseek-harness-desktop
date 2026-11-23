@@ -492,6 +492,9 @@ importers:
       '@ningbainb/dsh-data-location':
         specifier: workspace:*
         version: link:../../packages/dsh-data-location
+      '@ningbainb/dsh-llm-antigravity':
+        specifier: workspace:*
+        version: link:../../packages/dsh-llm-antigravity
       '@ningbainb/dsh-memory':
         specifier: workspace:*
         version: link:../../packages/dsh-memory
@@ -1205,6 +1208,60 @@ importers:
       vitest:
         specifier: ^4.1.1
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@26.1.0(supports-color@7.2.0))(yaml@2.9.1)
+
+  packages/dsh-llm-antigravity:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.2.0-alpha.1
+        version: 4.2.0-alpha.1(@deepseek-ai/cordis-plugin-include@1.2.0-alpha.1)(@deepseek-ai/cordis-plugin-loader@1.2.0-alpha.1)
+      '@deepseek-ai/cordis-plugin-loader':
+        specifier: 1.2.0-alpha.1
+        version: 1.2.0-alpha.1(@deepseek-ai/cordis@4.2.0-alpha.1)(node-addon-require-builtin@0.1.10)
+      '@deepseek-ai/dsh-client-locale':
+        specifier: 0.2.3-alpha.2
+        version: 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)
+      '@deepseek-ai/dsh-client-ui-renderer':
+        specifier: 0.2.3-alpha.2
+        version: 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)
+      '@deepseek-ai/dsh-client-ui-settings':
+        specifier: 0.2.3-alpha.2
+        version: 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: 0.2.3-alpha.2
+        version: 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)
+      '@deepseek-ai/dsh-host-webserver':
+        specifier: 0.2.3-alpha.2
+        version: 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(supports-color@7.2.0)
+      '@deepseek-ai/dsh-llm':
+        specifier: 0.2.3-alpha.2
+        version: 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))
+      '@deepseek-ai/dsh-settings':
+        specifier: 0.2.3-alpha.2
+        version: 0.2.3-alpha.2(056c1c32f5f89bd5074b382fc725638f)
+      '@deepseek-ai/schemastery':
+        specifier: 3.20.0-alpha.1
+        version: 3.20.0-alpha.1
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.3
+      '@types/react':
+        specifier: ~18.3.1
+        version: 18.3.31
+      lightningcss:
+        specifier: ^1.32.0
+        version: 1.32.0
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      tsdown:
+        specifier: ^0.22.2
+        version: 0.22.2(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.3.0))(yaml@2.9.1)
 
   packages/dsh-memory:
     dependencies:
@@ -2273,6 +2330,9 @@ importers:
       '@ningbainb/dsh-data-location':
         specifier: workspace:*
         version: link:../dsh-data-location
+      '@ningbainb/dsh-llm-antigravity':
+        specifier: workspace:*
+        version: link:../dsh-llm-antigravity
       '@ningbainb/dsh-memory':
         specifier: workspace:*
         version: link:../dsh-memory

@@ -186,6 +186,21 @@
       "requiredInDesktop": true
     },
     {
+      "id": "llm-antigravity",
+      "package": "@ningbainb/dsh-llm-antigravity",
+      "path": "packages/dsh-llm-antigravity",
+      "description": "通过官方 Antigravity CLI 使用已登录订阅的模型",
+      "features": [
+        "local-cli-model-discovery",
+        "stream-json-and-acp",
+        "dsh-owned-tool-execution"
+      ],
+      "patchId": "llm-antigravity",
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
       "id": "personal-prompt",
       "package": "@ningbainb/dsh-personal-prompt",
       "path": "packages/dsh-personal-prompt",
@@ -1476,6 +1491,7 @@
       "@ningbainb/dsh-memory",
       "@ningbainb/dsh-data-location",
       "@ningbainb/dsh-agent-inbox",
+      "@ningbainb/dsh-llm-antigravity",
       "@ningbainb/dsh-personal-prompt"
     ],
     "bundledDefaultOff": [

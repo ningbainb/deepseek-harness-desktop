@@ -32,6 +32,11 @@
     - id: agent-inbox
       name: '@ningbainb/dsh-agent-inbox'
 
+# from ../dsh-llm-antigravity
+- insert:
+    - id: llm-antigravity
+      name: '@ningbainb/dsh-llm-antigravity'
+
 # from ../dsh-personal-prompt
 - insert:
     - id: personal-prompt
