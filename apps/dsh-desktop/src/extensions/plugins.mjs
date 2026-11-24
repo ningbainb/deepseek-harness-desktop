@@ -29,7 +29,7 @@ const MAX_PNPM_PATH_ENTRY_LENGTH = 4_096
 const VERSION_PATTERN = /^[a-z0-9][a-z0-9._+~^*<>=|-]*$/i
 const SHA512_INTEGRITY_PATTERN = /^sha512-[a-z0-9+/]+={0,2}$/iu
 const PNPM_OFFLINE_CACHE_MISS = /\bERR_PNPM_NO_OFFLINE_(?:META|TARBALL)\b/u
-const PREBUILT_IM_CONNECT_SPEC = '@michengai/dsh-im-connect@1.0.44'
+const PREBUILT_IM_CONNECT_SPEC = '@michengai/dsh-im-connect@1.0.53'
 const UNKNOWN_COMPATIBILITY = Object.freeze({
   status: 'unknown',
   reasons: Object.freeze([Object.freeze({ code: 'compatibility-undeclared' })]),

@@ -38,7 +38,7 @@ test('createPluginInventory attributes confirmed plugins to ningbainb and omits 
       '@linxin666/dsh-value-mode': '0.1.0',
       '@ningbainb/dsh-memory': '0.1.0',
       '@linxin666/dsh-ssh': '0.1.0',
-      'dsh-context': '0.85.1',
+      'dsh-context': '0.87.1',
     },
     dsh: { profile: { bundles: [] } },
   }
@@ -46,7 +46,7 @@ test('createPluginInventory attributes confirmed plugins to ningbainb and omits 
     ['@linxin666/dsh-value-mode', { version: '0.1.0', author: 'linxin666' }],
     ['@ningbainb/dsh-memory', { version: '0.1.0' }],
     ['@linxin666/dsh-ssh', { version: '0.1.0', author: 'linxin666' }],
-    ['dsh-context', { version: '0.85.1', author: 'bowenliang123' }],
+    ['dsh-context', { version: '0.87.1', author: 'bowenliang123' }],
   ])
 
   const inventory = new Map(

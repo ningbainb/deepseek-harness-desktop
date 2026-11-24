@@ -1,10 +1,18 @@
 /** Chinese copy is the key-set source of truth for the model preferences UI. */
 export declare const zh: {
-    readonly 'action.bai': "bai 供应商：登录 / 充值";
-    readonly 'action.baiCompact': "bai · 登录/充值";
+    readonly 'action.bai': "聚合中转（bai）：登录 / 充值";
+    readonly 'action.baiCompact': "聚合中转 · 登录";
     readonly 'command.description': "选择模型（支持自定义置顶和供应商排序）";
     readonly 'trigger.fallback': "选择模型";
-    readonly 'trigger.baiPending': "bai（登录后获取模型）";
+    readonly 'trigger.baiPending': "聚合中转（登录解锁模型）";
+    readonly 'relayShowcase.group': "聚合模型中转（bai）";
+    readonly 'relayShowcase.badge': "登录后解锁";
+    readonly 'relayShowcase.claudeName': "Claude 系列";
+    readonly 'relayShowcase.claudeDesc': "强代码与长文 · 登录后可用";
+    readonly 'relayShowcase.gptName': "GPT 系列";
+    readonly 'relayShowcase.gptDesc': "全能推理与工具 · 登录后可用";
+    readonly 'relayShowcase.multiName': "DeepSeek / Gemini";
+    readonly 'relayShowcase.multiDesc': "国内直连高性价比 · 登录后可用";
     readonly 'trigger.aria': "当前模型：{model}";
     readonly 'trigger.ariaDisabled': "模型选择不可用";
     readonly 'menu.aria': "模型选择器";

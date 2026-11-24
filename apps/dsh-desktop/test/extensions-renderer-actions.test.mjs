@@ -50,7 +50,7 @@ test('Creative Workshop renders an installable local pin during load and after n
     assert.equal(market('total').textContent, '1')
     assert.equal(market('updated').textContent, '随本版提供')
     assert.match(market('bridge').textContent, /正在读取完整社区目录/u)
-    assert.match(market('list').textContent, /@michengai\/dsh-im-connect@1\.0\.44/u)
+    assert.match(market('list').textContent, /@michengai\/dsh-im-connect@1\.0\.53/u)
     assert.equal(market('list').querySelector('[data-install-market-plugin]').dataset.installMarketPlugin, trial.id)
 
     pendingReject(new Error('community market catalog unavailable: timeout'))
@@ -63,7 +63,7 @@ test('Creative Workshop renders an installable local pin during load and after n
     assert.equal(market('total').textContent, '22')
     assert.equal(market('updated').textContent, '2026-11-17')
     assert.equal(market('pagination').hidden, false)
-    market('query').value = '@michengai/dsh-im-connect@1.0.44'
+    market('query').value = '@michengai/dsh-im-connect@1.0.53'
     vm.runInContext('renderMarket()', context)
     assert.equal(market('list').children.length, 1)
     assert.equal(market('list').querySelector('[data-install-market-plugin]').dataset.installMarketPlugin, trial.id)
@@ -446,7 +446,7 @@ test('five Dock groups retain every old destination and place settings navigatio
 
 test('optional context and advanced prompt capabilities disclose scope and pending compatibility', () => {
   assert.match(source, /packageName: 'dsh-context'/u)
-  assert.match(source, /0\.85\.1/u)
+  assert.match(source, /0\.87\.1/u)
   assert.match(source, /packageName: 'dsh-context-memory'/u)
   assert.match(source, /1\.2\.0，默认关闭/u)
   assert.match(source, /本轮暂停新启用/u)

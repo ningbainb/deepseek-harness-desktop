@@ -57,13 +57,19 @@ it.each([undefined, 'official', 'third-party'])('a fresh user entering a non-bai
   expect(screen.queryByRole('dialog')).toBeNull()
 })
 
-it('an unauthenticated user choosing bai sees sign-in guidance and uses the trusted browser bridge once', async () => {
+it('an unauthenticated user choosing bai sees featured models first and opens browser only on CTA click', async () => {
   const { open, requests } = fixture()
   const popup = vi.spyOn(window, 'open')
   document.body.innerHTML = '<button data-dsh-relay-model-entry="true" data-dsh-relay-provider="project-relay">选择模型</button>'
   act(() => { disposers.push(installRelayModelEntrances(document, translate)) })
   fireEvent.click(screen.getByText('选择模型'))
-  expect(await screen.findByRole('dialog', { name: translate('accessTitle') })).toBeTruthy()
+  const dialog = await screen.findByRole('dialog', { name: translate('accessTitle') })
+  expect(dialog).toBeTruthy()
+  expect(dialog.querySelector('[data-relay-featured-models="true"]')).toBeTruthy()
+  expect(open).not.toHaveBeenCalled()
+  const connectButton = screen.getByRole('button', { name: translate('connect') }) as HTMLButtonElement
+  await waitFor(() => expect(connectButton.disabled).toBe(false))
+  fireEvent.click(connectButton)
   await waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith(connectionUrl))
   expect(screen.getByText(translate('waitingBrowser'))).toBeTruthy()
   fireEvent.click(screen.getByText('选择模型'))

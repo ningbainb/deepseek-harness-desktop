@@ -12,7 +12,7 @@
       "status": "supported",
       "upstreamVersion": "0.2.3-alpha.2",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=5.3.6",
+      "desktopRange": "=5.4.0",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -55,10 +55,10 @@
           "status": "unsupported"
         }
       ],
-      "verifiedAt": "2026-11-23",
+      "verifiedAt": "2026-11-25",
       "matrixArtifact": "docs/launch/release-notes.md",
       "knownIssues": [
-        "Exact public DSH 0.2.3-alpha.2 SDK cohort for Desktop 5.3.6. Package, session and native acceptance each require executed evidence.",
+        "Exact public DSH 0.2.3-alpha.2 SDK cohort for Desktop 5.4.0. Package, session and native acceptance each require executed evidence.",
         "Optional M2/P2 combination, legacy team history and actual installed upgrade/rollback remain subject to executed acceptance.",
         "Windows results do not certify macOS/Linux; preview acceptance requires matching native workflow SHA and uploaded artifacts."
       ],
@@ -75,7 +75,7 @@
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "15f774e60395d3024df649569036041b2686d55b6523ebc19a2636ff2c879bad"
+          "sha256": "c10f7e94e0c807db2b03d04dcdd524303e1e0d141a0c146208a4a1b9213909ed"
         },
         "slots": [
           "conversation.composer.dock",

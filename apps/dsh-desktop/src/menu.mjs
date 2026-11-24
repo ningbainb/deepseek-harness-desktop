@@ -14,6 +14,7 @@ export function createApplicationMenuTemplate({
   openPrivacy = () => shell.openExternal(PRIVACY_POLICY_URL),
   exportDiagnostics = () => {},
   openProject = () => shell.openExternal(GITHUB_PROJECT_URL),
+  openReleaseGuide,
   checkForUpdates,
   getCloseBehavior,
   setCloseBehavior,
@@ -120,6 +121,9 @@ export function createApplicationMenuTemplate({
     {
       label: '帮助 / Help',
       submenu: [
+        ...(typeof openReleaseGuide === 'function'
+          ? [{ label: "本版本新功能 / What's New", click: action(openReleaseGuide) }]
+          : []),
         { label: '检查更新 / Check for Updates', click: action(() => checkForUpdates({ manual: true })) },
         { label: '导出诊断日志 / Export Diagnostics', click: action(exportDiagnostics) },
         { type: 'separator' },

@@ -103,4 +103,48 @@ describe('model selector lifecycle', () => {
     } as never} />)
     await waitFor(() => expect(nextSessionLoad).toHaveBeenCalledTimes(1))
   })
+
+  it('shows unauthenticated relay showcase entries in model menu and hides once relay models exist', async () => {
+    const relayRoot = document.createElement('div')
+    relayRoot.dataset.dshRelayAccessRoot = 'true'
+    document.body.append(relayRoot)
+    const signInSpy = vi.fn()
+    document.addEventListener('dsh-relay-sign-in-required', signInSpy)
+
+    try {
+      const props = createProps(vi.fn())
+      const unconfiguredState = {
+        ...READY_DIRECTORY_STATE,
+        groups: [{ id: 'deepseek', name: 'DeepSeek', models: [{ id: 'flash', name: 'DeepSeek-Flash' }] }],
+      }
+      const view = render(<ModelSelect {...{ ...props, directory: {
+        ...props.directory, getSnapshot: () => unconfiguredState,
+      } } as never} />)
+
+      fireEvent.click(view.getByRole('button', { name: 'trigger.fallback' }))
+      fireEvent.click(view.getByRole('menuitem', { name: /menu.models/ }))
+      const showcase = view.getByRole('group', { name: 'relayShowcase.group' })
+      expect(showcase.textContent).toContain('relayShowcase.claudeName')
+      expect(showcase.textContent).toContain('relayShowcase.gptName')
+      expect(showcase.textContent).toContain('relayShowcase.multiName')
+
+      fireEvent.click(view.getByRole('menuitem', { name: /relayShowcase.claudeName/ }))
+      expect(signInSpy).toHaveBeenCalledTimes(1)
+      expect(view.queryByRole('menu')).toBeNull()
+
+      const configuredState = {
+        ...READY_DIRECTORY_STATE,
+        groups: [{ id: 'project-relay', name: '聚合模型中转（bai）', models: [{ id: 'claude-sonnet-4', name: 'Claude Sonnet 4' }] }],
+      }
+      view.rerender(<ModelSelect {...{ ...props, directory: {
+        ...props.directory, getSnapshot: () => configuredState,
+      } } as never} />)
+      fireEvent.click(view.getByRole('button', { name: 'trigger.fallback' }))
+      fireEvent.click(view.getByRole('menuitem', { name: /menu.models/ }))
+      expect(view.queryByRole('group', { name: 'relayShowcase.group' })).toBeNull()
+    } finally {
+      document.removeEventListener('dsh-relay-sign-in-required', signInSpy)
+      relayRoot.remove()
+    }
+  })
 })

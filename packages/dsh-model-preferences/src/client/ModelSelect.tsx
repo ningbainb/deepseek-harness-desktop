@@ -46,6 +46,9 @@ export function ModelSelect(props: ModelSelectProps) {
   const [pane, setPane] = useState<Pane>('root')
   const [selecting, setSelecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [relayAccessAvailable, setRelayAccessAvailable] = useState(
+    () => typeof document !== 'undefined' && document.querySelector('[data-dsh-relay-access-root]') !== null,
+  )
   const lastActionRef = useRef<'load' | 'select'>('load')
   const loadRef = useRef(load)
   loadRef.current = load
@@ -78,6 +81,9 @@ export function ModelSelect(props: ModelSelectProps) {
     () => [...catalog.pinned, ...catalog.groups.flatMap(group => group.models)],
     [catalog],
   )
+  const hasConfiguredRelay = options.some(
+    option => option.provider === PRIMARY_PROVIDER_ID && option.model.id !== '__bai_login_required__',
+  )
   const currentOption = options.find(option => option.current)
   const reasoning = currentOption?.model.reasoning
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
@@ -109,6 +115,15 @@ export function ModelSelect(props: ModelSelectProps) {
   const reload = useCallback((): void => {
     lastActionRef.current = 'load'
     loadRef.current()
+  }, [])
+
+  useEffect(() => {
+    const update = () => setRelayAccessAvailable(
+      typeof document !== 'undefined' && document.querySelector('[data-dsh-relay-access-root]') !== null,
+    )
+    document.addEventListener('dsh-relay-access-changed', update)
+    update()
+    return () => document.removeEventListener('dsh-relay-access-changed', update)
   }, [])
 
   useEffect(() => {
@@ -302,8 +317,41 @@ export function ModelSelect(props: ModelSelectProps) {
               <div className={`${styles.groups} scrollable`}>
                 {catalog.pinned.length > 0 && renderGroup(t('menu.pinned'), catalog.pinned, 'pinned')}
                 {catalog.groups.map(group => renderGroup(group.name, group.models, group.id))}
+                {relayAccessAvailable && !hasConfiguredRelay && (
+                  <section
+                    role="group"
+                    aria-label={t('relayShowcase.group')}
+                    className={`${styles.group} ${styles.primaryProviderGroup}`}
+                    data-dsh-relay-showcase="true"
+                  >
+                    <div className={styles.groupTitle}>
+                      <span>{t('relayShowcase.group')}</span>
+                      <span className={styles.recommendedBadge}>{t('relayShowcase.badge')}</span>
+                    </div>
+                    {(['claude', 'gpt', 'multi'] as const).map(tier => (
+                      <button
+                        key={tier}
+                        type="button"
+                        role="menuitem"
+                        className={styles.option}
+                        onClick={() => {
+                          close()
+                          document.dispatchEvent(new CustomEvent('dsh-relay-sign-in-required', { detail: { source: 'model-picker', tier } }))
+                        }}
+                      >
+                        <span className={styles.optionCopy}>
+                          <span className={styles.modelName}>{t(`relayShowcase.${tier}Name`)}</span>
+                          <span className={styles.description}>{t(`relayShowcase.${tier}Desc`)}</span>
+                        </span>
+                        <span aria-hidden="true" className={styles.cellChevron} />
+                      </button>
+                    ))}
+                  </section>
+                )}
               </div>
-              {state.status === 'ready' && options.length === 0 && <div className={styles.empty}>{t('status.empty')}</div>}
+              {state.status === 'ready' && options.length === 0 && !(relayAccessAvailable && !hasConfiguredRelay) && (
+                <div className={styles.empty}>{t('status.empty')}</div>
+              )}
             </>
           )}
 

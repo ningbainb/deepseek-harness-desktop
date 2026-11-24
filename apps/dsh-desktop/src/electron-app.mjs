@@ -130,6 +130,7 @@ import { installSettingsWindow } from './settings-window.mjs'
 import { exportStartupDiagnostics } from './startup-diagnostics.mjs'
 import { SettingsWindowStateStore } from './settings-window-state.mjs'
 import { installStarPromptSurface, STAR_PROMPT_VERSION, StarPromptStore } from './star-prompt.mjs'
+import { applyReleaseGuideSurface, installReleaseGuideSurface, RELEASE_GUIDE_VERSION, ReleaseGuideStore } from './release-guide.mjs'
 import { createDesktopTerminalPanel } from './terminal-window.mjs'
 import { TerminalShellPreferencesStore } from './terminal-shell-preferences.mjs'
 import { ProductTelemetryClient } from './telemetry-client.mjs'
@@ -999,6 +1000,11 @@ export async function startElectronApp(metadata) {
     forceVisible: process.env.DSH_DESKTOP_STAR_PROMPT_PREVIEW === '1',
     onError: (error) => void logStore.append(`[star-prompt] ${error.message}`),
   })
+  const removeReleaseGuideSurface = installReleaseGuideSurface({
+    browserWindow: mainWindow,
+    forceVisible: process.env.DSH_DESKTOP_RELEASE_GUIDE_PREVIEW === '1',
+    onError: (error) => void logStore.append(`[release-guide] ${error.message}`),
+  })
   const unregisterStartupIpc = registerDesktopStartupIpc({
     metadata,
     version: desktopVersion,
@@ -1267,6 +1273,7 @@ export async function startElectronApp(metadata) {
     return true
   }
   const starPromptStore = new StarPromptStore({ path: join(userData, 'star-prompt-state.json') })
+  const releaseGuideStore = new ReleaseGuideStore({ path: join(userData, 'release-guide-state.json') })
   const closePreferencesStore = new DesktopClosePreferencesStore(desktopPreferencesPath)
   const updateChannelStore = new DesktopUpdateChannelStore(updateChannelPreferencesPath)
   let closeBehavior = (await closePreferencesStore.load()).closeBehavior
@@ -2193,6 +2200,14 @@ export async function startElectronApp(metadata) {
         return false
       }
     },
+    claimReleaseGuide: async () => {
+      try {
+        return await releaseGuideStore.claim(RELEASE_GUIDE_VERSION)
+      } catch (error) {
+        await logStore.append(`[release-guide] failed to persist display state: ${error instanceof Error ? error.message : String(error)}`)
+        return false
+      }
+    },
     getUpdateController: () => updateController,
     getRepairStatus: async () => {
       const incident = await repairIncidentStore.latest()
@@ -3103,6 +3118,7 @@ export async function startElectronApp(metadata) {
         removeUpdateSurface,
         removeSettingsWindow,
         removeStarPromptSurface,
+        removeReleaseGuideSurface,
         removeConversationSkills,
         removeConversationPolish,
         removeEditContextMenu,
@@ -3365,6 +3381,10 @@ export async function startElectronApp(metadata) {
     openProject: () => {
       productMetrics.recordSurface('help')
       return shell.openExternal(GITHUB_PROJECT_URL)
+    },
+    openReleaseGuide: () => {
+      productMetrics.recordSurface('help')
+      return applyReleaseGuideSurface({ webContents: mainWindow?.webContents, forceVisible: true, showDelayMs: 0 })
     },
     openPrivacy: () => {
       productMetrics.recordSurface('help')

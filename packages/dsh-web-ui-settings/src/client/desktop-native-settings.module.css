@@ -11,23 +11,30 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 3px;
-  border-radius: var(--dsw-radius-lg, 8px);
+  padding: 4px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-lg, 10px);
   background: var(--dsw-alias-bg-module-platform, var(--dsw-alias-bg-layer-2));
 }
 
 .tabs button, .button {
-  min-height: 32px;
-  padding: 5px 12px;
+  min-height: 30px;
+  padding: 4px 12px;
   border: 1px solid transparent;
-  border-radius: var(--dsw-radius-md, 6px);
+  border-radius: var(--dsw-radius-md, 7px);
   color: var(--dsw-alias-label-secondary);
   background: none;
   font: inherit;
+  font-size: 13px;
   cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
 }
 
 .tabs button { flex: 1 0 auto; }
+.tabs button:hover:not([aria-selected='true']) {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
 .groupTabs { width: fit-content; max-width: 100%; box-sizing: border-box; }
 .groupTabs button { flex: 0 1 auto; min-width: 0; }
 .tabs button[aria-selected='true'] {
@@ -35,6 +42,7 @@
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-bg-layer-3);
   font-weight: 500;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
 }
 .button:hover {
   border-color: var(--dsw-alias-border-l2);

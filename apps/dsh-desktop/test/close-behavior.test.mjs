@@ -116,7 +116,7 @@ test('opt-in minimize-to-tray intercepts a window close and leaves runtime owner
   assert.equal(quit, 0)
 })
 
-test('titlebar minimize follows only the persistent tray opt-in without prompting or quitting', () => {
+test('titlebar minimize always stays in the taskbar without hiding to tray, prompting, or quitting', () => {
   let behavior = CLOSE_BEHAVIORS.QUIT
   let hidden = 0
   const controller = createCloseBehaviorController({
@@ -130,7 +130,9 @@ test('titlebar minimize follows only the persistent tray opt-in without promptin
   behavior = CLOSE_BEHAVIORS.ASK
   assert.equal(controller.handleWindowMinimize(), false)
   behavior = CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY
-  assert.equal(controller.handleWindowMinimize(), true)
+  assert.equal(controller.handleWindowMinimize(), false)
+  assert.equal(hidden, 0)
+  assert.equal(controller.handleWindowClose(closeEvent()), true)
   assert.equal(hidden, 1)
 })
 
@@ -157,7 +159,7 @@ test('one-time tray residency leaves the saved close choice untouched and respec
   assert.equal(hidden, 1)
 })
 
-test('minimize failures retain a reachable taskbar window and report the failure', () => {
+test('tray residency failures retain a reachable window and report the failure', () => {
   const errors = []
   const controller = createCloseBehaviorController({
     getCloseBehavior: () => CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY,
@@ -167,7 +169,7 @@ test('minimize failures retain a reachable taskbar window and report the failure
   })
   assert.equal(controller.handleWindowMinimize(), false)
   assert.equal(controller.minimizeToTray(), false)
-  assert.deepEqual(errors, ['window hide failed', 'window hide failed'])
+  assert.deepEqual(errors, ['window hide failed'])
 })
 
 test('quit, unavailable tray, crash, and explicit process exit all bypass background hiding', () => {

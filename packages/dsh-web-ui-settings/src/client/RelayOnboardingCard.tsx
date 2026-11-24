@@ -3,6 +3,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   RELAY_CONFIGURE_PATH,
   RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH,
+  RELAY_FEATURED_MODELS,
   isPendingBaiModel,
   type RelayConnection, type RelayConnectResponse,
   RELAY_KEYS_URL,
@@ -253,6 +254,7 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
   const configured = status?.configured === true
   const authorized = configured && status.sync?.error !== 'relay-auth'
   const showClear = status?.profileConfigured === true || status?.credentialConfigured === true
+  const isZh = /[\u4e00-\u9fff]/.test(t('title'))
 
   const continueToModels = (): void => {
     reportBaiAcquisition('continued', 'model-picker')
@@ -299,13 +301,24 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
         </div>}
       </header>
       <div id="dsh-relay-content" className={css.body} hidden={!expanded}>
-      {!configured && <div className={css.benefits} aria-label={t('benefitsLabel')}>
-        <span>{t('benefitSync')}</span>
-        <span>{t('benefitLocal')}</span>
-        <span>{t('benefitRevoke')}</span>
-      </div>}
-      <p className={css.notice}>{t('notice')}</p>
-      <p className={css.muted}>{t('autoRefreshNotice')}</p>
+      {!configured && <>
+        <div className={css.featuredSection} data-relay-featured-models="true">
+          <span className={css.featuredLabel}>{t('featuredModelsTitle')}</span>
+          <div className={css.featuredGrid}>
+            {RELAY_FEATURED_MODELS.map(model => (
+              <span key={model.id} className={css.modelChip}>
+                <span className={css.modelChipName}>{model.name}</span>
+                <span className={css.modelChipTag}>{isZh ? model.tagZh : model.tagEn}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className={css.benefits} aria-label={t('benefitsLabel')}>
+          <span>{t('benefitSync')}</span>
+          <span>{t('benefitLocal')}</span>
+          <span>{t('benefitRevoke')}</span>
+        </div>
+      </>}
 
       <div className={css.actions}>
         {configured
@@ -324,14 +337,19 @@ export function RelayOnboardingCard(props: RelayOnboardingCardProps) {
       {connection.phase === 'expired' && <p role="status" className={css.muted}>{t('expiredConnect')}</p>}
       {connection.phase === 'failed' && <p role="alert" className={css.error}>{t('errorConnect')}</p>}
 
-      {!configured && <section className={css.section}>
-        <strong>{t('stepsTitle')}</strong>
-        <ol className={css.steps}>
-          <li>{t('step1')}</li>
-          <li>{t('step2')}</li>
-          <li>{t('step3')}</li>
-        </ol>
-      </section>}
+      <details className={css.detailsDisclosure}>
+        <summary>{t('detailsSummary')}</summary>
+        <p className={css.notice}>{t('notice')}</p>
+        <p className={css.muted}>{t('autoRefreshNotice')}</p>
+        {!configured && <section className={css.section}>
+          <strong>{t('stepsTitle')}</strong>
+          <ol className={css.steps}>
+            <li>{t('step1')}</li>
+            <li>{t('step2')}</li>
+            <li>{t('step3')}</li>
+          </ol>
+        </section>}
+      </details>
 
       <details className={css.accountTools}>
         <summary>{t('accountTools')}</summary>

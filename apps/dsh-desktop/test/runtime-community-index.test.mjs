@@ -25,9 +25,9 @@ test('official format-1 validator accepts the named pinned catalog and retains l
   assert.match(parsed.title.en, /DSH Desktop/)
   assert.equal(parsed.title.zh, '创意工坊')
   assert.deepEqual(parsed.plugins.map(plugin => [plugin.name, plugin.versions[0].version]), [
-    ['dsh-context', '0.85.1'],
+    ['dsh-context', '0.87.1'],
     ['dsh-prompt-customizer', '2.2.0'],
-    ['@michengai/dsh-im-connect', '1.0.44'],
+    ['@michengai/dsh-im-connect', '1.0.53'],
   ])
   for (const plugin of parsed.plugins) {
     assert.ok(plugin.metadata.labels.some(label => label.startsWith('license-')))

@@ -102,8 +102,8 @@ test('official plugin mutations go through main IPC and retain the SDK response 
   installDesktopTransportBridge(target)
 
   const commands = [
-    ['pluginManager/installBundle', { spec: 'dsh-context@0.85.1', options: { expected: { name: 'dsh-context', version: '0.85.1' } } }],
-    ['pluginManager/updateBundle', { name: 'dsh-context', version: '0.86.0' }],
+    ['pluginManager/installBundle', { spec: 'dsh-context@0.87.1', options: { expected: { name: 'dsh-context', version: '0.87.1' } } }],
+    ['pluginManager/updateBundle', { name: 'dsh-context', version: '0.87.1' }],
     ['pluginManager/removeBundle', { name: 'dsh-context' }],
     ['pluginManager/setBundleEnabled', { name: 'dsh-context', enabled: false }],
   ]

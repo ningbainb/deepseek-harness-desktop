@@ -1512,7 +1512,7 @@
   "contextSuite": {
     "context": {
       "package": "dsh-context",
-      "version": "0.85.1",
+      "version": "0.87.1",
       "defaultEnabled": true,
       "entry": "conversation-right-context",
       "globalInsightNavigation": "retained-pending-public-sdk-relocation"

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   RELAY_CONNECT_PATH, RELAY_CONNECT_STATUS_PATH, RELAY_CONNECT_CANCEL_PATH,
+  RELAY_FEATURED_MODELS,
   RELAY_STATUS_PATH, RELAY_REFRESH_PATH, RELAY_WALLET_URL,
   type RelayConnectResponse, type RelayConnection, type RelayStatusResponse,
 } from '../relay-protocol.ts'
@@ -105,21 +106,63 @@ export function RelayAccessDialog({ t: translate, onClose, autoConnect, forceAut
   }
   const pending = ['starting', 'pending', 'connecting'].includes(connection.phase)
   const authenticated = !authRejected && status?.configured && status.sync?.error !== 'relay-auth'
+  const isZh = /[\u4e00-\u9fff]/.test(translate('accessTitle'))
+  const statusLine = status === null
+    ? translate('statusLoading')
+    : connection.phase === 'connected'
+      ? translate('connected')
+      : pending
+        ? translate('waitingBrowser')
+        : authenticated
+          ? translate('statusReady')
+          : authRejected
+            ? translate('notSignedIn')
+            : undefined
   return <div className={css.accessBackdrop}>
     <div ref={dialog} className={`${css.card} ${css.accessDialog}`} role="dialog" aria-modal="true" aria-label={translate('accessTitle')}>
-      <header className={css.header}><h3 className={css.title}>{translate('accessTitle')}</h3><button type="button" className={css.secondary} onClick={onClose}>{translate('closeAccess')}</button></header>
-      <p role="status">{status === null ? translate('statusLoading') : connection.phase === 'connected' ? translate('connected') : pending ? translate('waitingBrowser') : authenticated ? translate('statusReady') : translate('notSignedIn')}</p>
-      {pending && !authenticated && <p>{translate('notSignedIn')}</p>}
-      <p className={css.notice}>{translate('notice')}</p>
-      {status?.writable === false && <p role="status">{translate('readonly')}</p>}
-      <p>{translate('autoRefreshNotice')}</p>
+      <header className={css.header}>
+        <div>
+          <h3 className={css.title}>{translate('accessTitle')}</h3>
+          <p className={css.description}>{translate('description')}</p>
+        </div>
+        <button
+          type="button"
+          className={css.iconClose}
+          aria-label={translate('closeAccess')}
+          title={translate('closeAccess')}
+          onClick={onClose}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+      </header>
+      {statusLine && <p role="status" className={css.muted}>{statusLine}</p>}
+      {pending && !authenticated && <p className={css.muted}>{translate('notSignedIn')}</p>}
+      {!authenticated && <div className={css.featuredSection} data-relay-featured-models="true">
+        <span className={css.featuredLabel}>{translate('featuredModelsTitle')}</span>
+        <div className={css.featuredGrid}>
+          {RELAY_FEATURED_MODELS.map(model => (
+            <span key={model.id} className={css.modelChip}>
+              <span className={css.modelChipName}>{model.name}</span>
+              <span className={css.modelChipTag}>{isZh ? model.tagZh : model.tagEn}</span>
+            </span>
+          ))}
+        </div>
+      </div>}
+      {status?.writable === false && <p role="status" className={css.muted}>{translate('readonly')}</p>}
       <div className={css.actions}>
-        <button type="button" className={css.primary} disabled={busy || pending || status?.writable !== true} onClick={() => { void connect() }}>{authenticated ? translate('reconnect') : translate('connect')}</button>
+        <button type="button" className={authenticated ? css.primary : css.primaryWide} disabled={busy || pending || status?.writable !== true} onClick={() => { void connect() }}>{authenticated ? translate('reconnect') : translate('connect')}</button>
         <button type="button" className={css.secondary} onClick={() => openBrowser(RELAY_WALLET_URL)}>{translate('openWallet')}</button>
         {authenticated && <button type="button" className={css.secondary} disabled={busy || pending} onClick={() => { void refresh() }}>{translate('refreshModels')}</button>}
         {connection.url && <button type="button" className={css.secondary} onClick={() => openBrowser(connection.url!)}>{translate('continueBrowser')}</button>}
         {pending && <button type="button" className={css.secondary} onClick={() => { void postRelay<RelayConnectResponse>(RELAY_CONNECT_CANCEL_PATH).then(result => { if (active.current) setConnection(result.connection) }).catch(() => { if (active.current) setError(translate('errorConnect')) }) }}>{translate('cancelConnect')}</button>}
       </div>
+      <details className={css.detailsDisclosure}>
+        <summary>{translate('detailsSummary')}</summary>
+        <p className={css.notice}>{translate('notice')}</p>
+        <p className={css.muted}>{translate('autoRefreshNotice')}</p>
+      </details>
       {connection.phase === 'expired' && <p role="status">{translate('expiredConnect')}</p>}
       {connection.phase === 'failed' && <p role="alert">{translate('errorConnect')}</p>}
       {error && <p role="alert" className={css.error}>{error}</p>}
@@ -157,10 +200,10 @@ export function installRelayModelEntrances(doc: Document, translate: Translate):
     checking = true
     void postRelay<RelayStatusResponse>(RELAY_STATUS_PATH).then(status => {
       if (!disposed && (!status.configured || status.sync?.error === 'relay-auth')
-        && entry.dataset.dshRelayProvider === 'project-relay') show(true)
+        && entry.dataset.dshRelayProvider === 'project-relay') show(false)
     }).catch(() => {}).finally(() => { checking = false })
   }
-  const onSignInRequired = (event: Event) => show(true, event instanceof CustomEvent && event.detail?.reason === 'relay-auth')
+  const onSignInRequired = (event: Event) => show(false, event instanceof CustomEvent && event.detail?.reason === 'relay-auth')
   doc.addEventListener('click', onClick, true)
   doc.addEventListener(RELAY_SIGN_IN_REQUIRED_EVENT, onSignInRequired)
   return () => { disposed = true; doc.removeEventListener('click', onClick, true); doc.removeEventListener(RELAY_SIGN_IN_REQUIRED_EVENT, onSignInRequired); root.unmount(); container.remove(); doc.dispatchEvent(new Event('dsh-relay-access-changed')) }

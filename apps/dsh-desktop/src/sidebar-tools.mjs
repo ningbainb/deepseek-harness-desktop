@@ -44,6 +44,21 @@ export const SIDEBAR_TOOLS_CSS = `
 [data-dsh-tools-toggle]:focus-visible { outline: 2px solid var(--dsw-alias-state-business-primary, #4d78e8); outline-offset: -2px; }
 [data-pane="sidebar"][data-sidebar-collapsed] [data-dsh-tools-toggle] { inline-size: 36px; padding-inline: 0; justify-content: center; align-self: center; }
 [data-pane="sidebar"][data-sidebar-collapsed] [data-dsh-tools-toggle] span { display: none; }
+[data-dsh-tools-pending] {
+  margin-inline-start: auto;
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #3370ff) 14%, transparent);
+  color: var(--dsw-alias-brand-primary, #3370ff);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+[data-dsh-tools-pending][hidden] { display: none; }
 `
 
 export function installSidebarTools() {
@@ -60,7 +75,10 @@ export function installSidebarTools() {
   button.type = 'button'
   button.setAttribute('data-dsh-tools-toggle', '')
   const label = document.createElement('span')
-  button.append(label)
+  const pendingBadge = document.createElement('span')
+  pendingBadge.setAttribute('data-dsh-tools-pending', '')
+  pendingBadge.hidden = true
+  button.append(label, pendingBadge)
   const release = () => {
     button.remove()
     for (const row of rows) row.removeAttribute('data-dsh-collapsible-tool')
@@ -116,6 +134,9 @@ export function installSidebarTools() {
     const count = targets.reduce((total, row) => total + (row.matches('nav') ? row.querySelectorAll('button').length : 1), 0)
     const text = `${name} (${count})`
     if (label.textContent !== text) label.textContent = text
+    const pendingCount = Number(nativePanels?.querySelector?.('[data-agent-inbox-entry]')?.getAttribute?.('data-pending-count') || 0)
+    pendingBadge.hidden = !(collapsed && pendingCount > 0)
+    if (pendingCount > 0) pendingBadge.textContent = String(pendingCount)
     button.setAttribute('aria-label', name)
     button.title = name
     button.setAttribute('aria-expanded', String(!collapsed))
@@ -130,9 +151,10 @@ export function installSidebarTools() {
       record.target === root || record.target.contains(sidebar)
       || (!root && sidebar.contains(record.target))
       || (record.target.matches?.('nav') && sidebar.contains(record.target))
-      || [...record.addedNodes, ...record.removedNodes].some(node => node.contains(sidebar)))) schedule()
+      || (record.attributeName === 'data-pending-count' && sidebar.contains(record.target))
+      || [...(record.addedNodes ?? []), ...(record.removedNodes ?? [])].some(node => node.contains(sidebar)))) schedule()
   })
-  observer.observe(document, { childList: true, subtree: true })
+  observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-pending-count'] })
   const localeObserver = new MutationObserver(schedule)
   localeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] })
   const toggle = () => {

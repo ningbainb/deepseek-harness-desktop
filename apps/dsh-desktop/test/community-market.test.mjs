@@ -156,7 +156,7 @@ test('market discovery retains one pinned IM Connect trial and stages its exact 
     id: plugin.id,
     name: '@michengai/dsh-im-connect',
     sourceKind: 'npm',
-    installSpec: '@michengai/dsh-im-connect@1.0.44',
+    installSpec: '@michengai/dsh-im-connect@1.0.53',
   })
 })
 
@@ -173,7 +173,7 @@ test('packaged discovery is available and resolves its exact pin before any remo
   assert.equal(curated.source, 'curated')
   assert.equal(curated.count, 1)
   assert.ok(curated.plugins.every((plugin) => plugin.sourceKind === 'npm'))
-  assert.equal(await service.resolveInstall(curated.plugins[0].id), '@michengai/dsh-im-connect@1.0.44')
+  assert.equal(await service.resolveInstall(curated.plugins[0].id), '@michengai/dsh-im-connect@1.0.53')
   assert.equal(calls, 0)
   await assert.rejects(service.list(), /community market catalog unavailable: proxy/u)
   assert.deepEqual(service.listAvailable(), curated)

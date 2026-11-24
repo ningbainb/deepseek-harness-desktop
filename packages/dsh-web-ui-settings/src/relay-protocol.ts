@@ -7,7 +7,23 @@
 export const RELAY_PROVIDER_ID = 'project-relay'
 
 /** User-facing provider name shown by the official Models page and selector. */
-export const RELAY_PROVIDER_DISPLAY_NAME = 'bai供应商'
+export const RELAY_PROVIDER_DISPLAY_NAME = '聚合模型中转（bai）'
+
+export interface RelayFeaturedModel {
+  id: string
+  name: string
+  tagZh: string
+  tagEn: string
+}
+
+export const RELAY_FEATURED_MODELS: readonly RelayFeaturedModel[] = [
+  { id: 'claude-sonnet', name: 'Claude Sonnet', tagZh: '强代码', tagEn: 'Coding' },
+  { id: 'claude-opus', name: 'Claude Opus', tagZh: '深度推理', tagEn: 'Reasoning' },
+  { id: 'gpt', name: 'GPT', tagZh: '全能旗舰', tagEn: 'Flagship' },
+  { id: 'gemini', name: 'Gemini', tagZh: '超长上下文', tagEn: 'Long Context' },
+  { id: 'deepseek', name: 'DeepSeek', tagZh: '高性价比', tagEn: 'Best Value' },
+  { id: 'deepseek-flash', name: 'DeepSeek Flash', tagZh: '快速响应', tagEn: 'Fast' },
+]
 
 export const RELAY_PENDING_MODEL_ID = '__bai_login_required__'
 export const RELAY_PREFERRED_MODEL_ID = 'deepseek-flash'

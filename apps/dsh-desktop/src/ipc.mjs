@@ -478,6 +478,7 @@ export function registerDesktopIpc({
   onPluginInstallRequest = async () => { throw new Error('plugin install requests are unavailable') },
   setWindowChromeTheme,
   claimStarPrompt,
+  claimReleaseGuide,
   getUpdateController,
   getRepairStatus = async () => undefined,
   retryRepair = async () => ({ accepted: false }),
@@ -542,6 +543,7 @@ export function registerDesktopIpc({
     'desktop:dock-open',
     'desktop:window-chrome-theme',
     'desktop:star-prompt-claim',
+    'desktop:release-guide-claim',
     'desktop:update-status',
     'desktop:repair-status',
     'desktop:repair-retry',
@@ -664,6 +666,7 @@ export function registerDesktopIpc({
     opened: await openExtensionDock(normalizeDesktopDockOpenOptions(rawOptions)) === true,
   }))
   handle('desktop:star-prompt-claim', main, async () => await claimStarPrompt?.() === true)
+  handle('desktop:release-guide-claim', main, async () => await claimReleaseGuide?.() === true)
   handle('desktop:update-status', main, () => publicUpdateStatus(getUpdateController?.()?.getStatus?.()))
   handle('desktop:update-channel-get', main, () => publicUpdateChannel(getUpdateChannel()))
   handle('desktop:update-channel-set', main, async (_event, _surface, rawChannel) => {

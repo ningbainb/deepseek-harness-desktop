@@ -1,47 +1,49 @@
-# DeepSeek Harness Desktop 5.3.6
+# DeepSeek Harness Desktop 5.4.0
 
 ## 中文
 
-5.3.6 修复了共享浏览器组件下载失败或数据目录使用目录联接时，Windows 安装和覆盖升级被中断的问题。
+5.4.0 升级底层运行时至官方 DSH `0.2.3-alpha.2` 与 Cordis `4.2.0-alpha.1`，并围绕聚合模型中转、多 Agent 协作、插件体系及原生桌面交互体验进行全面升级。
 
 ### 本次亮点
 
-- **先安装，再准备浏览器。** 安装完成后可直接打开会话和项目。使用共享浏览器时才检查组件，已有且校验通过的组件会直接复用。
-- **保留原有数据。** 覆盖升级沿用已有程序目录和数据目录，保留会话、项目、模型配置、浏览器数据与动作权限。
-- **下载可重试。** Windows 在主下载源不可用时尝试备用源。下载后须通过相同的完整性校验才会启用。
+- **聚合模型中转（bai）全新引导体验。** 优化模型选择器、设置页卡片与首次启动三路分流引导（DeepSeek 官方直连 / 聚合模型中转 / 本地 CLI 或自有 Key），支持登录前浏览可解锁模型目录（Claude / GPT / Gemini / DeepSeek），并在遇到 429 限流、余额不足或请求超时时提供一键切至中转继续对话的快捷入口。
+- **内置多 Agent 审批收件箱与数据目录迁移。** 新增多 Agent 审批收件箱（`dsh-agent-inbox`），支持从顶部工具栏集中处理待审批调用与工作区 Git Diff 总览；新增事务型数据目录迁移（`dsh-data-location`），安全迁移数据并保留现有环境状态。
+- **Antigravity CLI (Gemini) 接入与社区插件升级。** 自动探测本机 `agy` 环境并同步可用 Gemini 模型；同步升级内置与社区插件 cohort（包括 `dsh-context` 0.87.1、`@tencent-connect/dsh-qqbot` 0.5.5、`reasoning-slider` 0.0.7 与 `@michengai/dsh-im-connect` 1.0.53）。
+- **拓展坞规整与窗口直觉优化。** 统一拓展坞侧边栏层级、卡片与按钮视觉规范，新增版本感知的「本版本新功能」引导弹窗（可通过顶部「帮助 → 本版本新功能」随时回看），并修正标题栏最小化行为：点击减号（`-`）正常最小化到任务栏，点击叉号（`×`）按托盘策略驻留系统托盘。
 
 ### 验证
 
-三端构建记录可在 GitHub Actions 查看。[发布工作流](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
+三端构建与验收记录可在 GitHub Actions 查看。[发布工作流](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
 
 ### 下载与校验
 
-安装包与 `SHA256SUMS.txt` 均在本发行页。5.3.5 如果在应用内更新时卡在浏览器准备，下载本版安装包覆盖安装即可。
+安装包与 `SHA256SUMS.txt` 均在本发行页。Windows 用户覆盖安装旧版本时会自动保留原有数据目录、模型配置、会话与拓展设置；安装前可通过 `SHA256SUMS.txt` 校验文件完整性。
 
 ### 说明
 
-继续使用官方 DSH `0.2.2-rc.5`。macOS arm64（macOS 13+）和 Linux x64 为 Preview。签名与文件信息见 `release-manifest.json`。
+基于官方 DSH `0.2.3-alpha.2` 与 Cordis `4.2.0-alpha.1` 构建。macOS arm64（macOS 13+）和 Linux x64 为 Preview。签名与文件信息见 `release-manifest.json`。
 
 [项目官网](https://1521003.xyz/) · [QQ 二群（1129522514）](https://qm.qq.com/q/9hrcdaEYPC)
 
 ## English
 
-5.3.6 fixes a Windows installation and upgrade failure that occurred when the Shared Browser component could not download or the existing data directory used a junction.
+5.4.0 upgrades the underlying runtime to official DSH `0.2.3-alpha.2` and Cordis `4.2.0-alpha.1`, delivering major improvements across multi-model relay onboarding, multi-agent collaboration, plugin ecosystem upgrades, and native desktop UX consistency.
 
 ### Highlights
 
-- **Install first.** Conversations and projects are available after installation. Shared Browser checks its component on first use and reuses an existing component that passes verification.
-- **Keep your data.** In-place upgrades preserve the existing installation and data locations, conversations, projects, model configuration, browser data, and permissions.
-- **Retry the download.** Windows can try a fallback source. Both sources must pass the same integrity checks before the component is activated.
+- **Redesigned multi-model relay (`bai`) onboarding and recovery.** Refreshed the model selector, settings card, and three-way First-Run Chooser (DeepSeek Official, Multi-Model Relay, or Local CLI / Custom Key), displaying unlockable Claude, GPT, Gemini, and DeepSeek families before login plus a quick fallback action when sessions encounter 429 rate limits, quota exhaustion, or timeouts.
+- **Built-in Agent Approval Inbox and transactional Data Directory Migration.** Added `dsh-agent-inbox` accessible directly from the top toolbar for reviewing scoped tool approvals and workspace Git diffs, alongside `dsh-data-location` for safe transactional data directory relocation.
+- **Antigravity CLI (Gemini) provider and upgraded plugin cohort.** Added automatic local `agy` CLI detection and Gemini model sync, and updated bundled community plugins including `dsh-context` (0.87.1), `@tencent-connect/dsh-qqbot` (0.5.5), `reasoning-slider` (0.0.7), and `@michengai/dsh-im-connect` (1.0.53).
+- **Extension Dock consolidation and window behavior polish.** Unified Extension Dock navigation hierarchy, native card styling, and action buttons, introduced a version-aware What's New dialog (reopenable via Help → What's New), and aligned window controls so minimize (`-`) sends the window to the taskbar while close (`×`) minimizes to the system tray when configured.
 
 ### Verification
 
-Build records are available in GitHub Actions. [Release workflow](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
+Three-platform build and verification records are available in GitHub Actions. [Release workflow](https://github.com/ningbainb/deepseek-harness-desktop/actions/workflows/desktop-three-platform-release.yml)
 
 ### Download and verification
 
-If 5.3.5 gets stuck preparing Shared Browser during an in-app update, run this release's installer over the existing installation. Verify the download with `SHA256SUMS.txt`.
+Installers and `SHA256SUMS.txt` are attached to this release. Running the Windows installer over an existing installation preserves your data directory, model settings, conversations, and extensions. Verify downloads with `SHA256SUMS.txt`.
 
 ### Notice
 
-Includes official DSH `0.2.2-rc.5`. macOS arm64 (macOS 13+) and Linux x64 remain previews. See `release-manifest.json` for signing status and file details.
+Built on official DSH `0.2.3-alpha.2` and Cordis `4.2.0-alpha.1`. macOS arm64 (macOS 13+) and Linux x64 remain previews. See `release-manifest.json` for signing status and file details.

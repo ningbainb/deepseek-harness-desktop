@@ -242,10 +242,12 @@ export function createCloseBehaviorController({
     return hide()
   }
 
-  const handleWindowMinimize = () => {
-    if (selectedBehavior() !== CLOSE_BEHAVIORS.MINIMIZE_TO_TRAY) return false
-    return minimizeToTray()
-  }
+  /**
+   * Titlebar minimize (`-`) always uses normal OS taskbar minimization rather
+   * than hiding to the system tray; tray residency is triggered by closing (`×`)
+   * or the explicit minimize-to-tray menu/shortcut action.
+   */
+  const handleWindowMinimize = () => false
 
   return Object.freeze({
     handleWindowClose,

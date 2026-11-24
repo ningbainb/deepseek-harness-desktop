@@ -39,11 +39,6 @@
           <button id="skills-local-tab" type="button" role="tab" data-tab="skills" data-group="skills" aria-controls="skills">本地技能</button>
           <button id="skill-market-tab" type="button" role="tab" data-tab="dock-settings" data-setting="skill-market" data-group="skills" aria-controls="dock-settings">技能市场</button>
         </nav>
-        <nav class="page-tabs" data-tab-group="desktop-settings" role="tablist" aria-label="备份与迁移" hidden>
-          <button id="presets-tab" type="button" role="tab" data-tab="presets" data-group="desktop-settings" aria-controls="presets">环境预设</button>
-          <button id="conversation-tab" type="button" role="tab" data-tab="conversation-import" data-group="desktop-settings" aria-controls="conversation-import">对话导入</button>
-          <button id="migration-tab" type="button" role="tab" data-tab="migration" data-group="desktop-settings" aria-controls="migration">旧配置迁移</button>
-        </nav>
         <nav class="page-tabs" data-tab-group="appearance" role="tablist" aria-label="外观" hidden>
           <button id="skins-page-tab" type="button" role="tab" data-tab="dock-settings" data-setting="appearance" data-group="appearance" aria-controls="dock-settings">皮肤与壁纸</button>
           <button type="button" class="tab" id="particle-theme-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-setting="particle-theme" data-group="appearance"><span class="tab-title">外观与动效</span></button>
@@ -58,8 +53,13 @@
           <button type="button" class="tab" id="data-location-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-group="desktop-settings" data-native-page="data-location" data-native-only><span class="tab-title">数据目录迁移</span></button>
           <button type="button" class="tab" id="agent-inbox-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-group="desktop-settings" data-native-page="agent-inbox" data-native-only><span class="tab-title">审批收件箱</span></button>
           <button type="button" class="tab" id="llm-antigravity-tab" role="tab" aria-controls="dock-settings" data-tab="dock-settings" data-group="desktop-settings" data-native-page="llm-antigravity" data-native-only><span class="tab-title">Antigravity CLI (Gemini)</span></button>
-          <button type="button" class="tab" id="backup-tab" role="tab" aria-controls="presets" data-tab="presets" data-group="desktop-settings"><span class="tab-title">备份与迁移</span></button>
           <button type="button" class="tab" id="recovery-tab" role="tab" aria-controls="recovery" data-tab="recovery" data-group="desktop-settings"><span class="tab-title">诊断与恢复</span><small id="recovery-count" hidden>0</small></button>
+          <button type="button" class="tab" id="backup-tab" role="tab" aria-controls="presets" data-tab="presets" data-group="desktop-settings"><span class="tab-title">备份与迁移</span></button>
+        </nav>
+        <nav class="page-tabs page-sub-tabs" data-tab-group="desktop-settings" role="tablist" aria-label="备份与迁移" hidden>
+          <button id="presets-tab" type="button" role="tab" data-tab="presets" data-group="desktop-settings" aria-controls="presets">环境预设</button>
+          <button id="conversation-tab" type="button" role="tab" data-tab="conversation-import" data-group="desktop-settings" aria-controls="conversation-import">对话导入</button>
+          <button id="migration-tab" type="button" role="tab" data-tab="migration" data-group="desktop-settings" aria-controls="migration">旧配置迁移</button>
         </nav>
         <nav class="page-tabs" data-tab-group="more-tools" role="tablist" aria-label="更多工具" hidden>
           <button id="task-board-tool" type="button" data-desktop-tool="task-board">任务看板</button>
@@ -83,6 +83,8 @@
           <button type="button" class="dock-destination" data-destination-icon="cpu" data-open-dock-tab="models-page-tab"><span class="dock-destination-copy"><strong>模型</strong><span>连接供应商与设置默认模型</span></span></button>
           <button type="button" class="dock-destination" data-destination-icon="user-check" data-open-dock-tab="personal-prompt-tab"><span class="dock-destination-copy"><strong>个人偏好</strong><span>回复偏好与本地记忆</span></span></button>
           <button type="button" class="dock-destination" data-destination-icon="git-branch" data-open-dock-tab="backup-tab"><span class="dock-destination-copy"><strong>备份与迁移</strong><span>环境预设、对话导入与旧版配置</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="hard-drive" data-open-dock-tab="data-location-tab"><span class="dock-destination-copy"><strong>数据目录迁移</strong><span>迁移应用数据与工作区存储位置</span></span></button>
+          <button type="button" class="dock-destination" data-destination-icon="activity" data-open-dock-tab="recovery-tab"><span class="dock-destination-copy"><strong>诊断与恢复</strong><span>插件环境修复、连通性检查与快照恢复</span></span></button>
         </section>
         <section id="dock-settings" class="panel" role="tabpanel" hidden><p id="dock-settings-state" role="status" hidden>正在加载设置…</p><button type="button" id="dock-settings-retry" class="secondary" hidden>重新加载</button></section>
         <div class="content-toolbar">

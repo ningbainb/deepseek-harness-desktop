@@ -104,6 +104,9 @@ describe('RelayOnboardingCard external links', () => {
     const wallet = screen.getByRole('link', { name: t('openWallet') })
     expect((wallet.closest('details') as HTMLDetailsElement | null)?.open).toBe(false)
     expect(screen.getByText(t('benefitSync'))).toBeTruthy()
+    expect(document.querySelector('[data-relay-featured-models="true"]')).toBeTruthy()
+    const stepsDetails = screen.getByText(t('detailsSummary')).closest('details') as HTMLDetailsElement | null
+    expect(stepsDetails?.open).toBe(false)
     expect(telemetry).toHaveBeenCalledWith('viewed', 'entry')
 
     fireEvent.click(primary)
@@ -159,7 +162,7 @@ describe('RelayOnboardingCard external links', () => {
     }
     const { container } = render(<RelayOnboardingCard t={t} compact {...{ defaultModelScope }} />)
     const currentDefault = container.querySelector('[data-dsh-default-model]')
-    expect(currentDefault?.textContent).toContain('Available after signing in to bai')
+    expect(currentDefault?.textContent).toContain(t('defaultModelBaiSignIn'))
     expect(currentDefault?.textContent).not.toContain(RELAY_PENDING_MODEL_ID)
     act(() => {
       snapshot = { ...snapshot, value: { provider: 'deepseek-official', model: 'deepseek-v4-flash' } }

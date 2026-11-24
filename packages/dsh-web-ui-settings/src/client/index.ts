@@ -56,6 +56,8 @@ import { relayEn, relayZh, type RelayLocaleKey } from './locales.ts'
 import { installRelayModelEntrances } from './relay-model-entrances.tsx'
 import { installRelaySendGuard } from './relay-send-guard.ts'
 import { installRelayAuthFailures } from './relay-auth-failures.ts'
+import { installRelayErrorFallback } from './relay-error-fallback.tsx'
+import { installFirstRunChooser } from './FirstRunChooser.tsx'
 import { installSettingsOnboardingPriority, supportsDesktopSettingsPriority } from './settings-onboarding-priority.tsx'
 
 export type { WebUIPluginsSectionProps } from './WebUIPluginsCard.tsx'
@@ -148,6 +150,20 @@ export function apply(ctx: ClientContext): void {
   if (!dockSetting) ctx.inject(['sessions'], scope => {
     scope.effect(() => installRelayAuthFailures(scope.sessions, document), 'web-ui-settings: bai runtime authorization failures')
   })
+  if (!dockSetting) ctx.inject(['sessions', 'modelDirectories'], scope => {
+    scope.effect(() => installRelayErrorFallback(scope.sessions, scope.modelDirectories, document, ctx.locale.bind('relay-onboarding')), 'web-ui-settings: bai error fallback')
+  })
+  if (!dockSetting && (desktopHost.dshDesktop || desktopHost.dshDesktopTransport)) {
+    ctx.effect(() => installFirstRunChooser(document, ctx.locale.bind('relay-onboarding'), {
+      openModelsSettings: () => {
+        if (nativeDesktopSettings) {
+          openDesktopNativeSettings('models')
+        } else {
+          document.querySelector<HTMLButtonElement>('[data-shortcut-trigger="settings"]')?.click()
+        }
+      },
+    }), 'web-ui-settings: first-run onboarding chooser')
+  }
   if (!dockSetting) ctx.effect(
     () => installDesktopManagementRouting(document, ctx.locale.bind('web-ui-plugins'), nativeDesktopSettings ? {
       openPlugins() {

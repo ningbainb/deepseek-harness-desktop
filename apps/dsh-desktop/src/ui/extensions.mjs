@@ -392,8 +392,8 @@ const NATIVE_PLUGINS = [
   {
     id: 'context', name: '上下文增强', packageName: 'dsh-context',
     category: 'ai', categoryLabel: 'AI 核心',
-    description: '上下文组件 0.85.1；沿用当前会话和项目作用域提供上下文增强。',
-    features: ['0.85.1', '上下文增强'], icon: 'brain',
+    description: '上下文组件 0.87.1；沿用当前会话和项目作用域提供上下文增强。',
+    features: ['0.87.1', '上下文增强'], icon: 'brain',
   },
   {
     id: 'context-memory', name: '项目经验记忆 (M2)', packageName: 'dsh-context-memory',
@@ -463,9 +463,9 @@ const NATIVE_PLUGINS = [
     packageName: '@ningbainb/dsh-data-location',
     author: 'ningbainb',
     category: 'tools', categoryLabel: '工具协同',
-    description: '把数据复制到新目录，并在运行时启动失败时回滚。',
-    features: ['目录预检', '复制校验', '迁移回滚'],
-    icon: 'git-branch',
+    description: '通过目录与空间预检将数据迁移到其他磁盘，并在启动异常时自动回滚。',
+    features: ['目录预检', '校验复制', '失败回滚'],
+    icon: 'hard-drive',
   },
   {
     id: 'agent-inbox',
@@ -473,9 +473,9 @@ const NATIVE_PLUGINS = [
     packageName: '@ningbainb/dsh-agent-inbox',
     author: 'ningbainb',
     category: 'tools', categoryLabel: '工具协同',
-    description: '集中处理跨会话审批并查看工作区 Git 变更。',
-    features: ['待审批', '工作区变更'],
-    icon: 'message',
+    description: '集中处理跨会话工具审批并实时预览各工作区 Git 变更差异。',
+    features: ['跨会话审批', 'Git 变更预览', '桌面提醒'],
+    icon: 'inbox',
   },
   {
     id: 'llm-antigravity',
@@ -484,9 +484,9 @@ const NATIVE_PLUGINS = [
     author: 'ningbainb',
     category: 'ai',
     categoryLabel: 'AI 核心',
-    description: '通过已登录的 Antigravity CLI 调用模型。',
-    features: ['动态模型目录', '流式输出', 'ACP'],
-    icon: 'message',
+    description: '通过本机已登录的官方 Antigravity CLI 调用 Gemini 模型，支持动态目录与推理档位。',
+    features: ['动态模型目录', '流式输出', '推理档位'],
+    icon: 'terminal',
   },
   {
     id: 'personal-prompt',
@@ -723,6 +723,8 @@ function nativeIconSvg(icon) {
     smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
     toggle: '<rect x="1" y="5" width="22" height="14" rx="7" ry="7"/><circle cx="16" cy="12" r="3"/>',
     'user-check': '<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/>',
+    'hard-drive': '<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/>',
+    inbox: '<path d="M4 13l2.5-7h11l2.5 7v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 13h5l1 2h4l1-2h5"/>',
   }
   const content = icons[icon] ?? icons.sparkles
   return `<svg class="native-card-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">${content}</svg>`
@@ -732,11 +734,9 @@ function nativePluginMarkup(item, installedPlugin) {
   const version = installedPlugin?.version ? `v${installedPlugin.version}` : '内置'
   const settingsLink = item.id === 'prompt-customizer'
     ? '<button type="button" class="secondary" data-open-dock-setting="value-mode">打开高级设置</button>'
-    : item.id === 'data-location'
-    ? '<button type="button" class="secondary" data-open-dock-setting="data-location">打开设置</button><button type="button" class="secondary" data-data-migration>迁移数据目录</button><p role="status" data-data-migration-status></p>'
     : item.settingsOwner
     ? `<button type="button" class="secondary" data-open-native-plugin-options="${escapeHtml(item.settingsOwner)}">打开设置</button>`
-    : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'agent-inbox', 'llm-antigravity'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
+    : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'data-location', 'agent-inbox', 'llm-antigravity'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
   const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
   const subtitle = item.author
     ? `作者：${item.author}`
@@ -1363,7 +1363,7 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
 // Reuse the product's existing icon set across both navigation and catalog.
-const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'data-location-tab': 'git-branch', 'agent-inbox-tab': 'message', 'llm-antigravity-tab': 'cpu', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+const navigationIcons = { 'control-center-tab': 'sliders', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'data-location-tab': 'hard-drive', 'agent-inbox-tab': 'inbox', 'llm-antigravity-tab': 'terminal', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 for (const destination of document.querySelectorAll('.dock-destination[data-destination-icon]')) {
   destination.insertAdjacentHTML('afterbegin', `<span class="dock-destination-icon" aria-hidden="true">${nativeIconSvg(destination.dataset.destinationIcon)}</span>`)
@@ -1426,14 +1426,19 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
   activeSettings = setting ? { tab, setting, plugin } : undefined
   document.querySelector('#workspace-heading').hidden = Boolean(setting)
   document.querySelector('.content-toolbar').hidden = Boolean(setting) || ['plugins-home', 'settings-home'].includes(tab.dataset.tab)
+  const searchActive = Boolean(document.querySelector('#dock-search')?.value.trim())
   for (const nav of document.querySelectorAll('.settings-sidebar > nav')) {
-    nav.hidden = Boolean(document.querySelector('#dock-search')?.value.trim()) || Boolean(nav.dataset.tabGroup && nav.dataset.tabGroup !== tab.dataset.group)
+    nav.hidden = searchActive || Boolean(nav.dataset.tabGroup && nav.dataset.tabGroup !== tab.dataset.group)
   }
   const storageLocations = document.querySelector('#desktop-storage-locations')
   if (storageLocations) storageLocations.hidden = tab.dataset.group !== 'desktop-settings'
   const [group, title] = groupTitles[tab.dataset.group] ?? ['', '']
-  document.querySelector('#workspace-breadcrumb').textContent = ['plugins-home', 'settings-home'].includes(tab.dataset.tab) ? '' : group
-  document.querySelector('#workspace-title').textContent = title
+  const tabTitleClone = (tab.querySelector('.tab-title') ?? tab).cloneNode(true)
+  tabTitleClone.querySelectorAll?.('small, svg').forEach(el => el.remove())
+  const leafTitle = tabTitleClone.textContent?.trim() || title
+  const isHomePanel = ['plugins-home', 'settings-home'].includes(tab.dataset.tab) || tab.id === 'skills-tab'
+  document.querySelector('#workspace-breadcrumb').textContent = isHomePanel ? '' : (title || group)
+  document.querySelector('#workspace-title').textContent = isHomePanel ? title : leafTitle
   document.querySelector('main').scrollTop = 0
   try { localStorage.setItem('dsh-dock-setting', setting ?? '') } catch { /* optional navigation state */ }
   const settingState = document.querySelector('#dock-settings-state')
@@ -1643,31 +1648,6 @@ searchItems.addEventListener('keydown', event => {
 })
 
 nativePluginGrid?.addEventListener('click', event => {
-  const migration = event.target.closest('[data-data-migration]')
-  if (migration) {
-    const status = migration.parentElement.querySelector('[data-data-migration-status]')
-    migration.disabled = true
-    void (async () => {
-      try {
-        const current = await window.dshDesktop.statusDataMigration()
-        status.textContent = current.home
-        if (!current.canMigrate) {
-          status.textContent = current.reason ?? '运行时就绪后可以迁移。'
-          return
-        }
-        const target = await window.dshDesktop.chooseDataMigration()
-        if (!target) return
-        status.textContent = '正在预检：' + target
-        await window.dshDesktop.preflightDataMigration()
-        status.textContent = '预检通过：' + target
-        const result = await window.dshDesktop.executeDataMigration()
-        if (!result.accepted) status.textContent = '已取消迁移。'
-      } catch (error) {
-        status.textContent = error.message
-      } finally { migration.disabled = false }
-    })()
-    return
-  }
   const pluginOptions = event.target.closest('[data-open-native-plugin-options]')
   if (pluginOptions) {
     void activateTab(document.getElementById('plugin-options-tab'), true, undefined, pluginOptions.dataset.openNativePluginOptions)

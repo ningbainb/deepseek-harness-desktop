@@ -8,7 +8,7 @@ const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.
 const rootManifest = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url)))
 
 test('next Desktop has an unambiguous candidate version and exact official Alpha.2 core', () => {
-  assert.equal(manifest.version, '5.3.6')
+  assert.equal(manifest.version, '5.4.0')
   assert.equal(rootManifest.version, manifest.version)
   assert.equal(manifest.dependencies['@deepseek-ai/dsh'], '0.2.3-alpha.2')
   assert.equal(manifest.dependencies['@deepseek-ai/dsh-web-app'], '0.2.3-alpha.2')
@@ -33,7 +33,7 @@ test('explicit team disable takes precedence over a stale legacy bundle', () => 
 })
 
 test('context suite is pinned while existing memory and preferences remain installed', () => {
-  assert.equal(manifest.dependencies['dsh-context'], '0.85.1')
+  assert.equal(manifest.dependencies['dsh-context'], '0.87.1')
   assert.equal(manifest.dependencies['dsh-context-memory'], '1.2.0')
   assert.equal(manifest.dependencies['dsh-prompt-customizer'], '2.2.0')
   assert.equal(manifest.dependencies['@ningbainb/dsh-memory'], 'workspace:*')

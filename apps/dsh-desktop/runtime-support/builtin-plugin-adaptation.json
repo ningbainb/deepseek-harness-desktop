@@ -1380,16 +1380,16 @@
     {
       "name": "@tencent-connect/dsh-qqbot",
       "selection": {
-        "version": "0.5.0",
+        "version": "0.5.5",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
-        "latest": "0.5.0",
-        "checkedAt": "2026-09-12T06:50:37.496Z",
+        "latest": "0.5.5",
+        "checkedAt": "2026-11-24T14:16:00.000Z",
         "url": "https://registry.npmjs.org/%40tencent-connect%2Fdsh-qqbot"
       },
-      "reason": "当前 0.5.0 与公开最新一致；profile/SDK 契约检查通过。未在本次执行真实 QQ 收发。",
+      "reason": "当前 0.5.5 与公开最新一致；profile/SDK 契约检查通过。未在本次执行真实 QQ 收发。",
       "desktopContracts": [
         "QQ Bot extension and profile configuration"
       ],
@@ -1459,16 +1459,16 @@
     {
       "name": "reasoning-slider",
       "selection": {
-        "version": "0.0.6",
+        "version": "0.0.7",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
-        "latest": "0.0.6",
-        "checkedAt": "2026-09-12T06:50:37.62Z",
+        "latest": "0.0.7",
+        "checkedAt": "2026-11-24T14:16:00.000Z",
         "url": "https://registry.npmjs.org/reasoning-slider"
       },
-      "reason": "Select 0.0.6 and keep the model preferences integration; verify that the reasoning control remains visible and affects requests.",
+      "reason": "Select 0.0.7 and keep the model preferences integration; verify that the reasoning control remains visible and affects requests.",
       "desktopContracts": [
         "Existing reasoning control through model preferences",
         "No competing model-slot UI"
@@ -1822,13 +1822,13 @@
     {
       "name": "dsh-context",
       "selection": {
-        "version": "0.85.1",
+        "version": "0.87.1",
         "source": "npm"
       },
       "publicSnapshot": {
         "status": "available",
-        "latest": "0.85.1",
-        "checkedAt": "2026-11-17T10:29:17.412Z",
+        "latest": "0.87.1",
+        "checkedAt": "2026-11-24T14:16:00.000Z",
         "url": "https://registry.npmjs.org/dsh-context"
       },
       "reason": "Pinned context insight; primary Desktop entry is the conversation right sidebar.",

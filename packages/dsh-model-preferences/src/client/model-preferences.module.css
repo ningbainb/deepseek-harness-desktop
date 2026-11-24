@@ -64,11 +64,12 @@
   max-height: min(360px, calc(100vh - 96px));
   padding: 4px;
   overflow: hidden;
-  border: 1px solid var(--dsw-alias-border-inverted, rgba(0, 0, 0, .16));
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, .12));
   border-radius: 12px;
   outline: none;
-  background: var(--dsw-specific-menu, var(--dsw-alias-bg-layer-1, #fff));
-  box-shadow: var(--dsw-shadow-lv3, 0 12px 36px rgba(0, 0, 0, .18));
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
+  backdrop-filter: none;
+  box-shadow: var(--dsw-shadow-lv3, 0 12px 36px rgba(0, 0, 0, .16));
   color: var(--dsw-alias-label-primary, #1f2329);
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2, rgba(0, 0, 0, .16));
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2, rgba(0, 0, 0, .24));
@@ -115,7 +116,11 @@
   overflow-x: hidden;
   overflow-y: auto;
 }
-.group + .group { margin-top: 4px; }
+.group + .group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, .08));
+}
 .groupTitle {
   position: sticky;
   top: 0;
@@ -125,7 +130,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 5px 8px 3px;
-  background: var(--dsw-specific-menu, var(--dsw-alias-bg-layer-1, #fff));
+  background: var(--dsw-alias-bg-layer-1, #ffffff);
   color: var(--dsw-alias-label-tertiary, #81858c);
   font-size: 12px;
   font-weight: 500;
@@ -133,15 +138,16 @@
 }
 .primaryProviderGroup {
   border-radius: 9px;
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #3370ff) 7%, transparent);
+  background: transparent;
 }
 .recommendedBadge {
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary, #3370ff) 34%, transparent);
-  border-radius: 8px;
-  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #3370ff) 10%, transparent);
   color: var(--dsw-alias-brand-primary, #3370ff);
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
   line-height: 16px;
 }
 .option {

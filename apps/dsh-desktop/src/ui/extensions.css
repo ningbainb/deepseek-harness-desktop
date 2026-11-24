@@ -40,7 +40,7 @@ body {
 
 .settings-shell {
   display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
   width: 100%;
   height: 100%;
   height: calc(100vh - var(--dsh-desktop-window-chrome-height, 0px) - 1px);
@@ -59,29 +59,42 @@ body {
   padding: 18px 14px 14px;
   overflow-y: auto;
   overflow-x: hidden;
-  border-right: 0;
+  border-right: 1px solid var(--harness-border);
   background: var(--glass-sidebar-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--harness-text) 16%, transparent) transparent;
+}
+.settings-sidebar::-webkit-scrollbar { width: 6px; }
+.settings-sidebar::-webkit-scrollbar-track { background: transparent; }
+.settings-sidebar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--harness-text) 16%, transparent);
 }
 
 .settings-sidebar header { padding: 0 12px 16px; }
-.dock-destinations { display: grid; gap: 3px; max-width: 820px; }
+.dock-destinations { display: grid; gap: 8px; max-width: 820px; }
 .dock-maintenance-links { margin-bottom: 24px; }
 .dock-destinations .dock-destination {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) 10px;
   align-items: center;
   gap: 14px;
-  min-height: 68px;
-  padding: 9px 12px;
-  border: 1px solid transparent;
+  min-height: 66px;
+  padding: 12px 14px;
+  border: 1px solid var(--harness-border);
   border-radius: 12px;
-  background: transparent;
+  background: var(--harness-bg);
   color: var(--harness-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.14s ease, border-color 0.14s ease;
+}
+.dock-destinations .dock-destination:hover {
+  background: var(--harness-bg-hover);
+  border-color: var(--harness-border-strong);
 }
 .dock-destination::after {
   width: 6px;
@@ -1375,9 +1388,128 @@ form, .skill-actions, .migration-card, .recovery-primary, .environment-repair { 
 }
 
 /* Keep grouped navigation outside the unprivileged runtime view's bounds. */
-.settings-sidebar nav.page-tabs { flex: 0 0 auto; flex-direction: column; gap: 2px; margin: 12px 0; overflow: visible; }
-.settings-sidebar nav.page-tabs button { width: 100%; border: 0; border-radius: 8px; text-align: left; padding: 7px 12px; overflow-wrap: anywhere; }
-.settings-sidebar nav.page-tabs button.active { background: var(--harness-bg-hover); }
+.settings-sidebar nav.page-tabs {
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 2px;
+  margin: 10px 0 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--harness-border);
+  overflow: visible;
+}
+.settings-sidebar nav.page-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.settings-sidebar nav.page-tabs .tab-icon,
+.settings-sidebar nav.page-tabs .native-card-icon { display: none; }
+.settings-sidebar nav.page-tabs button.active,
+.settings-sidebar nav.page-tabs button[aria-selected="true"] {
+  background: var(--harness-bg-hover);
+  color: var(--harness-text);
+  font-weight: 600;
+}
+.settings-sidebar nav.page-tabs.page-sub-tabs {
+  margin: 2px 0 8px 12px;
+  padding: 2px 0 2px 10px;
+  border-top: 0;
+  border-left: 1px solid var(--harness-border);
+}
 .desktop-storage-locations { padding: 10px 12px; font-size: 12px; }
 .desktop-storage-locations dd { margin: 3px 0 10px; overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
 .desktop-storage-locations dt { font-weight: 600; }
+
+/* Unified DeepSeek native card surfaces and control sizing for Dock sub-views. */
+.content-toolbar { padding: 0; border: 0; background: transparent; }
+.content-toolbar .refresh {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--harness-border);
+  border-radius: 8px;
+  background: var(--harness-bg);
+  color: var(--harness-text-secondary);
+  font-size: 12px;
+}
+.content-toolbar .refresh:hover { background: var(--harness-bg-hover); color: var(--harness-text); }
+
+.settings-list {
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--harness-border);
+  border-radius: 12px;
+  background: var(--harness-bg);
+  overflow: hidden;
+}
+.settings-list .setting-row { padding: 14px 16px; }
+.settings-list .setting-row + .setting-row { border-top: 1px solid var(--harness-border); }
+
+.skill-actions {
+  padding: 14px 16px;
+  border: 1px solid var(--harness-border);
+  border-radius: 12px;
+  background: var(--harness-bg-subtle);
+  margin-bottom: 14px;
+}
+.skill-list {
+  border: 1px solid var(--harness-border);
+  border-radius: 12px;
+  background: var(--harness-bg);
+  overflow: hidden;
+}
+.skill-list .item { padding: 14px 16px; margin-top: 0; }
+.skill-list .item + .item { border-top: 1px solid var(--harness-border); margin-top: 0; }
+
+.preset-actions {
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 16px 18px;
+  border: 1px solid var(--harness-border);
+  border-radius: 12px;
+  background: var(--harness-bg-subtle);
+  margin-bottom: 16px;
+}
+.recovery-primary {
+  padding: 16px 18px;
+  border: 1px solid var(--harness-border);
+  border-radius: 12px;
+  background: var(--harness-bg-subtle);
+  margin-bottom: 16px;
+}
+.qqbot-card {
+  padding: 18px 20px;
+  border: 1px solid var(--harness-border);
+  border-radius: 12px;
+  background: var(--harness-bg);
+}
+.qqbot-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 0 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--harness-border);
+}
+.qqbot-body { padding: 0; }
+.panel button.primary,
+.panel button.secondary,
+.panel .action.primary,
+.panel .action.secondary {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 500;
+}

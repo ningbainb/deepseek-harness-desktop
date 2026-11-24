@@ -505,8 +505,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/dsh-user-scope
       '@tencent-connect/dsh-qqbot':
-        specifier: 0.5.0
-        version: 0.5.0(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-agent@0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a))(@deepseek-ai/dsh-llm@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-user-approval@0.2.3-alpha.2(e533969a5ef4fe5a468035af6ded2059))(@deepseek-ai/schemastery@3.20.0-alpha.1)(@tencent-connect/qqbot-connector@1.2.0)
+        specifier: 0.5.5
+        version: 0.5.5(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-agent@0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a))(@deepseek-ai/dsh-llm@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-user-approval@0.2.3-alpha.2(e533969a5ef4fe5a468035af6ded2059))(@deepseek-ai/schemastery@3.20.0-alpha.1)(@tencent-connect/qqbot-connector@1.2.0)
       '@tencent-connect/qqbot-connector':
         specifier: 1.2.0
         version: 1.2.0
@@ -526,8 +526,8 @@ importers:
         specifier: file:../../vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz
         version: file:vendor/plugins-20261026/dsh-builtin-browser-0.4.14.tgz(9839ba798d69079cf4f2ea2531ec3046)
       dsh-context:
-        specifier: 0.85.1
-        version: 0.85.1(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-client-ui-primitives@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@7.2.0))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/schemastery@3.20.0-alpha.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: 0.87.1
+        version: 0.87.1(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-client-ui-primitives@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@7.2.0))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/schemastery@3.20.0-alpha.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       dsh-context-memory:
         specifier: 1.2.0
         version: 1.2.0(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-agent@0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a))(@deepseek-ai/dsh-home-paths@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-llm@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-tools@0.2.3-alpha.2(8b3ba488459d96ba8bfcd4c3db86edfd))
@@ -559,8 +559,8 @@ importers:
         specifier: 1.5.4
         version: 1.5.4
       reasoning-slider:
-        specifier: 0.0.6
-        version: 0.0.6
+        specifier: 0.0.7
+        version: 0.0.7
       schemastery:
         specifier: 3.18.0
         version: 3.18.0
@@ -7579,9 +7579,9 @@ packages:
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
 
-  '@tencent-connect/dsh-qqbot@0.5.0':
-    resolution: {integrity: sha512-hbX0IRv+OdPi/p+drKEckQGiS0CdXBOda+cdFVaWWkny3q0h5IqeGcrA0ilDhN9jn0Fu+tHhZ04cVjTalZ+W/g==}
-    engines: {node: '>=18'}
+  '@tencent-connect/dsh-qqbot@0.5.5':
+    resolution: {integrity: sha512-E15Du9xWfWk7CffRba8/ADHV9l6t9kDQ+U3ImLmB5Ffpnbwsm5ovYtHlhiENlILaqx0r+46cSxBiqhmu9Lz+IA==}
+    engines: {node: '>=20.3.0'}
     peerDependencies:
       '@deepseek-ai/cordis': 4.2.0-alpha.1
       '@deepseek-ai/dsh-agent': '>=0.1.0-rc.6'
@@ -7598,9 +7598,9 @@ packages:
     resolution: {integrity: sha512-FAOUCvgxP4M9UiYbHrtVgJ7BavSlh1CHJPjeEQuTAkP9MZ91lX4yATqv6I/lB9yp15nVq+G2DaGSSJwQTSoSsA==}
     engines: {node: '>=18.0.0'}
 
-  '@tencent-connect/qqbot-nodejs@1.0.4':
-    resolution: {integrity: sha512-gU5HySLplczZXMUjM7NtiUACY7YfX9YlI/R9PKzCLMgLmHvwsX9L2sitsrYPMentGUr9b8NLfSaSTsndF77NBA==}
-    engines: {node: '>=18'}
+  '@tencent-connect/qqbot-nodejs@1.0.6':
+    resolution: {integrity: sha512-tXrNvkMxvQV6dpbwd2wPH6w3J2B9dnqCGsjAEALldY5x4aS7ole74IDnNoJf7CGOqiXx4R60NwSbjFzeFmK7Ow==}
+    engines: {node: '>=20'}
     peerDependencies:
       mpg123-decoder: ^1.0.3
       silk-wasm: ^3.7.1
@@ -8872,8 +8872,8 @@ packages:
       '@deepseek-ai/dsh-session': ^0.2.1-rc.2
       '@deepseek-ai/dsh-tools': ^0.2.1-rc.2
 
-  dsh-context@0.85.1:
-    resolution: {integrity: sha512-M0Ycbx86SQF19HYRe7zlfsvagtkVGInFUDSZ9je8ti1aSQbxwoECKk0xDd5YcbUCgJLZXMWAgEx61tE0tCkSPA==}
+  dsh-context@0.87.1:
+    resolution: {integrity: sha512-8VvNjcznzfC5asutEeFL+2al5JIXho6prUHNJe9BrQR50BkXuaChqi8fupi/r4lCwi0LJs4Ne7Q3phyjExHxDw==}
     engines: {dsh: '>=0.2.0-rc.2 || >=0.2.1-rc.2 || >=0.2.2-rc.1', node: ^22.19.0 || >=24.0.0}
     peerDependencies:
       '@deepseek-ai/cordis': 4.2.0-alpha.1
@@ -10537,8 +10537,8 @@ packages:
     resolution: {integrity: sha512-Kko+Y5XQ6fM+Ce3dq3m9YGxnacYZYl9cA1wZjaF3Vbry2L3i1qVg8+CAgNPsXRArPMUMCaOR7oa9Nqntc43JKA==}
     engines: {node: '>= 20.19.0'}
 
-  reasoning-slider@0.0.6:
-    resolution: {integrity: sha512-YNnJ8Apa4V0ezHpIYZGiyYPWDfP6PZv8wegdIcyjC7u/iVK4CFu5AX+490hRVAfR2fVicyh2zYaLmhRYznJguA==}
+  reasoning-slider@0.0.7:
+    resolution: {integrity: sha512-PFk1T4FkhvaytuSV0fL8na6MR2LdhPRl9GFuAkcIDDgNAXKMGQdlm9b7BHA4Ap0UQa1pb1kdfFNSUDqaqhUf8Q==}
     engines: {node: '>=22.13.0'}
 
   regex-recursion@6.0.2:
@@ -11510,6 +11510,11 @@ packages:
   yallist@5.0.0:
     resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
     engines: {node: '>=18'}
+
+  yaml@2.8.1:
+    resolution: {integrity: sha512-lcYcMxX2PO9XMGvAJkJ3OsNMw+/7FKes7/hgerGUYWIoWu5j/+YQqcZr5JnPZWzOsEBgMbSbiSTn/dv/69Mkpw==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
 
   yaml@2.9.0:
     resolution: {integrity: sha512-2AvhNX3mb8zd6Zy7INTtSpl1F15HW6Wnqj0srWlkKLcpYl/gMIMJiyuGq2KeI2YFxUPjdlB+3Lc10seMLtL4cA==}
@@ -18946,7 +18951,7 @@ snapshots:
     dependencies:
       defer-to-connect: 2.0.1
 
-  '@tencent-connect/dsh-qqbot@0.5.0(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-agent@0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a))(@deepseek-ai/dsh-llm@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-user-approval@0.2.3-alpha.2(e533969a5ef4fe5a468035af6ded2059))(@deepseek-ai/schemastery@3.20.0-alpha.1)(@tencent-connect/qqbot-connector@1.2.0)':
+  '@tencent-connect/dsh-qqbot@0.5.5(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-agent@0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a))(@deepseek-ai/dsh-llm@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-user-approval@0.2.3-alpha.2(e533969a5ef4fe5a468035af6ded2059))(@deepseek-ai/schemastery@3.20.0-alpha.1)(@tencent-connect/qqbot-connector@1.2.0)':
     dependencies:
       '@deepseek-ai/cordis': 4.2.0-alpha.1(@deepseek-ai/cordis-plugin-include@1.2.0-alpha.1)(@deepseek-ai/cordis-plugin-loader@1.2.0-alpha.1)
       '@deepseek-ai/dsh-agent': 0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a)
@@ -18954,8 +18959,10 @@ snapshots:
       '@deepseek-ai/dsh-session': 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))
       '@deepseek-ai/schemastery': 3.20.0-alpha.1
       '@tencent-connect/qqbot-connector': 1.2.0
-      '@tencent-connect/qqbot-nodejs': 1.0.4
+      '@tencent-connect/qqbot-nodejs': 1.0.6
       js-yaml: 4.3.2
+      qrcode: 1.5.4
+      yaml: 2.8.1
     optionalDependencies:
       '@deepseek-ai/dsh-user-approval': 0.2.3-alpha.2(e533969a5ef4fe5a468035af6ded2059)
     transitivePeerDependencies:
@@ -18968,7 +18975,7 @@ snapshots:
     dependencies:
       qrcode-terminal: 0.12.0
 
-  '@tencent-connect/qqbot-nodejs@1.0.4':
+  '@tencent-connect/qqbot-nodejs@1.0.6':
     dependencies:
       ws: 8.21.3
     transitivePeerDependencies:
@@ -20344,7 +20351,7 @@ snapshots:
       '@deepseek-ai/dsh-session': 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))
       '@deepseek-ai/dsh-tools': 0.2.3-alpha.2(8b3ba488459d96ba8bfcd4c3db86edfd)
 
-  dsh-context@0.85.1(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-client-ui-primitives@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@7.2.0))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/schemastery@3.20.0-alpha.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+  dsh-context@0.87.1(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-client-ui-primitives@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(supports-color@7.2.0))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/schemastery@3.20.0-alpha.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       '@deepseek-ai/cordis': 4.2.0-alpha.1(@deepseek-ai/cordis-plugin-include@1.2.0-alpha.1)(@deepseek-ai/cordis-plugin-loader@1.2.0-alpha.1)
       '@deepseek-ai/dsh-session': 0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))
@@ -22272,7 +22279,7 @@ snapshots:
 
   readdirp@5.1.1: {}
 
-  reasoning-slider@0.0.6: {}
+  reasoning-slider@0.0.7: {}
 
   regex-recursion@6.0.2:
     dependencies:
@@ -23692,6 +23699,8 @@ snapshots:
   yallist@4.0.0: {}
 
   yallist@5.0.0: {}
+
+  yaml@2.8.1: {}
 
   yaml@2.9.0: {}
 

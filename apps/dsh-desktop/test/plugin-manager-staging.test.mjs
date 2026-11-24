@@ -131,7 +131,7 @@ test('a cold transitive dependency cache is resolved in staging before runtime d
 })
 
 test('the pinned prebuilt IM Connect registry install skips install scripts on a warm cache', async () => {
-  const packageManifest = candidate('@michengai/dsh-im-connect', '1.0.44')
+  const packageManifest = candidate('@michengai/dsh-im-connect', '1.0.53')
   const value = await fixture({
     registry: { fetchManifest: async () => packageManifest },
     runner: async ({ args, profileDir }) => {
@@ -143,7 +143,7 @@ test('the pinned prebuilt IM Connect registry install skips install scripts on a
   })
   try {
     const prepared = await value.manager.prepare(`${packageManifest.name}@${packageManifest.version}`)
-    assert.equal(prepared.version, '1.0.44')
+    assert.equal(prepared.version, '1.0.53')
     await prepared.staging.cancel()
   } finally {
     await rm(value.root, { recursive: true, force: true })
