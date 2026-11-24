@@ -59,7 +59,7 @@ body {
   padding: 18px 14px 14px;
   overflow-y: auto;
   overflow-x: hidden;
-  border-right: 1px solid var(--harness-border);
+  border-right: 0;
   background: var(--glass-sidebar-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;

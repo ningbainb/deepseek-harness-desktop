@@ -4,7 +4,7 @@ import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { apply, argumentCount } from '../src/index.ts'
 import { changes, parseStatus, preview } from '../src/host/git.ts'
 import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -77,7 +77,7 @@ it('preserves the official answerer while accepting a local decision at most onc
 })
 
 it('reports scoped Git changes and loads a literal file diff', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-inbox-test-'))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh-inbox-test-')))
   try {
     const git = (...args: string[]) => execFileSync('git', args, { cwd: root, windowsHide: true, stdio: 'ignore' })
     git('init')
