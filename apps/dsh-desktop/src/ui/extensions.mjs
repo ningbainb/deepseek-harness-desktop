@@ -733,10 +733,10 @@ function nativePluginMarkup(item, installedPlugin) {
   const settingsLink = item.id === 'prompt-customizer'
     ? '<button type="button" class="secondary" data-open-dock-setting="value-mode">打开高级设置</button>'
     : item.id === 'data-location'
-    ? '<button type="button" class="secondary" data-data-migration>迁移数据目录</button><p role="status" data-data-migration-status></p>'
+    ? '<button type="button" class="secondary" data-open-dock-setting="data-location">打开设置</button><button type="button" class="secondary" data-data-migration>迁移数据目录</button><p role="status" data-data-migration-status></p>'
     : item.settingsOwner
     ? `<button type="button" class="secondary" data-open-native-plugin-options="${escapeHtml(item.settingsOwner)}">打开设置</button>`
-    : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
+    : ['agent-team', 'value-mode', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'agent-inbox', 'llm-antigravity'].includes(item.id) ? `<button type="button" class="secondary" data-open-dock-setting="${escapeHtml(item.id)}">打开设置</button>` : ''
   const featuresHtml = item.features.map((f) => `<span class="native-feature-tag">${escapeHtml(f)}</span>`).join('')
   const subtitle = item.author
     ? `作者：${item.author}`
@@ -1363,7 +1363,7 @@ const removeQqBotEventListener = window.dshDesktop.onQqBotEvent((payload) => {
 const removeProgressListener = window.dshDesktop.onExtensionProgress(renderProgress)
 
 // Reuse the product's existing icon set across both navigation and catalog.
-const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
+const navigationIcons = { 'control-center-tab': 'mouse', 'models-tab': 'cpu', 'value-mode-tab': 'cpu', 'personal-prompt-tab': 'user-check', 'describe-image-tab': 'image', 'usage-tab': 'gauge', 'sessions-tab': 'message', 'data-location-tab': 'git-branch', 'agent-inbox-tab': 'message', 'llm-antigravity-tab': 'cpu', 'plugins-hub-tab': 'layout', 'skills-tab': 'sparkles', 'qqbot-tab': 'message', 'appearance-tab': 'palette', 'particle-theme-tab': 'palette', 'backup-tab': 'git-branch', 'recovery-tab': 'activity' }
 for (const [id, icon] of Object.entries(navigationIcons)) document.querySelector(`#${id} .tab-title`)?.insertAdjacentHTML('afterbegin', nativeIconSvg(icon))
 for (const destination of document.querySelectorAll('.dock-destination[data-destination-icon]')) {
   destination.insertAdjacentHTML('afterbegin', `<span class="dock-destination-icon" aria-hidden="true">${nativeIconSvg(destination.dataset.destinationIcon)}</span>`)
@@ -1380,6 +1380,17 @@ const groupTitles = {
 async function activateTab(tab, focus = false, settingOverride, plugin, userAction = false, nativeDestination) {
   const navigation = ++navigationRequest
   const nativePage = nativeDestination ?? (settingOverride === 'prompt-customizer' ? undefined : settingOverride ?? tab.dataset.nativePage)
+  if (Object.hasOwn(tab.dataset, 'nativeOnly')) {
+    if (!userAction) return activateTab(document.getElementById('models-tab'), focus)
+    try {
+      if (await window.dshDesktop.openNativePage?.(nativePage)) return
+    } catch (error) {
+      if (navigation === navigationRequest) notify(error.message || '页面未能打开，请重试。', true)
+      return
+    }
+    if (navigation === navigationRequest) notify('请打开桌面主窗口后重试。', true)
+    return
+  }
   if (userAction && tab.dataset.nativePage && nativePage && typeof window.dshDesktop.openNativePage === 'function') {
     try {
       if (await window.dshDesktop.openNativePage(nativePage)) return
@@ -1536,6 +1547,9 @@ const searchEntries = [
   ['对话导入', 'Claude Codex 历史', 'conversation-tab'],
   ['旧配置迁移', 'Web Profile', 'migration-tab'],
   ['诊断与恢复', '故障 隔离 网络 检查 重置', 'recovery-tab'],
+  ['数据目录迁移', '迁移 数据目录 缓存 磁盘 Data Location', 'data-location-tab'],
+  ['审批收件箱', '多 Agent 待审批 工具调用 Git Diff 工作区变更 Approval Inbox', 'agent-inbox-tab'],
+  ['Antigravity CLI (Gemini)', '模型 Google Gemini 订阅 agy 供应商', 'llm-antigravity-tab'],
   ['存储位置', '程序目录 安装路径 数据 缓存 文件夹', 'desktop-storage-locations'],
 ]
 const dockSearch = document.querySelector('#dock-search')
@@ -1664,7 +1678,7 @@ nativePluginGrid?.addEventListener('click', event => {
   const id = button.dataset.openDockSetting
   const tabId = id === 'memory' ? 'personal-prompt' : id === 'relay' ? 'models' : id
   const tab = document.getElementById(`${tabId}-tab`)
-  if (tab) activateTab(tab, true, id)
+  if (tab) activateTab(tab, true, id, undefined, Object.hasOwn(tab.dataset, 'nativeOnly'))
 })
 
 nativeSearch?.addEventListener('input', () => {

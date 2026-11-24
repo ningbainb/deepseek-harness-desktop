@@ -8,7 +8,19 @@ import css from './desktop-native-settings.module.css'
 
 export const PERSONAL_SECTION = 'desktop-personal-preferences'
 export const ADVANCED_MODEL_SECTION = 'desktop-model-advanced'
+const builtinSlots = {
+  'data-location': 'desktop-native.settings.data-location',
+  'agent-inbox': 'desktop-native.settings.agent-inbox',
+  'llm-antigravity': 'desktop-native.settings.llm-antigravity',
+} as const
+type BuiltinCard = keyof typeof builtinSlots
+type BuiltinSlot = typeof builtinSlots[BuiltinCard]
+type BuiltinSlotEntry = { kind: 'list'; scope: 'root'; owner: {} }
+
 const sections = {
+  'data-location': 'data-location',
+  'agent-inbox': 'agent-inbox',
+  'llm-antigravity': 'llm-antigravity',
   models: 'models',
   relay: 'models',
   'value-mode': ADVANCED_MODEL_SECTION,
@@ -27,11 +39,13 @@ type SettingsActions = { openSection?: OpenSection }
 
 const copy = {
   zh: {
+    'data-location': '数据目录迁移', 'agent-inbox': '审批收件箱', 'llm-antigravity': 'Antigravity CLI (Gemini)',
     personal: '个人偏好', responses: '回复偏好', memory: '记忆', advancedModels: '高级模型策略',
     valueMode: '性价比模式', image: '图像理解', promptCustomizer: 'Agent 高级提示词 (P2)',
     unavailable: '此设置暂时不可用。', promptCustomizerError: '无法打开高级提示词设置，请重试。',
   },
   en: {
+    'data-location': 'Data directory migration', 'agent-inbox': 'Approval inbox', 'llm-antigravity': 'Antigravity CLI (Gemini)',
     personal: 'Personal preferences', responses: 'Response preferences', memory: 'Memory', advancedModels: 'Advanced models',
     valueMode: 'Value Mode', image: 'Image understanding', promptCustomizer: 'Advanced agent prompt (P2)',
     unavailable: 'This setting is temporarily unavailable.', promptCustomizerError: 'Could not open advanced prompt settings. Please try again.',
@@ -44,6 +58,9 @@ type SettingsCopy = { t: (key: CopyKey) => string }
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'desktop-native-settings': CopyKey }
   interface SlotMap {
+    'desktop-native.settings.data-location': BuiltinSlotEntry
+    'desktop-native.settings.agent-inbox': BuiltinSlotEntry
+    'desktop-native.settings.llm-antigravity': BuiltinSlotEntry
     'desktop-native.settings.personal': { kind: 'list'; scope: 'root'; owner: {} }
     'desktop-native.settings.models': { kind: 'list'; scope: 'root'; owner: {} }
   }
@@ -202,10 +219,18 @@ function ModelPaneContent({ render }: { render: () => ReactNode }) {
   return <div className={css.form} ref={ref}>{visited && render()}</div>
 }
 
-/** Registers only the new layout seats. Each editor keeps its original plugin and store. */
+function BuiltinSettings({ id, t, renderSlot }: SettingsCopy & { id: BuiltinCard } & PropsRenderSlots<BuiltinSlot>) {
+  return <div className={css.section} data-dsh-native-settings={id}>
+    <SafePluginBoundary pluginName={id}>
+      {renderSlot(builtinSlots[id], {}, { only: id, fallback: <p role="status">{t('unavailable')}</p> })}
+    </SafePluginBoundary>
+  </div>
+}
+
+/** Mount cards in the official settings shell with their original plugin services. */
 export function installDesktopNativeSettings(ctx: Context): () => void {
   const locale = 'desktop-native-settings'
-  const declareCards = (destination: 'desktop-native.settings.personal' | 'desktop-native.settings.models', ids: readonly Target[], dispose: () => void) => {
+  const declareCards = (destination: 'desktop-native.settings.personal' | 'desktop-native.settings.models' | BuiltinSlot, ids: readonly Target[], dispose: () => void) => {
     try {
       const mirror = mirrorDockSlot(ctx.slots, 'web-ui.plugin.item', destination, entry => ids.some(id => entry.options.id === id))
       return () => { mirror(); dispose() }
@@ -225,5 +250,19 @@ export function installDesktopNativeSettings(ctx: Context): () => void {
     label: () => ctx.locale.bind(locale)('advancedModels'),
     children: { 'desktop-native.settings.models': { kind: 'list', scope: 'root' } },
   }, AdvancedModels)))
-  return () => { models(); personal(); dictionary() }
+  const builtin = (Object.keys(builtinSlots) as BuiltinCard[]).map((id, index) => {
+    const destination = builtinSlots[id]
+    return ctx.slots.inject('settings.section', () => declareCards(destination, [id], ctx.slots.register({
+      name: 'settings.section', id, order: 57 + index, locale,
+      label: () => ctx.locale.bind(locale)(id),
+      children: { [destination]: { kind: 'list', scope: 'root' } },
+      inject: () => ({ id }),
+    }, BuiltinSettings)))
+  })
+  return () => {
+    for (const dispose of builtin) dispose()
+    models()
+    personal()
+    dictionary()
+  }
 }

@@ -156,6 +156,23 @@ try {
   await page.screenshot({ path: join(screenshots, 'usage-footer-settings.png') })
   assert.equal(app.windows().filter(candidate => candidate.url().includes('extensions.html')).length, 1)
   console.log('PASS ordinary usage footer click opens the shared official usage section in the main window')
+  for (const [query, label, selector] of [
+    ['Data Location', '数据目录迁移', '[data-data-location-card]'],
+    ['Approval Inbox', '审批收件箱', '[data-agent-inbox-settings]'],
+    ['Gemini', 'Antigravity CLI (Gemini)', '[data-antigravity-settings]'],
+  ]) {
+    await dock.locator('#dock-search').fill(query)
+    await dock.getByRole('button', { name: label, exact: true }).click()
+    await settings.locator(selector).waitFor({ state: 'visible' })
+  }
+  await dock.locator('#dock-search').fill('Approval Inbox')
+  await dock.getByRole('button', { name: '审批收件箱', exact: true }).click()
+  await settings.getByRole('button', { name: '打开审批收件箱' }).click()
+  const inbox = page.getByRole('dialog', { name: '审批收件箱', exact: true })
+  await inbox.getByRole('button', { name: '变更总览', exact: true }).waitFor()
+  await inbox.getByRole('button', { name: '关闭', exact: true }).click()
+  await inbox.waitFor({ state: 'hidden' })
+  console.log('PASS built-in Dock search opens each native settings card and the approval inbox shortcut opens its drawer')
   console.log(JSON.stringify({ temporary, screenshots }))
 } catch (error) {
   if (sidebarDiagnostic && page) await captureSidebarLedgerDiagnostic(page, join(screenshots, 'sidebar-ledger-failure.json'), [...consoleEvents, ...rendererErrors.map(text => ({ type: 'pageerror', text }))]).catch(probeError => console.error('sidebar diagnostic capture failed', probeError.message))

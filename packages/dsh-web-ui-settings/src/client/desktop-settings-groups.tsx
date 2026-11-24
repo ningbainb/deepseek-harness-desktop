@@ -6,10 +6,10 @@ export type SettingsSection = { id: string; order: number; label: string }
 type Group = SettingsSection & { sections: readonly SettingsSection[] }
 
 const definitions = [
-  { id: 'general', zh: '通用', en: 'General', pages: ['general'] },
-  { id: 'models', zh: '模型与登录', en: 'Models and sign-in', pages: ['models', 'account', 'chatgpt-auth', ADVANCED_MODEL_SECTION, 'dsh-usage'] },
+  { id: 'general', zh: '通用', en: 'General', pages: ['general', 'data-location'] },
+  { id: 'models', zh: '模型与登录', en: 'Models and sign-in', pages: ['models', 'account', 'chatgpt-auth', 'llm-antigravity', ADVANCED_MODEL_SECTION, 'dsh-usage'] },
   { id: PERSONAL_SECTION, zh: '个人偏好', en: 'Personal preferences', pages: [PERSONAL_SECTION] },
-  { id: 'agent-presets', zh: '会话与 Agent', en: 'Sessions and agents', pages: ['agent-presets', 'prompt-pilot', 'archived-sessions'] },
+  { id: 'agent-presets', zh: '会话与 Agent', en: 'Sessions and agents', pages: ['agent-presets', 'prompt-pilot', 'agent-inbox', 'archived-sessions'] },
   { id: 'skin-center', zh: '外观', en: 'Appearance', pages: ['skin-center', 'better-sidebar'] },
   { id: 'plugins', zh: '工具与权限', en: 'Tools and permissions', pages: ['dsh-builtin-browser', 'plugins', 'release-plugin-adapter'] },
 ] as const

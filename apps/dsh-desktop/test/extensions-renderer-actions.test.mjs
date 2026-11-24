@@ -5,6 +5,7 @@ import test from 'node:test'
 import { setImmediate as tick } from 'node:timers/promises'
 import vm from 'node:vm'
 
+import { assertNativeDockDestination } from '../src/dock-pages.mjs'
 import { createExtensionOperationQueue } from '../src/ui/extension-operation-queue.mjs'
 import { createCommunityMarketService } from '../src/extensions/community-market.mjs'
 import * as marketViewHelpers from '../src/ui/community-market-view.mjs'
@@ -422,7 +423,23 @@ test('five Dock groups retain every old destination and place settings navigatio
   const embeddedCalls = selected.length
   await vm.runInContext("activateTab(document.getElementById('models-page-tab'), false, undefined, undefined, true)", context)
   await vm.runInContext("activateTab(document.getElementById('market-tab'), false, undefined, undefined, true)", context)
-  assert.deepEqual(native, ['models', 'workshop'])
+  vm.runInContext(section('function nativeIconSvg(', 'let currentNativeCategory'), context)
+  context.escapeHtml = value => String(value)
+  const grid = document.createElement('div')
+  document.body.append(grid)
+  context.nativePluginGrid = grid
+  vm.runInContext(section("nativePluginGrid?.addEventListener('click'", "nativeSearch?.addEventListener('input'"), context)
+  for (const id of ['data-location', 'agent-inbox', 'llm-antigravity']) {
+    assert.doesNotThrow(() => assertNativeDockDestination(id))
+    context.item = { id, packageName: id, features: [] }
+    grid.innerHTML = vm.runInContext('nativePluginMarkup(item)', context)
+    const action = grid.querySelector('button[data-open-dock-setting]')
+    assert.equal(action?.textContent, '打开设置')
+    assert.equal(action.dataset.openDockSetting, id)
+    action.click()
+    await tick()
+  }
+  assert.deepEqual(native, ['models', 'workshop', 'data-location', 'agent-inbox', 'llm-antigravity'])
   assert.equal(selected.length, embeddedCalls, 'Successful native shortcuts do not mount duplicate embedded settings')
   dom.window.close()
 })

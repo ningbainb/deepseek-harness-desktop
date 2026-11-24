@@ -164,7 +164,8 @@
       "description": "桌面数据目录事务迁移",
       "features": [
         "verified-copy",
-        "startup-rollback"
+        "startup-rollback",
+        "migration-preflight-settings-and-dock-shortcuts"
       ],
       "patchId": "data-location",
       "requiredInAggregate": true,
@@ -178,7 +179,8 @@
       "description": "跨会话审批与工作区变更",
       "features": [
         "local-owner-approval-decisions",
-        "bounded-workspace-diff"
+        "bounded-workspace-diff",
+        "approval-inbox-settings-and-dock-shortcuts"
       ],
       "patchId": "agent-inbox",
       "requiredInAggregate": true,
@@ -193,7 +195,8 @@
       "features": [
         "local-cli-model-discovery",
         "stream-json-and-acp",
-        "dsh-owned-tool-execution"
+        "dsh-owned-tool-execution",
+        "cli-diagnostics-settings-and-dock-shortcuts"
       ],
       "patchId": "llm-antigravity",
       "requiredInAggregate": true,

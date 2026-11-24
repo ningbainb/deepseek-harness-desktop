@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useState, type ReactNode } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { openDesktopNativeSettings, useDesktopNativeSettingsNavigation } from '../src/client/desktop-native-settings.tsx'
+import { installDesktopNativeSettings, openDesktopNativeSettings, useDesktopNativeSettingsNavigation } from '../src/client/desktop-native-settings.tsx'
 import { withSettingsOnboardingPriority } from '../src/client/settings-onboarding-priority.tsx'
 import type { SnapshotSelectorHook } from './settings-sdk-adapter.ts'
 
@@ -73,7 +73,8 @@ it.each(['slot', 'factory'])('groups the official %s navigation while opening ol
   const rows = [
     ['general', 'General'], ['models', 'Models'], ['chatgpt-auth', 'ChatGPT sign-in'], ['dsh-usage', 'Usage'],
     ['desktop-personal-preferences', 'Personal preferences'], ['agent-presets', 'Agent presets'],
-    ['archived-sessions', 'Archived sessions'], ['skin-center', 'Skins'],
+    ['archived-sessions', 'Archived sessions'], ['data-location', 'Data directory migration'],
+    ['agent-inbox', 'Approval inbox'], ['llm-antigravity', 'Antigravity CLI (Gemini)'], ['skin-center', 'Skins'],
     ['dsh-builtin-browser', 'Browser'], ['plugins', 'Built-in plugins'], ['custom-extension', 'Custom extension'],
   ].map(([id, label], order) => ({ id: id!, label: label!, order }))
   type Shell = {
@@ -112,7 +113,44 @@ it.each(['slot', 'factory'])('groups the official %s navigation while opening ol
   fireEvent.keyDown(screen.getByRole('tab', { name: 'Usage and balance' }), { key: 'Home' })
   expect(document.activeElement).toBe(screen.getByRole('tab', { name: 'Providers' }))
   expect(screen.getByTestId('official-form').textContent).toBe('models')
+  for (const [id, group, label] of [
+    ['data-location', 'General', 'Data directory migration'],
+    ['agent-inbox', 'Sessions and agents', 'Approval inbox'],
+    ['llm-antigravity', 'Models and sign-in', 'Antigravity CLI (Gemini)'],
+  ]) {
+    act(() => { expect(openDesktopNativeSettings(id)).toBe(true) })
+    expect(screen.getByRole('button', { name: group }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('tab', { name: label }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByTestId('official-form').textContent).toBe(id)
+  }
   fireEvent.click(screen.getByRole('button', { name: 'Tools and permissions' }))
   fireEvent.click(screen.getByRole('tab', { name: 'Custom extension' }))
   expect(screen.getByTestId('official-form').textContent).toBe('custom-extension')
+})
+
+it('declares a dedicated slot per built-in settings page and mirrors its original card', () => {
+  const ids = ['data-location', 'agent-inbox', 'llm-antigravity']
+  const cards = ids.map(id => ({ options: { id }, component: () => <h3>{id}</h3> }))
+  const register = vi.fn((_options: Record<string, unknown>, _component: unknown) => () => {})
+  const slots = {
+    inject: (_name: string, install: () => () => void) => install(),
+    register,
+    entriesOfSlot: () => cards,
+    subscribe: () => () => {},
+  }
+  const dispose = installDesktopNativeSettings({
+    locale: { register: () => () => {}, bind: () => (key: string) => key },
+    slots,
+  } as never)
+  try {
+    for (const card of cards) {
+      const { id } = card.options
+      const child = 'desktop-native.settings.' + id
+      expect(register).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'settings.section', id, children: { [child]: { kind: 'list', scope: 'root' } },
+      }), expect.any(Function))
+      const mirrors = register.mock.calls.filter(([options]) => options.name === child)
+      expect(mirrors).toEqual([[expect.objectContaining({ name: child, id }), card.component]])
+    }
+  } finally { dispose() }
 })
