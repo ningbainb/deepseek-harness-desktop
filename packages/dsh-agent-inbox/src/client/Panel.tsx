@@ -5,12 +5,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { createDesktopClient } from '@linxin666/dsh-desktop-client'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import css from './agent-inbox.module.css'
 import type { ApprovalItem, ChangesPage, DiffPreview, WorkspaceChanges } from '../core/types.ts'
 
 const zh = {
+  open: '打开审批收件箱', description: '跨会话处理工具审批，集中查看工作区的 Git 变更。', reminderHint: '有工具调用等待审批时发送桌面通知。', saveFailed: '无法保存提醒设置。',
   title: '审批收件箱', approvals: '待审批', changes: '变更总览', approve: '批准一次', reject: '拒绝',
   session: '打开会话', reminders: '桌面审批提醒', empty: '暂无待审批请求。', close: '关闭',
   error: '操作未完成，请重试。', refresh: '刷新', redacted: '参数值已隐藏', seconds: '秒',
@@ -19,6 +21,7 @@ const zh = {
   none: '没有检测到变更。', reminderBody: '有工具调用等待审批。',
 }
 const en: typeof zh = {
+  open: 'Open approval inbox', description: 'Review tool approvals across sessions and inspect workspace Git changes.', reminderHint: 'Show a desktop notification when a tool call needs approval.', saveFailed: 'Could not save notification preferences.',
   title: 'Approval inbox', approvals: 'Pending approvals', changes: 'Workspace changes', approve: 'Allow once', reject: 'Reject',
   session: 'Open session', reminders: 'Desktop approval reminders', empty: 'No pending approvals.', close: 'Close',
   error: 'The operation could not complete. Try again.', refresh: 'Refresh', redacted: 'Argument values hidden', seconds: 's',
@@ -35,6 +38,17 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 type Locale = PropsLocale<'agent-inbox'>
 const desktop = createDesktopClient()
 const reminderKey = 'dsh:agent-inbox:notifications'
+const openEvent = 'dsh:agent-inbox:open'
+const reminderListeners = new Set<() => void>()
+
+function subscribeReminders(listener: () => void) {
+  reminderListeners.add(listener)
+  window.addEventListener('storage', listener)
+  return () => {
+    reminderListeners.delete(listener)
+    window.removeEventListener('storage', listener)
+  }
+}
 
 async function request<T>(path: string, decision?: { id: string; value: string }): Promise<T> {
   const response = await fetch('/api/dsh-agent-inbox/' + path, {
@@ -53,35 +67,82 @@ function remindersEnabled() {
   try { return localStorage.getItem(reminderKey) === '1' } catch { return false }
 }
 
-function Settings({ t }: Locale) {
-  const [enabled, setEnabled] = useState(remindersEnabled)
-  return <label><input type="checkbox" checked={enabled} onChange={event => {
-    const value = event.currentTarget.checked
-    localStorage.setItem(reminderKey, value ? '1' : '0')
-    setEnabled(value)
-  }} />{t('reminders')}</label>
+function InboxIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 13l2.5-7h11l2.5 7v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM4 13h5l1 2h4l1-2h5" />
+  </svg>
 }
 
-function FileDiff({ t, workspaceId, path }: Locale & { workspaceId: string; path: string }) {
+function ReminderSwitch({ t }: Locale) {
+  const enabled = useSyncExternalStore(subscribeReminders, remindersEnabled, () => false)
+  const [failed, setFailed] = useState(false)
+  return <div className={css.reminder}>
+    <button className={css.toggle} type="button" role="switch" aria-checked={enabled} onClick={() => {
+      try {
+        localStorage.setItem(reminderKey, enabled ? '0' : '1')
+        setFailed(false)
+        for (const listener of reminderListeners) listener()
+      } catch { setFailed(true) }
+    }}><span className={css.track} aria-hidden="true" />{t('reminders')}</button>
+    {failed && <p role="alert" className={css.error}>{t('saveFailed')}</p>}
+  </div>
+}
+
+export function Settings({ t }: Locale) {
+  const [available, setAvailable] = useState(false)
+  useEffect(() => {
+    let active = true
+    void desktop.hasCapability('notifications.show').then(value => { if (active) setAvailable(value) }).catch(() => {})
+    return () => { active = false }
+  }, [])
+  return <section className={css.card} data-agent-inbox-settings>
+    <header><h3>{t('title')}</h3><p>{t('description')}</p></header>
+    <div className={css.settingsRow}>
+      <div><ReminderSwitch t={t} /><p>{t('reminderHint')}</p></div>
+      <button type="button" disabled={!available} onClick={() => window.dispatchEvent(new Event(openEvent))}><InboxIcon />{t('open')}</button>
+    </div>
+  </section>
+}
+
+function diffTone(line: string) {
+  if (line.startsWith('@@') || /^(?:diff |index |--- |\+\+\+ )/.test(line)) return 'hunk'
+  if (line.startsWith('+')) return 'added'
+  if (line.startsWith('-')) return 'deleted'
+}
+
+function FileDiff({ t, workspaceId, file }: Locale & { workspaceId: string; file: WorkspaceChanges['files'][number] }) {
   const [result, setResult] = useState<DiffPreview>()
   const [failed, setFailed] = useState(false)
-  return <details onToggle={event => {
+  const requestId = useRef(0)
+  const tone = file.status.includes('D') ? 'deleted' : file.status === '??' || file.status.includes('A') ? 'added' : 'modified'
+  return <details className={css.file} onToggle={event => {
     if (!event.currentTarget.open) return
+    const id = ++requestId.current
     setResult(undefined)
     setFailed(false)
-    const params = new URLSearchParams({ workspaceId, path })
-    void request<DiffPreview>('diff?' + params).then(setResult, () => setFailed(true))
+    const params = new URLSearchParams({ workspaceId, path: file.path })
+    void request<DiffPreview>('diff?' + params).then(
+      value => { if (id === requestId.current) setResult(value) },
+      () => { if (id === requestId.current) setFailed(true) },
+    )
   }}>
-    <summary>{t('diff')}</summary>
-    {failed ? <p role="alert">{t('error')}</p> : !result ? <p>{t('loading')}</p> : <>
-      {result.truncated && <p>{t('truncated')}</p>}
-      <pre style={{ overflow: 'auto', maxHeight: 360 }}>{result.text}</pre>
-    </>}
+    <summary title={t('diff')}>
+      <code title={file.path}>{file.path}</code>
+      <span className={css.badge} data-tone={tone}>{t(tone)}</span>
+      {file.added !== undefined && <span className={css.stats}><span data-tone="added">+{file.added}</span> / <span data-tone="deleted">-{file.removed}</span></span>}
+    </summary>
+    <div className={css.diffBody}>
+      {failed ? <p role="alert" className={css.error}>{t('error')}</p> : !result ? <p role="status">{t('loading')}</p> : <>
+        {result.truncated && <p>{t('truncated')}</p>}
+        <pre className={css.diff} tabIndex={0} aria-label={t('diff')}>{result.text.split('\n').map((line, index) =>
+          <span key={index} data-tone={diffTone(line)}>{line}{'\n'}</span>)}</pre>
+      </>}
+    </div>
   </details>
 }
 
-type EntryProps = Locale & { openSession: (id: string) => void; sessionTitle: (id: string) => string }
-function Inbox({ t, openSession, sessionTitle }: EntryProps) {
+type EntryProps = Locale & Pick<PropsRuntime<'sidebar.footer.action'>, 'wide'> & { openSession: (id: string) => void; sessionTitle: (id: string) => string }
+function Inbox({ t, openSession, sessionTitle, wide }: EntryProps) {
   const dialog = useRef<HTMLDialogElement>(null)
   const notified = useRef(new Set<string>())
   const [items, setItems] = useState<ApprovalItem[]>([])
@@ -92,12 +153,16 @@ function Inbox({ t, openSession, sessionTitle }: EntryProps) {
   const [busy, setBusy] = useState(false)
   const [desktopAvailable, setDesktopAvailable] = useState(false)
   const activePoll = useRef(false)
+  const approvalRevision = useRef(0)
+  const [changesRevision, setChangesRevision] = useState(0)
 
   const refresh = async () => {
     if (activePoll.current) return
     activePoll.current = true
+    const revision = approvalRevision.current
     try {
       const rows = await request<ApprovalItem[]>('pending')
+      if (approvalRevision.current !== revision) return
       setItems(rows)
       const next = new Set(rows.map(item => item.id))
       if (remindersEnabled()) for (const item of rows) {
@@ -131,53 +196,85 @@ function Inbox({ t, openSession, sessionTitle }: EntryProps) {
     const page = await request<ChangesPage>('changes?offset=' + offset)
     setWorkspaces(current => offset ? [...(current ?? []), ...page.workspaces] : page.workspaces)
     setNextOffset(page.nextOffset)
+    if (offset === 0) setChangesRevision(revision => revision + 1)
   })
+
+  useEffect(() => {
+    if (!desktopAvailable) return
+    const open = () => { if (dialog.current && !dialog.current.open) dialog.current.showModal() }
+    window.addEventListener(openEvent, open)
+    return () => window.removeEventListener(openEvent, open)
+  }, [desktopAvailable])
 
   if (!desktopAvailable) return null
   return <>
-    <button type="button" onClick={() => dialog.current?.showModal()}>{t('title')}{items.length ? ' (' + items.length + ')' : ''}</button>
-    <dialog ref={dialog} aria-label={t('title')} style={{
-      width: 'min(38rem, 92vw)', height: 'min(48rem, 92vh)', marginInlineEnd: 12, overflow: 'auto',
-      color: 'CanvasText', backgroundColor: 'Canvas', border: '1px solid GrayText', borderRadius: 12, padding: 20,
+    <button className={css.entry} type="button" data-agent-inbox-entry data-rail={wide ? undefined : "rail"} aria-label={t('title')} title={t('title')} aria-haspopup="dialog" onClick={() => dialog.current?.showModal()}>
+      <InboxIcon /><span>{t('title')}</span>{items.length > 0 && <span className={css.count}>{items.length}</span>}
+    </button>
+    <dialog ref={dialog} aria-label={t('title')} className={css.dialog} onClick={event => {
+      if (event.target === event.currentTarget) dialog.current?.close()
     }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>{t('title')}</h2><button onClick={() => dialog.current?.close()}>{t('close')}</button>
-      </header>
-      <nav aria-label={t('title')}>
-        <button aria-pressed={tab === 'approvals'} onClick={() => { setTab('approvals'); setFailed(false) }}>{t('approvals')}</button>{' '}
-        <button aria-pressed={tab === 'changes'} disabled={busy} onClick={() => { setTab('changes'); void loadChanges() }}>{t('changes')}</button>
-      </nav>
-      {failed && <p role="alert">{t('error')}</p>}
-      {tab === 'approvals' ? <>
-        <p><Settings t={t} /></p>
-        {items.length === 0 && <p>{t('empty')}</p>}
-        <ul>{items.map(item => <li key={item.id}>
-          <p><strong>{item.toolName}</strong> · {sessionTitle(item.sessionId)} · {Math.max(0, Math.floor((Date.now() - item.waitingSince) / 1000))} {t('seconds')}</p>
-          <p>{t('redacted')}{item.argumentCount === undefined ? '' : ' (' + item.argumentCount + ')'}</p>
-          <button onClick={() => { dialog.current?.close(); openSession(item.sessionId) }}>{t('session')}</button>{' '}
-          {(['allowed-once', 'rejected'] as const).map(value => <button key={value} disabled={busy} onClick={() => void run(async () => {
-            await request('decision', { id: item.id, value })
-            setItems(current => current.filter(row => row.id !== item.id))
-          })}>{t(value === 'allowed-once' ? 'approve' : 'reject')}</button>)}
-        </li>)}</ul>
-      </> : <>
-        <p><button disabled={busy} onClick={() => void loadChanges()}>{t('refresh')}</button></p>
-        {busy && <p role="status">{t('loading')}</p>}
-        {workspaces?.map(workspace => <section key={workspace.id}>
-          <h3>{workspace.title}</h3>
-          {workspace.unavailable ? <p>{t('unavailable')}</p> : <>
-            {workspace.truncated && <p>{t('truncated')}</p>}
-            {!workspace.files.length && <p>{t('none')}</p>}
-            <ul>{workspace.files.map(file => <li key={file.path}>
-              <span>{t(file.status.includes('D') ? 'deleted' : file.status === '??' || file.status.includes('A') ? 'added' : 'modified')}</span>{' '}
-              <code>{file.path}</code>
-              {file.added !== undefined && <> +{file.added} / -{file.removed}</>}
-              <FileDiff t={t} path={file.path} workspaceId={workspace.id} />
+      <div className={css.drawer}>
+        <header className={css.header}>
+          <h2>{t('title')}</h2>
+          <div className={css.actions}>
+            <ReminderSwitch t={t} />
+            <button type="button" disabled={busy} onClick={() => {
+              if (tab === 'changes') void loadChanges()
+              else { setFailed(false); void refresh() }
+            }}>{t('refresh')}</button>
+            <button type="button" aria-label={t('close')} title={t('close')} onClick={() => dialog.current?.close()}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </div>
+        </header>
+        <nav aria-label={t('title')} className={css.tabs}>
+          <button type="button" aria-pressed={tab === 'approvals'} onClick={() => { setTab('approvals'); setFailed(false) }}>{t('approvals')} <span className={css.count}>{items.length}</span></button>
+          <button type="button" aria-pressed={tab === 'changes'} disabled={busy} onClick={() => {
+            setTab('changes')
+            if (!workspaces) void loadChanges()
+          }}>{t('changes')}</button>
+        </nav>
+        <div className={css.content}>
+          {failed && <p role="alert" className={css.error}>{t('error')}</p>}
+          {tab === 'approvals' ? <>
+            {items.length === 0 && <p className={css.empty}>{t('empty')}</p>}
+            <ul className={css.list}>{items.map(item => <li key={item.id} className={css.item}>
+              <div className={css.approvalHeading}>
+                <h3>{sessionTitle(item.sessionId)}</h3>
+                <span className={css.badge}>{item.toolName}</span>
+                <span className={css.waiting}>{Math.max(0, Math.floor((Date.now() - item.waitingSince) / 1000))} {t('seconds')}</span>
+              </div>
+              <p className={css.preview}>{t('redacted')}{item.argumentCount === undefined ? '' : ' (' + item.argumentCount + ')'}</p>
+              <div className={css.decision}>
+                <button type="button" onClick={() => { dialog.current?.close(); openSession(item.sessionId) }}>{t('session')}</button>
+                <div className={css.actions}>
+                  {(['rejected', 'allowed-once'] as const).map(value => <button type="button" key={value}
+                    className={value === 'rejected' ? css.danger : css.primary} disabled={busy} onClick={() => void run(async () => {
+                      await request('decision', { id: item.id, value })
+                      approvalRevision.current++
+                      setItems(current => current.filter(row => row.id !== item.id))
+                    })}>{t(value === 'allowed-once' ? 'approve' : 'reject')}</button>)}
+                </div>
+              </div>
             </li>)}</ul>
+          </> : <>
+            {busy && <p role="status">{t('loading')}</p>}
+            {workspaces?.length === 0 && <p className={css.empty}>{t('none')}</p>}
+            {workspaces?.map(workspace => <section className={css.item} key={changesRevision + ":" + workspace.id}>
+              <h3>{workspace.title}</h3>
+              {workspace.unavailable ? <p>{t('unavailable')}</p> : <>
+                {workspace.truncated && <p>{t('truncated')}</p>}
+                {!workspace.files.length && <p>{t('none')}</p>}
+                <ul className={css.files}>{workspace.files.map(file => <li key={file.path}>
+                  <FileDiff t={t} file={file} workspaceId={workspace.id} />
+                </li>)}</ul>
+              </>}
+            </section>)}
+            {nextOffset !== undefined && <button type="button" disabled={busy} onClick={() => void loadChanges(nextOffset)}>{t('more')}</button>}
           </>}
-        </section>)}
-        {nextOffset !== undefined && <button disabled={busy} onClick={() => void loadChanges(nextOffset)}>{t('more')}</button>}
-      </>}
+        </div>
+      </div>
     </dialog>
   </>
 }

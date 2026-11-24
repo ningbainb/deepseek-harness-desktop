@@ -25,6 +25,7 @@
   },
   "include": [
     "src/client/**/*",
-    "src/config.ts"
+    "src/config.ts",
+    "src/css-modules.d.ts"
   ]
 }
