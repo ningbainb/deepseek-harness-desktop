@@ -19,6 +19,11 @@ import { installSessionCheckpointRecovery } from './session-checkpoint-recovery.
 import { installSessionTitleCheckpoint } from './session-title-checkpoint.ts'
 import { installControlToolApproval } from './control-tool-approval.ts'
 import { installAgentWslTool } from './agent-wsl-tool.ts'
+import { ConnectorRegistryService } from './connectors/connector-registry-service.ts'
+import { registerConnectorRoutes } from './connectors/connector-routes.ts'
+import { registerWorkOfficePreset } from './connectors/work-office-preset.ts'
+import { AcpAgentManager } from './acp/acp-agent-manager.ts'
+import { registerAcpRoutes } from './acp/acp-routes.ts'
 
 export const name = 'desktop-compat'
 // The import route resolves the optional log-backed title service through
@@ -30,11 +35,21 @@ export const inject = ['llm', 'tools', 'webServer', 'workspaceRegistry', 'sessio
 /** Install Desktop-only compatibility behavior through public DSH hooks. */
 export function apply(ctx: Context): void {
   new DesktopSkinStateService(ctx)
+  const connectorRegistry = new ConnectorRegistryService(ctx)
+  void connectorRegistry.init().catch((error) => {
+    ctx.logger?.warn?.(`dsh-desktop-compat: connector registry init failed: ${error instanceof Error ? error.message : String(error)}`)
+  })
+  ctx.effect(() => () => connectorRegistry.dispose(), 'dsh-desktop-compat: connector registry cleanup')
+  ctx.effect(() => registerConnectorRoutes(ctx, connectorRegistry), 'dsh-desktop-compat: connector HTTP routes')
+  registerWorkOfficePreset(ctx)
+  const acpManager = new AcpAgentManager(ctx)
+  ctx.effect(() => () => { void acpManager.dispose() }, 'dsh-desktop-compat: ACP agent cleanup')
+  ctx.effect(() => registerAcpRoutes(ctx, acpManager), 'dsh-desktop-compat: ACP HTTP routes')
   installToolCallArgumentNormalization(ctx)
   installTranscriptBalanceGuard(ctx)
   installSessionCheckpointRecovery(ctx)
   installSessionTitleCheckpoint(ctx)
-  installControlToolApproval(ctx)
+  installControlToolApproval(ctx, { lookupConnectorRisk: name => connectorRegistry.matchToolRisk(name) })
   installAgentWslTool(ctx)
   ctx.effect(
     () => registerDesktopWorkspaceFileOpenRoute(ctx),
@@ -79,9 +94,41 @@ export function apply(ctx: Context): void {
 }
 
 export {
+  connectorToolApprovalDecision,
   controlToolApprovalDecision,
   installControlToolApproval,
 } from './control-tool-approval.ts'
+
+export {
+  ConnectorRegistryService,
+  classifyConnectorFailure,
+  resolveConnectorsHome,
+  type ConnectorInstallRunnerSpec,
+  type ConnectorRegistryDeps,
+  type LoginChildProcessLike,
+} from './connectors/connector-registry-service.ts'
+export { ConnectorSecretVault, type SecretCipherAdapter } from './connectors/secret-vault.ts'
+export { registerConnectorRoutes } from './connectors/connector-routes.ts'
+export { registerWorkOfficePreset } from './connectors/work-office-preset.ts'
+export { loadBuiltinCatalog } from './connectors/builtin-catalog.ts'
+export * from './connectors/types.ts'
+
+export {
+  ANTIGRAVITY_ACP_AGENT,
+  AcpAgentManager,
+  AcpComplianceError,
+  assertAcpUsageAllowed,
+  type AcpAgentManagerDeps,
+} from './acp/acp-agent-manager.ts'
+export {
+  AcpClient,
+  AcpClientError,
+  assertWorkspaceContained,
+  type AcpClientHandlers,
+  type AcpClientLaunchOptions,
+} from './acp/acp-client.ts'
+export { registerAcpRoutes } from './acp/acp-routes.ts'
+export * from './acp/types.ts'
 
 export { installAgentWslTool } from './agent-wsl-tool.ts'
 

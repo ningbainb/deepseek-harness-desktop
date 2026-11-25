@@ -170,6 +170,16 @@ html[data-dsh-desktop-chrome-theme="dark"] #${UPDATE_SURFACE_ID} {
 
 #${UPDATE_SURFACE_ID} .dsh-update-channel[hidden] { display: none; }
 
+#${UPDATE_SURFACE_ID} .dsh-update-route {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l1,var(--dsh-update-border));
+}
+
+#${UPDATE_SURFACE_ID} .dsh-update-route[hidden] { display: none; }
+
 #${UPDATE_SURFACE_ID} .dsh-update-channel label {
   color: var(--dsw-alias-label-primary, var(--dsh-update-fg));
   font-weight: 600;
@@ -330,7 +340,22 @@ export function createUpdateSurfaceScript() {
     channel.append(stableChannel, betaChannel);
     const channelHint = document.createElement('p');
     channelHint.className = 'dsh-update-channel-hint';
-    channelSection.append(channelLabel, channel, channelHint);
+    const routeWrap = document.createElement('div');
+    routeWrap.className = 'dsh-update-route';
+    routeWrap.hidden = true;
+    const routeLabel = document.createElement('label');
+    routeLabel.htmlFor = 'dsh-update-download-route';
+    routeLabel.textContent = '下载线路';
+    const downloadRoute = document.createElement('select');
+    downloadRoute.id = 'dsh-update-download-route';
+    for (const [val, text] of [['auto', '自动（按地区优选）'], ['cdn', '加速线路（CDN）'], ['github', 'GitHub 官方']]) {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = text;
+      downloadRoute.append(opt);
+    }
+    routeWrap.append(routeLabel, downloadRoute);
+    channelSection.append(channelLabel, channel, channelHint, routeWrap);
     const actions = document.createElement('div');
     actions.className = 'dsh-update-actions';
     panel.append(header, status, versions, notes, progress, fallback, channelSection, actions);
@@ -371,9 +396,16 @@ export function createUpdateSurfaceScript() {
       channelSection.hidden = false;
       const updateInProgress = ['downloading', 'ready', 'installing'].includes(currentPhase);
       channel.disabled = updateInProgress;
+      downloadRoute.disabled = updateInProgress;
       channelHint.textContent = updateInProgress
         ? '正在处理已发现的更新，完成后可切换通道。'
         : '切换到稳定通道不会自动降级：已安装的较高 Beta 将保留，直到有更高的稳定版可用。';
+    };
+    const renderDownloadRoute = (value = {}) => {
+      const selected = ['auto', 'cdn', 'github'].includes(value?.route) ? value.route : 'auto';
+      downloadRoute.value = selected;
+      routeWrap.hidden = false;
+      downloadRoute.disabled = ['downloading', 'ready', 'installing'].includes(currentPhase);
     };
     const render = (value = {}) => {
       const phase = value.phase || 'idle';
@@ -464,6 +496,15 @@ export function createUpdateSurfaceScript() {
         });
       });
     });
+    downloadRoute.addEventListener('change', () => {
+      const selected = downloadRoute.value;
+      downloadRoute.disabled = true;
+      void api.setUpdateDownloadRoute?.(selected).then(renderDownloadRoute).catch(() => {
+        void api.getUpdateDownloadRoute?.().then(renderDownloadRoute).catch(() => {
+          downloadRoute.disabled = ['downloading', 'ready', 'installing'].includes(currentPhase);
+        });
+      });
+    });
     document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !root.hidden) hide(); });
     api.onUpdateStatus?.(render);
     api.onDeepLink?.((link) => {
@@ -477,6 +518,9 @@ export function createUpdateSurfaceScript() {
         && contract.capabilities.includes('updates.channel.manage');
       if (!hasChannelControl || typeof api.getUpdateChannel !== 'function' || typeof api.setUpdateChannel !== 'function') return;
       void api.getUpdateChannel().then(renderChannel).catch(() => {});
+      if (typeof api.getUpdateDownloadRoute === 'function' && typeof api.setUpdateDownloadRoute === 'function') {
+        void api.getUpdateDownloadRoute().then(renderDownloadRoute).catch(() => {});
+      }
     }).catch(() => {});
     return true;
   })()`

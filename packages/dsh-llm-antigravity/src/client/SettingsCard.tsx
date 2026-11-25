@@ -5,7 +5,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import css from './llm-antigravity.module.css'
-import { defaults, efforts, namespace, statusPath, type Diagnostic, type Settings } from '../config.ts'
+import { authModes, defaults, efforts, namespace, statusPath, type AuthMode, type Diagnostic, type Settings } from '../config.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'llm-antigravity': keyof typeof zh }
@@ -18,9 +18,15 @@ const en = {
   description: 'Use your local Gemini subscription through the official Antigravity CLI.',
   installed: 'Ready', signedOut: 'Signed out', missing: 'Not installed', stopped: 'Disabled', checkFailed: 'Detection failed',
   copy: 'Copy command', copied: 'Copied', copyFailed: 'Could not copy command.',
-  check: 'Check again', advanced: 'Advanced settings', recommended: 'stream-json (recommended)',
-  acpOption: 'ACP (stdio per request)',
-  transportHint: 'stream-json streams NDJSON with lower startup overhead; ACP spawns a fresh session per turn.',
+  check: 'Check again', advanced: 'Advanced settings', recommended: 'stream-json (legacy headless)',
+  acpOption: 'ACP (recommended, interactive stdio)',
+  transportHint: 'ACP uses the official Agent Client Protocol over standard input and output.',
+  authMode: 'Authentication mode',
+  authPersonal: 'Google account (oauth-personal, interactive ACP only)',
+  authBusiness: 'Gemini Enterprise (oauth-business, interactive ACP only)',
+  authApiKey: 'Gemini API key (gemini-api-key)',
+  authPlatform: 'Google Cloud / Vertex AI (agent-platform)',
+  oauthComplianceNotice: 'Personal and business OAuth are restricted to direct interactive ACP sessions. The CLI can reuse a saved Google login, so model backend access requires independently verified API-billed authentication.',
   expand: 'Show all models', collapse: 'Show fewer models', unsaved: 'Unsaved changes', saved: 'Settings saved.', saving: 'Saving settings',
   reset: 'Discard changes',
   title: 'Antigravity CLI (Gemini)', enabled: 'Enable provider', cliPath: 'Absolute agy executable path',
@@ -30,12 +36,16 @@ const en = {
   timeoutSeconds: 'Timeout (seconds)', extraModels: 'Extra model IDs',
   extraHint: 'Separate model IDs with commas or spaces', save: 'Save settings', refresh: 'Refresh models',
   loading: 'Checking Antigravity CLI', failed: 'Settings could not be saved.',
-  disabledHint: 'Provider is turned off. Enable it above and save to expose Antigravity CLI models in chat.',
+  disabledHint: 'Enable Antigravity CLI and save to check the local installation.',
   installStep1: 'Install the official Antigravity CLI, or specify the executable path in Advanced settings.',
   installStep2: 'Sign in with agy acp --login in your terminal, then click Check again.',
   fillCliPath: 'Set executable path',
   loginGuide: 'Run this command in your terminal to sign in with your Google account, then refresh models:',
   readyGuide: 'Synced to the model selector — you can pick these Gemini models directly in chat.',
+  readyOauthWithheldGuide: 'The local CLI returned its model list. Antigravity is available for direct interactive use.',
+  acpCapabilitiesSummary: 'Official ACP v1 negotiated',
+  acpLoadSupported: 'session resume supported',
+  acpLoadUnsupported: 'fresh session per launch',
   'not-installed': 'Install Antigravity CLI or set its executable path.',
   'not-authenticated': 'Run agy or agy acp --login in a terminal, then refresh models.',
   error: 'Could not load models. Check agy models in a terminal.', modelCount: 'Available models',
@@ -44,9 +54,15 @@ const zh: typeof en = {
   description: '通过官方 Antigravity CLI 使用本机已登录的 Gemini 订阅。',
   installed: '已就绪', signedOut: '未登录', missing: '未安装', stopped: '已停用', checkFailed: '检测失败',
   copy: '复制命令', copied: '已复制', copyFailed: '无法复制命令。',
-  check: '重新检测', advanced: '高级配置', recommended: 'stream-json（推荐）',
-  acpOption: 'ACP（每次独立会话）',
-  transportHint: 'stream-json 通过标准流传输 NDJSON，启动开销更低；ACP 每次请求开启独立会话。',
+  check: '重新检测', advanced: '高级配置', recommended: 'stream-json（兼容无头流）',
+  acpOption: 'ACP（推荐，官方交互协议）',
+  transportHint: 'ACP 通过标准输入输出使用官方 Agent Client Protocol。',
+  authMode: '认证方式',
+  authPersonal: '个人 Google 账号（仅交互 ACP）',
+  authBusiness: 'Gemini Enterprise（仅交互 ACP）',
+  authApiKey: 'Gemini API Key（按量计费）',
+  authPlatform: 'Google Cloud / Vertex AI（ADC 按量计费）',
+  oauthComplianceNotice: '个人与企业 OAuth 仅可用于本机人工交互的 ACP 会话。CLI 可能复用已保存的 Google 登录，因此只有独立验证了按量计费凭据才能开放模型后端。',
   expand: '显示全部模型', collapse: '收起模型', unsaved: '有未保存的修改', saved: '设置已保存。', saving: '正在保存设置',
   reset: '还原修改',
   title: 'Antigravity CLI (Gemini)', enabled: '启用模型提供商', cliPath: 'agy 可执行文件绝对路径',
@@ -55,12 +71,16 @@ const zh: typeof en = {
   effortXhigh: '极高 (xhigh)', effortMax: '最大 (max)',
   timeoutSeconds: '超时（秒）', extraModels: '额外模型 ID', extraHint: '用逗号或空格分隔模型 ID',
   save: '保存设置', refresh: '刷新模型', loading: '正在检测 Antigravity CLI', failed: '无法保存设置。',
-  disabledHint: '当前已停用此提供商。开启上方开关并保存后，即可在会话中选择 Gemini 模型。',
+  disabledHint: '开启 Antigravity CLI 并保存后，可检测本机安装。',
   installStep1: '安装官方 Antigravity CLI，或在下方「高级配置」中指定 agy.exe 的绝对路径。',
   installStep2: '在终端运行 agy acp --login 完成登录，然后点击「重新检测」。',
   fillCliPath: '填写可执行文件路径',
   loginGuide: '请在终端运行以下命令完成 Google 账号登录，登录后点击「重新检测」：',
   readyGuide: '已同步到模型选择器，可直接在会话中切换使用以下 Gemini 模型。',
+  readyOauthWithheldGuide: '已检测到本机 CLI 的模型列表。Antigravity 可用于本机人工交互。',
+  acpCapabilitiesSummary: '已协商官方 ACP v1 协议',
+  acpLoadSupported: '支持会话恢复',
+  acpLoadUnsupported: '每次独立会话',
   'not-installed': '请安装 Antigravity CLI 或配置其可执行文件路径。',
   'not-authenticated': '请在终端运行 agy 或 agy acp --login，登录后刷新模型。',
   error: '无法加载模型。请在终端检查 agy models。', modelCount: '可用模型',
@@ -74,6 +94,12 @@ const statusLabel = {
 const effortLabelKey = {
   low: 'effortLow', medium: 'effortMedium', high: 'effortHigh', xhigh: 'effortXhigh', max: 'effortMax',
 } as const
+const authModeLabelKey: Record<AuthMode, keyof typeof en> = {
+  'oauth-personal': 'authPersonal',
+  'oauth-business': 'authBusiness',
+  'gemini-api-key': 'authApiKey',
+  'agent-platform': 'authPlatform',
+}
 
 function ProviderMark() {
   return <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -89,6 +115,7 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
   const [busy, setBusy] = useState(false)
   const [saveState, setSaveState] = useState<'saving' | 'saved' | 'failed'>()
   const [copyState, setCopyState] = useState<'copied' | 'copyFailed'>()
+  const [acpCaps, setAcpCaps] = useState<{ loadSession: boolean }>()
   const [expanded, setExpanded] = useState(false)
   const detection = useRef<AbortController | null>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -110,6 +137,18 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
       if (!result.ok) throw new Error()
       const value: Diagnostic = await result.json()
       if (!controller.signal.aborted) setDiagnostic(value)
+      if (!controller.signal.aborted && value.state === 'ready') {
+        void fetch('/api/dsh-acp/probe', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-dsh-acp': '1' },
+          body: JSON.stringify({ agentId: 'antigravity', commandOverride: value.path }),
+          signal: controller.signal,
+        }).then(r => (r.ok ? r.json() : null)).then((probe) => {
+          if (!controller.signal.aborted && probe?.state === 'ready' && probe?.capabilities) {
+            setAcpCaps({ loadSession: Boolean(probe.capabilities.loadSession) })
+          }
+        }).catch(() => {})
+      }
     } catch {
       if (!controller.signal.aborted) setDiagnostic({ state: 'error', models: [] })
     } finally {
@@ -220,7 +259,10 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
       {state === 'error' && <p className={css.notice} data-tone="error" role="alert">{t('error')}</p>}
 
       {state === 'ready' && <div className={css.models}>
-        <p className={css.readyBanner}>{t('readyGuide')}</p>
+        <p className={css.readyBanner}>
+          {t(diagnostic?.harnessLlmAllowed ? 'readyGuide' : 'readyOauthWithheldGuide')}
+          {acpCaps && ` (${t('acpCapabilitiesSummary')}: ${t(acpCaps.loadSession ? 'acpLoadSupported' : 'acpLoadUnsupported')})`}
+        </p>
         <div className={css.modelsHead}>
           <h4>{t('modelCount')} <span className={css.countPill}>{models.length}</span></h4>
           {models.length > visibleModelCount && <button type="button" className={css.quietBtn} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
@@ -237,10 +279,16 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
         <div className={css.formPanel}>
           <div className={css.fields}>
             <label>
+              <span>{t('authMode')}</span>
+              <select value={draft.authMode} onChange={e => update('authMode', authModes.find(value => value === e.target.value) ?? 'oauth-personal')}>
+                {authModes.map(mode => <option key={mode} value={mode}>{t(authModeLabelKey[mode])}</option>)}
+              </select>
+            </label>
+            <label>
               <span>{t('transport')}</span>
               <select value={draft.transport} onChange={e => update('transport', e.target.value === 'acp' ? 'acp' : 'stream-json')}>
-                <option value="stream-json">{t('recommended')}</option>
                 <option value="acp">{t('acpOption')}</option>
+                <option value="stream-json">{t('recommended')}</option>
               </select>
             </label>
             <label>
@@ -257,6 +305,9 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
             </label>
           </div>
           <p className={css.fieldHint}>{t('transportHint')}</p>
+          {!diagnostic?.harnessLlmAllowed && <div className={css.guideBox} data-tone="warn">
+            <p className={css.guideText}>{t('oauthComplianceNotice')}</p>
+          </div>}
 
           <details ref={advancedRef} className={css.advanced}>
             <summary>{t('advanced')}</summary>
@@ -282,7 +333,7 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
           </div>
           <div className={css.footerActions}>
             {dirty && <button type="button" className={css.secondary} onClick={() => { setDraft(value); setSaveState(undefined) }}>{t('reset')}</button>}
-            <button className={css.primary} type="submit" disabled={!dirty}>{t('save')}</button>
+            <button className={css.primary} type="submit" data-dock-save disabled={!dirty}>{t('save')}</button>
           </div>
         </div>
       </fieldset>

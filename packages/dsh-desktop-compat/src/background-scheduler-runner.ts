@@ -215,6 +215,8 @@ function defaultSessionId(executionKey: string): string {
  * for the browser scheduler, which may have a different viable execution
  * path. Keep this in lockstep with the early guards in `run` below.
  */
+const AUTOMATION_RESTRICTED_PROVIDERS = new Set(['antigravity-cli'])
+
 async function canDesktopRunnerOwnTask(
   input: DesktopScheduledTaskEligibilityInput,
   options: DesktopTaskBoardHostScheduleRunnerOptions,
@@ -228,7 +230,8 @@ async function canDesktopRunnerOwnTask(
   const workspace = options.workspaceRegistry.get(project.workspaceId as WorkspaceId)
   if (workspace === undefined || await workspace.status() !== 'ok') return false
   const selection = options.defaultModel.currentSelection()
-  return selection.provider.trim() !== '' && selection.model.trim() !== ''
+  const provider = selection.provider.trim()
+  return provider !== '' && selection.model.trim() !== '' && !AUTOMATION_RESTRICTED_PROVIDERS.has(provider)
 }
 
 /**
@@ -266,8 +269,12 @@ export function createDesktopTaskBoardHostScheduleRunner(
       if (await workspace.status() !== 'ok') return failure(input, 'scheduled task workspace directory is unavailable')
 
       const selection = options.defaultModel.currentSelection()
-      if (selection.provider.trim() === '' || selection.model.trim() === '') {
+      const provider = selection.provider.trim()
+      if (provider === '' || selection.model.trim() === '') {
         return failure(input, 'no default DSH model is configured for background automation')
+      }
+      if (AUTOMATION_RESTRICTED_PROVIDERS.has(provider)) {
+        return failure(input, `provider "${provider}" is not permitted for unattended background scheduling`)
       }
 
       let handle: Awaited<ReturnType<AgentRegistry['create']>> | undefined

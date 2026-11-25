@@ -1,6 +1,6 @@
 import { LlmAdapter, type LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, GenerateOptions, LlmResolvedModelInfo, ReasoningEffortId, StreamChunk, TokenUsage } from '@deepseek-ai/dsh-llm/types'
-import { efforts, namespace, type Diagnostic, type Settings } from './config.ts'
+import { efforts, isHarnessLlmAllowed, namespace, type AuthMode, type Diagnostic, type Settings } from './config.ts'
 import { CliRunner, findCli, installHint, modelSlug } from './core/cli-runner.ts'
 import { acp, errorFinish, headless } from './core/transport.ts'
 import { formatPrompt, ToolBridge } from './core/tool-bridge.ts'
@@ -15,13 +15,19 @@ export class AntigravityAdapter extends LlmAdapter {
     private readonly cli: CliRunner,
     private readonly settings: () => Settings,
     private readonly catalogUpdated: () => void = () => {},
+    private readonly verifyHarnessAuth: (mode: AuthMode) => boolean = () => false,
   ) { super() }
 
   providerInfo(provider: string) { return { id: provider, name: displayName } }
 
+  private canUseHarness(authMode: AuthMode): boolean {
+    return isHarnessLlmAllowed(authMode) && this.verifyHarnessAuth(authMode)
+  }
+
   async status(refresh = false): Promise<Diagnostic> {
     const settings = this.settings()
-    if (!settings.enabled) return { state: 'disabled', models: [] }
+    const harnessLlmAllowed = this.canUseHarness(settings.authMode)
+    if (!settings.enabled) return { state: 'disabled', authMode: settings.authMode, harnessLlmAllowed, models: [] }
     const path = settings.cliPath
     const now = Date.now()
     if (this.cache?.path !== path || (now >= this.cache.expires) || (refresh && this.cache.expires !== Infinity)) {
@@ -41,7 +47,8 @@ export class AntigravityAdapter extends LlmAdapter {
       )
     }
     const result = await this.cache.probe
-    return result.state === 'ready' ? { ...result, models: this.models(result, settings.extraModels) } : result
+    const models = result.state === 'ready' ? this.models(result, settings.extraModels) : result.models
+    return { ...result, authMode: settings.authMode, harnessLlmAllowed, models }
   }
 
   private models(result: Diagnostic | undefined, extras: string) {
@@ -55,7 +62,7 @@ export class AntigravityAdapter extends LlmAdapter {
 
   async listModels(provider: string) {
     const settings = this.settings()
-    if (!settings.enabled) return []
+    if (!settings.enabled || !this.canUseHarness(settings.authMode)) return []
     // The SDK reads provider catalogs during renderer initialization. Refresh
     // outside that request, then notify model selectors to read the new view.
     void this.status().catch(() => {})
@@ -109,6 +116,11 @@ export class AntigravityAdapter extends LlmAdapter {
       signal?.throwIfAborted()
       const settings = this.settings()
       if (!settings.enabled) throw new Error('Antigravity CLI is disabled in DSH settings.')
+      if (!this.canUseHarness(settings.authMode)) {
+        throw new Error(
+          'Antigravity harness access requires verified API-billed authentication because the CLI can reuse a saved OAuth login. Google Antigravity Terms Section 6 restricts OAuth to interactive use.',
+        )
+      }
       if (!modelSlug.test(options.model)) throw new Error('Invalid Antigravity CLI model ID.')
       const path = await findCli(settings.cliPath)
       if (!path) throw new Error(installHint)

@@ -49,7 +49,7 @@
 .card .primary {
   border-color: transparent;
   background: var(--dsw-alias-brand-primary);
-  color: var(--dsw-alias-label-inverse, #fff);
+  color: var(--dsw-alias-label-primary-foreground, #fff);
 }
 .card .primary:hover:enabled {
   background: var(--dsw-alias-button-primary-hover, var(--dsw-alias-brand-primary));
@@ -167,7 +167,7 @@
   transition: inset-inline-start .15s;
 }
 .toggle[aria-checked="true"] .track { background: var(--dsw-alias-brand-primary); border-color: transparent; }
-.toggle[aria-checked="true"] .track::after { inset-inline-start: 16px; background: var(--dsw-alias-label-inverse, #fff); }
+.toggle[aria-checked="true"] .track::after { inset-inline-start: 16px; background: var(--dsw-alias-label-primary-foreground, #fff); }
 
 .statusPanel,
 .formPanel {
@@ -383,7 +383,8 @@
 }
 
 .form { display: grid; gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
-.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr)); gap: 12px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 540px) { .fields { grid-template-columns: 1fr; } }
 .fields label { display: grid; gap: 5px; min-width: 0; }
 .fields label > span { font-size: 12px; font-weight: 500; color: var(--dsw-alias-label-secondary); }
 .fields :is(input, select) {

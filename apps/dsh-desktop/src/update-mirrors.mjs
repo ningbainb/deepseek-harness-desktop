@@ -13,6 +13,39 @@ export const OFFICIAL_UPDATE_SOURCE = Object.freeze({
   prefix: undefined,
 })
 
+export const UPDATE_DOWNLOAD_ROUTES = Object.freeze(['auto', 'cdn', 'github'])
+export const DEFAULT_UPDATE_DOWNLOAD_ROUTE = 'auto'
+const UPDATE_DOWNLOAD_ROUTE_SET = new Set(UPDATE_DOWNLOAD_ROUTES)
+const CHINA_TIMEZONES = new Set(['Asia/Shanghai', 'Asia/Chongqing', 'Asia/Harbin', 'Asia/Urumqi', 'PRC'])
+
+export function normalizeUpdateDownloadRoute(value, fallback = DEFAULT_UPDATE_DOWNLOAD_ROUTE) {
+  const candidate = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (UPDATE_DOWNLOAD_ROUTE_SET.has(candidate)) return candidate
+  const normalizedFallback = typeof fallback === 'string' ? fallback.trim().toLowerCase() : ''
+  return UPDATE_DOWNLOAD_ROUTE_SET.has(normalizedFallback) ? normalizedFallback : DEFAULT_UPDATE_DOWNLOAD_ROUTE
+}
+
+export function assertUpdateDownloadRoute(value) {
+  const route = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (!UPDATE_DOWNLOAD_ROUTE_SET.has(route)) {
+    throw new TypeError(`invalid update download route: ${JSON.stringify(value)}`)
+  }
+  return route
+}
+
+export function detectChinaRegion({ timeZone, locale } = {}) {
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions()
+    const tz = typeof timeZone === 'string' ? timeZone : resolved.timeZone
+    if (typeof tz === 'string' && CHINA_TIMEZONES.has(tz)) return true
+    const loc = typeof locale === 'string' ? locale : resolved.locale
+    if (typeof loc === 'string' && /^zh(?:[-_](?:hans[-_])?cn)\b/iu.test(loc)) return true
+  } catch {
+    // Fall back safely when Intl options are unavailable.
+  }
+  return false
+}
+
 function normalizedMirror(value) {
   try {
     const url = new URL(value)
@@ -20,6 +53,14 @@ function normalizedMirror(value) {
     url.hash = ''
     url.search = ''
     if (!url.pathname.endsWith('/')) url.pathname += '/'
+    if (/\/releases\/$/iu.test(url.pathname)) {
+      return Object.freeze({
+        id: url.hostname,
+        label: `CDN 加速 ${url.hostname}`,
+        prefix: url.href,
+        mode: 'release-path',
+      })
+    }
     return Object.freeze({
       id: url.hostname,
       label: `备用线路 ${url.hostname}`,
@@ -54,6 +95,10 @@ function isPublicGitHubReleaseAsset(url) {
 export function rewriteGitHubReleaseUrl(value, source) {
   const original = value instanceof URL ? new URL(value.href) : new URL(value)
   if (!source?.prefix || !isPublicGitHubReleaseAsset(original)) return original
+  if (source.mode === 'release-path' || /\/releases\/$/iu.test(source.prefix)) {
+    const match = /^\/[^/]+\/[^/]+\/releases\/download\/([^/]+\/.+)$/.exec(original.pathname)
+    if (match) return new URL(`${source.prefix}${match[1]}`)
+  }
   return new URL(`${source.prefix}${original.href}`)
 }
 
@@ -108,10 +153,19 @@ export async function probeUpdateSource(url, {
   }
 }
 
-export async function rankUpdateSources({ officialUrl, mirrors, probe }) {
+export async function rankUpdateSources({
+  officialUrl,
+  mirrors,
+  probe,
+  route = DEFAULT_UPDATE_DOWNLOAD_ROUTE,
+  preferCdn = false,
+}) {
+  const normalizedRoute = normalizeUpdateDownloadRoute(route)
   const candidates = [
     { ...OFFICIAL_UPDATE_SOURCE, url: new URL(officialUrl) },
-    ...mirrors.map((source) => ({ ...source, url: rewriteGitHubReleaseUrl(officialUrl, source) })),
+    ...(normalizedRoute === 'github'
+      ? []
+      : mirrors.map((source) => ({ ...source, url: rewriteGitHubReleaseUrl(officialUrl, source) }))),
   ]
   const results = await Promise.all(candidates.map(async (source, index) => {
     try {
@@ -133,6 +187,16 @@ export async function rankUpdateSources({ officialUrl, mirrors, probe }) {
     }
     return left.index - right.index
   })
+  const healthyFallbacks = fallbacks.filter((item) => item.probe.ok)
+  const failedFallbacks = fallbacks.filter((item) => !item.probe.ok)
+  if (normalizedRoute === 'cdn' && healthyFallbacks.length > 0) {
+    return [...healthyFallbacks, official, ...failedFallbacks]
+  }
+  if (normalizedRoute === 'auto' && preferCdn && healthyFallbacks.length > 0) {
+    if (!official.probe.ok || healthyFallbacks[0].probe.elapsedMs < official.probe.elapsedMs) {
+      return [...healthyFallbacks, official, ...failedFallbacks]
+    }
+  }
   return [official, ...fallbacks]
 }
 
@@ -154,11 +218,15 @@ export class UpdateDownloadRouter {
     updater,
     mirrors = DEFAULT_UPDATE_MIRRORS,
     probe = (url) => probeUpdateSource(url),
+    getDownloadRoute = () => DEFAULT_UPDATE_DOWNLOAD_ROUTE,
+    preferCdn = () => detectChinaRegion(),
     log = () => {},
   }) {
     this.updater = updater
     this.mirrors = mirrors
     this.probe = probe
+    this.getDownloadRoute = getDownloadRoute
+    this.preferCdn = preferCdn
     this.log = log
     this.active = false
     this.attemptIndex = -1
@@ -190,6 +258,8 @@ export class UpdateDownloadRouter {
       officialUrl: officialAsset.url,
       mirrors: this.mirrors,
       probe: this.probe,
+      route: this.getDownloadRoute(),
+      preferCdn: Boolean(this.preferCdn()),
     })
     this.active = true
     let lastError

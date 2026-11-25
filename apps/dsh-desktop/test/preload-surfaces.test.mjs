@@ -15,6 +15,8 @@ test('main preload exposes product actions without extension mutation channels',
   assert.match(source, /desktop:update-dismiss/u)
   assert.match(source, /desktop:update-channel-get/u)
   assert.match(source, /desktop:update-channel-set/u)
+  assert.match(source, /desktop:update-download-route-get/u)
+  assert.match(source, /desktop:update-download-route-set/u)
   assert.match(source, /desktop:skills-list/u)
   assert.match(source, /desktop:settings-window-bounds-get/u)
   assert.match(source, /desktop:settings-window-bounds-set/u)

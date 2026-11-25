@@ -12,6 +12,11 @@ import { normalizeDesktopNotification } from './notifications.mjs'
 import { isStartupPhase } from './startup-phase.mjs'
 import { parseRemoteExternalPluginReference } from './external-plugin-source.mjs'
 import { assertUpdateChannel } from './update-channel-preferences.mjs'
+import {
+  DEFAULT_UPDATE_DOWNLOAD_ROUTE,
+  assertUpdateDownloadRoute,
+  normalizeUpdateDownloadRoute,
+} from './update-mirrors.mjs'
 import { normalizeUpdateChannel } from './release-channel.mjs'
 import { openWorkspaceFile } from './workspace-files.mjs'
 import { normalizeValueModeProductEvent } from './value-mode-telemetry.mjs'
@@ -449,6 +454,12 @@ export function publicUpdateChannel(value) {
   })
 }
 
+export function publicUpdateDownloadRoute(value) {
+  return Object.freeze({
+    route: normalizeUpdateDownloadRoute(value),
+  })
+}
+
 const publicRepairRetryResult = (value) => {
   const reason = REPAIR_UNAVAILABLE_REASONS.has(value?.reason) ? value.reason : undefined
   return Object.freeze({
@@ -487,6 +498,8 @@ export function registerDesktopIpc({
   configureLanGateway = async () => undefined,
   getUpdateChannel = () => 'stable',
   setUpdateChannel = async () => { throw new Error('update channel selection is unavailable') },
+  getUpdateDownloadRoute = () => DEFAULT_UPDATE_DOWNLOAD_ROUTE,
+  setUpdateDownloadRoute = async (route) => route,
   confirmUpdateChannelChange = async () => true,
   getSettingsWindowBounds = async () => undefined,
   setSettingsWindowBounds = async () => undefined,
@@ -555,6 +568,8 @@ export function registerDesktopIpc({
     'desktop:lan-gateway-configure',
     'desktop:update-channel-get',
     'desktop:update-channel-set',
+    'desktop:update-download-route-get',
+    'desktop:update-download-route-set',
     'desktop:update-check',
     'desktop:update-dismiss',
     'desktop:update-install',
@@ -681,6 +696,12 @@ export function registerDesktopIpc({
     }
     const persisted = await setUpdateChannel(channel)
     return publicUpdateChannel(persisted?.channel ?? persisted ?? channel)
+  })
+  handle('desktop:update-download-route-get', main, () => publicUpdateDownloadRoute(getUpdateDownloadRoute()))
+  handle('desktop:update-download-route-set', main, async (_event, _surface, rawRoute) => {
+    const route = assertUpdateDownloadRoute(rawRoute)
+    const persisted = await setUpdateDownloadRoute(route)
+    return publicUpdateDownloadRoute(persisted?.route ?? persisted ?? route)
   })
   handle('desktop:update-check', main, () => {
     try { onUpdateCheck() } catch (error) { logDiagnostic('ipc', 'update-check', error) }

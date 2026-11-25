@@ -1293,6 +1293,7 @@ export async function startElectronApp(metadata) {
   let closeBehavior = (await closePreferencesStore.load()).closeBehavior
   const updateChannelPreference = await updateChannelStore.loadState()
   let updateChannel = updateChannelPreference.channel
+  let updateDownloadRoute = await updateChannelStore.loadDownloadRoute()
   let trayLifecycle
   let closeBehaviorController
   let refreshApplicationMenu = () => {}
@@ -1946,6 +1947,16 @@ export async function startElectronApp(metadata) {
     updateChannelWriteQueue = operation.catch(() => {})
     return operation
   }
+  const persistUpdateDownloadRoute = (route) => {
+    const operation = updateChannelWriteQueue.then(async () => {
+      const persisted = await updateChannelStore.saveDownloadRoute(route)
+      updateDownloadRoute = persisted
+      void logStore.append(`[updater] update download route selected: ${persisted}`).catch(() => {})
+      return persisted
+    })
+    updateChannelWriteQueue = operation.catch(() => {})
+    return operation
+  }
   installNavigationPolicy({
     webContents: mainWindow.webContents,
     getRuntimeOrigin: () => activeOrigin,
@@ -2276,6 +2287,8 @@ export async function startElectronApp(metadata) {
     },
     getUpdateChannel: () => updateController?.getChannel?.() ?? updateChannel,
     setUpdateChannel: persistUpdateChannel,
+    getUpdateDownloadRoute: () => updateDownloadRoute,
+    setUpdateDownloadRoute: persistUpdateDownloadRoute,
     confirmUpdateChannelChange: async ({ from, to }) => {
       if (from !== 'stable' || to !== 'beta') return true
       const confirmation = await dialog.showMessageBox(mainWindow, {
@@ -3286,6 +3299,7 @@ export async function startElectronApp(metadata) {
   const updateDownloadRouter = autoUpdater ? new UpdateDownloadRouter({
     updater: autoUpdater,
     mirrors: parseUpdateMirrors(process.env.DSH_DESKTOP_UPDATE_MIRRORS),
+    getDownloadRoute: () => updateDownloadRoute,
     probe: (url) => probeUpdateSource(url, {
       fetchFn: updateProbeFetch,
     }),

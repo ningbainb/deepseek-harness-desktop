@@ -154,6 +154,8 @@ function afterCursor(row: { updatedAt: number; sessionId: string }, cursor: { up
     || (row.updatedAt === cursor.updatedAt && row.sessionId > cursor.sessionId)
 }
 
+const MOBILE_RESTRICTED_MODEL_PROVIDERS = new Set(['antigravity-cli'])
+
 /**
  * Build the owner-aware mobile routes. The only resource-bearing calls that
  * reach ApiProxy have already passed a current scope check.
@@ -207,6 +209,15 @@ export function makeMobileApiRoutes(deps: MobileApiDeps): WebRoute[] {
     }
     if (method === MOBILE_PREFERENCES_METHOD) {
       writeRpc(res, rpcId, { ok: true, value: { mobileEnterToSend: mobileEnterToSend() } })
+      return
+    }
+    if (
+      method === 'session.selectModel'
+      && isRecord(payload)
+      && typeof payload.provider === 'string'
+      && MOBILE_RESTRICTED_MODEL_PROVIDERS.has(payload.provider.trim())
+    ) {
+      writeRpc(res, rpcId, { ok: false, error: { code: 'forbidden', message: 'provider is not permitted on remote mobile sessions' } })
       return
     }
     try {

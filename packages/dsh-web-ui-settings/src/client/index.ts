@@ -59,6 +59,10 @@ import { installRelayAuthFailures } from './relay-auth-failures.ts'
 import { installRelayErrorFallback } from './relay-error-fallback.tsx'
 import { installFirstRunChooser } from './FirstRunChooser.tsx'
 import { installSettingsOnboardingPriority, supportsDesktopSettingsPriority } from './settings-onboarding-priority.tsx'
+import { ensureOfficeWorkSession, registerOfficeAppsIntegration } from './settings-sdk-adapter.ts'
+import { OfficeAppsComposerTrigger, OfficeStarterDock } from './work-mode/OfficeAppsComposerBar.tsx'
+import { workModeEn, workModeZh } from './work-mode/locales.ts'
+import { installSidebarModeSwitcher } from './work-mode/sidebar-mode-switcher.ts'
 
 export type { WebUIPluginsSectionProps } from './WebUIPluginsCard.tsx'
 export { SafePluginBoundary } from './SafePluginBoundary.tsx'
@@ -126,6 +130,27 @@ export function apply(ctx: ClientContext): void {
     ctx.effect(() => installBrowserClose(document), 'web-ui-settings: browser close action')
     ctx.inject?.(['workspaces', 'sessions', 'uiWorkspace'], scope => {
       scope.effect(() => installProjectDialog(scope as ClientContext), 'web-ui-settings: project dialog')
+    })
+    ctx.inject?.(['slots', 'locale', 'uiWorkspace', 'sessions'], scope => {
+      scope.effect(() => registerOfficeAppsIntegration(scope, {
+        zh: workModeZh,
+        en: workModeEn,
+        OfficeAppsComposerTrigger,
+        OfficeStarterDock,
+        onOpenExtensions: () => {
+          const transport = (window as Window & { dshDesktopTransport?: { openExtensions?(tab?: string): void } }).dshDesktopTransport
+          if (transport?.openExtensions) transport.openExtensions('plugins')
+          else if (nativeDesktopSettings) openDesktopNativeSettings('plugins')
+          else document.querySelector<HTMLButtonElement>('[data-shortcut-trigger="settings"]')?.click()
+        },
+      }), 'web-ui-settings: unified office apps composer and starter dock')
+      scope.effect(
+        () => installSidebarModeSwitcher(document, {
+          locale: () => scope.locale.getSnapshot().active,
+          onEnterOfficeMode: () => ensureOfficeWorkSession(scope),
+        }),
+        'web-ui-settings: prominent sidebar experience mode switcher',
+      )
     })
   }
   ctx.effect(() => ctx.locale.register('desktop-project', projectCopy), 'web-ui-settings: project dictionaries')

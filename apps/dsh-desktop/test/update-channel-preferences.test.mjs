@@ -43,6 +43,13 @@ test('update channel preference serializes atomic Stable and Beta changes', asyn
       channel: 'stable',
     })
     assert.equal((await readdir(directory)).some((entry) => entry.includes('.tmp-') || entry.includes('.bak-')), false)
+
+    assert.equal(await store.loadDownloadRoute(), 'auto')
+    assert.equal(await store.saveDownloadRoute('cdn'), 'cdn')
+    assert.equal(await store.loadDownloadRoute(), 'cdn')
+    await store.save('beta')
+    assert.equal(await store.load(), 'beta')
+    assert.equal(await store.loadDownloadRoute(), 'cdn')
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

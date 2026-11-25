@@ -3,8 +3,12 @@ import { EventEmitter } from 'node:events'
 import test from 'node:test'
 
 import {
+  DEFAULT_UPDATE_DOWNLOAD_ROUTE,
   DEFAULT_UPDATE_MIRRORS,
   UpdateDownloadRouter,
+  assertUpdateDownloadRoute,
+  detectChinaRegion,
+  normalizeUpdateDownloadRoute,
   parseUpdateMirrors,
   probeUpdateSource,
   rankUpdateSources,
@@ -138,4 +142,72 @@ test('download router preserves checksums, tries GitHub before opt-in mirrors, a
   assert.equal(updater.attempts[0].url.href, OFFICIAL_ASSET)
   assert.equal(updater.attempts[1].url.hostname, 'fast.example')
   assert.equal(provider.resolveFiles, originalResolveFiles)
+})
+
+test('supports Cloudflare R2 direct /releases/ URLs and region-aware CDN vs GitHub ordering', async () => {
+  const r2Mirrors = parseUpdateMirrors('https://cdn.example.com/releases/')
+  assert.deepEqual(r2Mirrors, [{
+    id: 'cdn.example.com',
+    label: 'CDN 加速 cdn.example.com',
+    prefix: 'https://cdn.example.com/releases/',
+    mode: 'release-path',
+  }])
+  assert.equal(
+    rewriteGitHubReleaseUrl(OFFICIAL_ASSET, r2Mirrors[0]).href,
+    'https://cdn.example.com/releases/v2.1.0/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe',
+  )
+
+  assert.equal(DEFAULT_UPDATE_DOWNLOAD_ROUTE, 'auto')
+  assert.equal(normalizeUpdateDownloadRoute('CDN'), 'cdn')
+  assert.equal(normalizeUpdateDownloadRoute('invalid'), 'auto')
+  assert.equal(assertUpdateDownloadRoute(' github '), 'github')
+  assert.throws(() => assertUpdateDownloadRoute('mirror'), /download route/u)
+  assert.equal(detectChinaRegion({ timeZone: 'Asia/Shanghai', locale: 'en-US' }), true)
+  assert.equal(detectChinaRegion({ timeZone: 'America/New_York', locale: 'zh-CN' }), true)
+  assert.equal(detectChinaRegion({ timeZone: 'America/New_York', locale: 'en-US' }), false)
+
+  // In China region (`preferCdn: true`) when CDN probe is faster than GitHub, CDN ranks first.
+  const cnRanked = await rankUpdateSources({
+    officialUrl: OFFICIAL_ASSET,
+    mirrors: r2Mirrors,
+    route: 'auto',
+    preferCdn: true,
+    probe: async (_url, source) => ({ ok: true, elapsedMs: source.id === 'github' ? 320 : 45 }),
+  })
+  assert.deepEqual(cnRanked.map(s => s.id), ['cdn.example.com', 'github'])
+
+  // Forced `github` ignores CDN mirrors cleanly.
+  const ghOnly = await rankUpdateSources({
+    officialUrl: OFFICIAL_ASSET,
+    mirrors: r2Mirrors,
+    route: 'github',
+    preferCdn: true,
+    probe: async () => ({ ok: true, elapsedMs: 25 }),
+  })
+  assert.deepEqual(ghOnly.map(s => s.id), ['github'])
+
+  // End-to-end UpdateDownloadRouter picks faster R2 CDN directly when preferCdn is true.
+  const selected = []
+  const provider = {
+    resolveFiles(updateInfo) {
+      return [{ url: new URL(OFFICIAL_ASSET), info: updateInfo.files[0] }]
+    },
+  }
+  const router = new UpdateDownloadRouter({
+    updater: {
+      updateInfoAndProvider: { info: { tag: 'v2.1.0', version: '2.1.0', files: [{ sha512: 'abc' }] }, provider },
+      async downloadUpdate() {
+        return [provider.resolveFiles({ files: [{ sha512: 'abc' }] })[0].url.href]
+      },
+    },
+    mirrors: r2Mirrors,
+    preferCdn: () => true,
+    probe: async (_url, source) => ({ ok: true, elapsedMs: source.id === 'github' ? 400 : 30 }),
+  })
+  const downloaded = await router.downloadUpdate(
+    { tag: 'v2.1.0', version: '2.1.0', files: [{ sha512: 'abc' }] },
+    { onSource: (s) => selected.push(s.id) },
+  )
+  assert.deepEqual(selected, ['cdn.example.com'])
+  assert.deepEqual(downloaded, ['https://cdn.example.com/releases/v2.1.0/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe'])
 })

@@ -64,6 +64,8 @@ authority 时，才用 `--trusted-host` 扩展传输层信任列表。
 
 移动端适配器通过插件持有的官方 SDK Peer 委托已经授权的请求，使用本机所有者身份并设置 `interactions: none`。委托前仍须完成配对、方法白名单、Workspace/Session 归属检查与撤销校验；该 Peer 不开放新的手机接口，也不参与转发事件交互。网络输入不能选择 Peer，其生命周期随插件上下文结束。
 
+手机端的模型选择拒绝桌面版 Antigravity CLI 提供商。Antigravity OAuth 仅限本机人工交互。
+
 ## 安装
 
 推荐直接安装全家桶聚合包 `@linxin666/dsh-web-ui-all`（一个包装齐全部功能插件与皮肤），或单独安装本插件：

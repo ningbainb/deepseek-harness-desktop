@@ -3,7 +3,17 @@ export declare const name = "desktop-compat";
 export declare const inject: string[];
 /** Install Desktop-only compatibility behavior through public DSH hooks. */
 export declare function apply(ctx: Context): void;
-export { controlToolApprovalDecision, installControlToolApproval, } from './control-tool-approval.ts';
+export { connectorToolApprovalDecision, controlToolApprovalDecision, installControlToolApproval, } from './control-tool-approval.ts';
+export { ConnectorRegistryService, classifyConnectorFailure, resolveConnectorsHome, type ConnectorInstallRunnerSpec, type ConnectorRegistryDeps, type LoginChildProcessLike, } from './connectors/connector-registry-service.ts';
+export { ConnectorSecretVault, type SecretCipherAdapter } from './connectors/secret-vault.ts';
+export { registerConnectorRoutes } from './connectors/connector-routes.ts';
+export { registerWorkOfficePreset } from './connectors/work-office-preset.ts';
+export { loadBuiltinCatalog } from './connectors/builtin-catalog.ts';
+export * from './connectors/types.ts';
+export { ANTIGRAVITY_ACP_AGENT, AcpAgentManager, AcpComplianceError, assertAcpUsageAllowed, type AcpAgentManagerDeps, } from './acp/acp-agent-manager.ts';
+export { AcpClient, AcpClientError, assertWorkspaceContained, type AcpClientHandlers, type AcpClientLaunchOptions, } from './acp/acp-client.ts';
+export { registerAcpRoutes } from './acp/acp-routes.ts';
+export * from './acp/types.ts';
 export { installAgentWslTool } from './agent-wsl-tool.ts';
 export { FRIENDLY_CANCELLED_MESSAGE, createQueueRecoveryScheduler, normalizeCancellationDecision, recoverQueuedTurns, } from './recovery.ts';
 export { DesktopSkinStateService, DesktopSkinStateStore, SKIN_STATE_END, SKIN_STATE_START, type DesktopSkinStateFace, type SkinLoaderEntry, } from './skin-state.ts';

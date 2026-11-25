@@ -534,6 +534,7 @@
         "sidebar-layout-anchors-follow-panels-and-clean-up-only-owned-attributes",
         "optional-tools-collapse-without-moving-native-react-nodes",
         "persistent-accessible-tools-toggle-keeps-workspaces-and-session-actions-visible",
+        "office-mode-switch-and-connector-management-keep-native-conversation",
         "skin-rail-footer-grows-to-retain-every-action-and-account-menu",
         "startup-package-resolution-prefers-physical-unpacked-sdk-tree",
         "startup-host-identity-checks-remain-complete-and-bounded-parallel",
@@ -1317,6 +1318,7 @@
       "features": [
         "workspace-and-session-create",
         "model-select",
+        "local-acp-permission-bridge-and-interactive-antigravity-isolation",
         "real-composer-submit",
         "pwsh-tool-round-trip",
         "assistant-completion",

@@ -33,11 +33,16 @@ export { dshHome } from "./dsh-home.js";
 export function bundledPresetsRoot() {
     return fileURLToPath(new URL('../presets/', import.meta.url));
 }
+const VALUE_MODE_RESTRICTED_PROVIDERS = new Set(['antigravity-cli']);
 function readDefaultExpert(ctx) {
     const service = ctx.agentDefaultModel;
     try {
         const selection = service?.currentSelection?.();
-        return isCompleteModelRoute(selection) ? { ...selection } : undefined;
+        if (!isCompleteModelRoute(selection))
+            return undefined;
+        if (VALUE_MODE_RESTRICTED_PROVIDERS.has(selection.provider.trim()))
+            return undefined;
+        return { ...selection };
     }
     catch {
         return undefined;
@@ -144,7 +149,7 @@ export function apply(ctx, initialConfig = {}) {
             return resolved;
         }
         const route = isSubagent ? effectiveConfig.executor : effectiveConfig.expert;
-        if (!isCompleteModelRoute(route)) {
+        if (!isCompleteModelRoute(route) || VALUE_MODE_RESTRICTED_PROVIDERS.has(route.provider.trim())) {
             return resolved;
         }
         if (isSubagent)
