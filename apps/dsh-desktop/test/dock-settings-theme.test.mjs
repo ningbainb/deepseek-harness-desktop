@@ -44,7 +44,7 @@ function fixture() {
 test('settings child view starts after the complete sidebar at every responsive breakpoint', async () => {
   const { control, bounds, resize } = fixture()
   await control.select('memory')
-  for (const [width, sidebar] of [[960, 200], [901, 200], [900, 180], [801, 180], [800, 180], [680, 180]]) {
+  for (const [width, sidebar] of [[960, 224], [901, 224], [900, 224], [801, 224], [800, 180], [680, 180]]) {
     resize([width, 680])
     assert.equal(bounds.at(-1).x, sidebar, `sidebar boundary at ${width}`)
     assert.equal(bounds.at(-1).width, width - sidebar)
