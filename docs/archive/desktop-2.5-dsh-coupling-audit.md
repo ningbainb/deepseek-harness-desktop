@@ -1165,8 +1165,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/runtime-candidate-policy.mjs | 21 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/runtime-community-index.mjs | 111 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-community-index.mjs | 112 | profileDir |
-| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 701 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 702 | DSH_PROFILE |
+| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 704 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/runtime-controller.mjs | 705 | DSH_PROFILE |
 | profile-home | apps/dsh-desktop/src/runtime-graph-validator.mjs | 79 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-graph-validator.mjs | 130 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-graph-validator.mjs | 145 | profileDir |
@@ -1182,10 +1182,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/runtime-graph-validator.mjs | 279 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-integrity-audit.mjs | 22 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-integrity-audit.mjs | 29 | profileDir |
-| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 212 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 213 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 224 | profileDir |
-| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 230 | profileDir |
+| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 214 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 215 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 226 | profileDir |
+| profile-home | apps/dsh-desktop/src/runtime-launcher.mjs | 232 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-provider.mjs | 224 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-provider.mjs | 228 | profileDir |
 | profile-home | apps/dsh-desktop/src/runtime-provider.mjs | 229 | profileDir |

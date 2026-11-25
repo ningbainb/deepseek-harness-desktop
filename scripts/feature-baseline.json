@@ -785,6 +785,7 @@
         "packaged-windows-background-console-regression",
         "quit-invalidates-pending-runtime-presentation",
         "private-runtime-graceful-shutdown-with-force-fallback",
+        "windows-runtime-cleanup-deadline-precedes-receipt-and-force-deadlines",
         "windows-shutdown-receipt-can-complete-after-three-seconds-within-the-existing-force-deadline",
         "runtime-stays-alive-until-shutdown-acknowledgement-pipe-closes",
         "bounded-shutdown-waits-for-inflight-http-responses",
