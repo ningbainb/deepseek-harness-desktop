@@ -1161,6 +1161,7 @@
       "features": [
         "real-local-provider-progressive-chinese-and-code-output",
         "streamed-reply-dom-does-not-remeasure-skills-composer-or-caption",
+        "work-mode-switcher-ignores-stream-mutations-and-remounts-with-sidebar",
         "usage-card-reuses-live-footer-without-global-stream-time-sidebar-rescans",
         "collapsed-tools-preserve-workspaces-sessions-dock-and-keyboard-access",
         "rc3-grid-owned-tool-rows-use-content-column-with-normal-click-targets",

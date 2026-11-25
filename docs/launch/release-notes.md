@@ -9,7 +9,7 @@
 - **原生对话办公模式。** 在侧边栏切换到办公模式，通过输入框上方的面板管理飞书、腾讯文档、语雀、金山文档、企业微信、钉钉、腾讯会议和 WPS 365。支持自动安装的连接器可一键安装，无需手动配置 PATH。Windows 安装和登录时隐藏命令行窗口。飞书首次连接会自动执行 `config init --new`，并在系统浏览器中打开授权页。连接器官网和授权链接也在系统浏览器中打开。
 - **通用 ACP v1 与 Antigravity OAuth。** 通过标准输入输出接入符合 ACP v1 的本地 Agent，支持能力协商、会话管理及权限请求。Antigravity 个人与企业 OAuth 仅限本机人工交互，手机远程端、省钱模式、定时任务和普通模型后端均无法调用。
 - **升级提示与插件归属。** 精简升级后邀请用户为项目点 Star 的弹窗版式，并补齐内置插件的来源与维护者信息。
-- **按地区选择更新线路。** 本版内置下载源为 GitHub。配置可用的 CDN 后，自动选线在中国大陆优先尝试该 CDN，其他地区优先使用 GitHub。更新面板也支持手动选线。Cloudflare R2 镜像已预留接入能力，本版尚未上线。
+- **按地区选择更新线路。** 本版内置下载源为 GitHub。在中国大陆，已配置的 CDN 可用且更快时，或 GitHub 不可用时，自动选线可以优先使用该 CDN。其他地区优先使用 GitHub。更新面板也支持手动选线。Cloudflare R2 镜像已预留接入能力，本版尚未上线。
 
 ### 验证
 
@@ -34,7 +34,7 @@ Desktop 5.5.0 brings office connectors into native conversations, adds generic A
 - **Work Mode in native conversations.** Switch to Work Mode in the sidebar and manage Feishu, Tencent Docs, Yuque, Kingsoft Docs, WeCom, DingTalk, Tencent Meeting, and WPS 365 from the panel above the composer. Supported connectors install in one click without a manual PATH change. Windows keeps the console hidden during installation and sign-in. On first connection, Feishu runs `config init --new` and opens its authorization page in the system browser. Connector websites and other authorization links also open in the system browser.
 - **Generic ACP v1 and Antigravity OAuth.** Connect local ACP v1 agents over standard input and output with capability negotiation, session management, and permission requests. Antigravity personal and enterprise OAuth require direct local interaction and are unavailable to mobile remote access, Value Mode, scheduled tasks, and regular model backends.
 - **Post-upgrade prompt and plugin attribution.** Refined the prompt to star the project after upgrading and filled in source and maintainer details for built-in plugins.
-- **Region-aware update downloads.** GitHub is the built-in download source for this release. With a reachable CDN configured, automatic routing can prefer that CDN in mainland China, while GitHub comes first elsewhere. The update panel also supports manual route selection. Cloudflare R2 integration is reserved for a future mirror.
+- **Region-aware update downloads.** GitHub is the built-in download source for this release. In mainland China, automatic routing can prefer a configured, reachable CDN if it responds faster or GitHub is unavailable. GitHub comes first elsewhere. The update panel also supports manual route selection. Cloudflare R2 integration is reserved for a future mirror.
 
 ### Verification
 

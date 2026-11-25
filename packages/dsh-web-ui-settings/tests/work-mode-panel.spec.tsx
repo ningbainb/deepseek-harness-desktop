@@ -228,6 +228,41 @@ describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
     dispose()
   })
 
+  it('ignores streamed conversation mutations and remounts after sidebar replacement', async () => {
+    document.body.innerHTML = `
+      <aside data-pane="sidebar"><button>New chat</button></aside>
+      <main data-pane="conversation"></main>
+    `
+    const sidebar = document.querySelector('[data-pane="sidebar"]')!
+    const conversation = document.querySelector('[data-pane="conversation"]')!
+    const sidebarScan = vi.spyOn(sidebar, 'querySelectorAll')
+    const dispose = installSidebarModeSwitcher(document)
+    const switcher = sidebar.querySelector('[data-dsh-mode-switcher-host]')
+    const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve))
+    try {
+      expect(switcher).not.toBeNull()
+      for (const packet of ['First fragment', 'Second fragment', 'Final fragment']) {
+        const fragment = document.createElement('p')
+        fragment.textContent = packet
+        conversation.append(fragment)
+        await nextFrame()
+        await nextFrame()
+      }
+      expect(sidebarScan).toHaveBeenCalledTimes(1)
+
+      const replacement = document.createElement('aside')
+      replacement.dataset.pane = 'sidebar'
+      replacement.innerHTML = '<div><button>New session</button></div>'
+      sidebar.replaceWith(replacement)
+      await waitFor(() => {
+        expect(replacement.querySelector('button')?.nextElementSibling).toBe(switcher)
+      })
+    } finally {
+      dispose()
+      sidebarScan.mockRestore()
+    }
+  })
+
   it('routes external download links through dshDesktop.openExternalUrl and surfaces install logs on failure', async () => {
     const openExternalStub = vi.fn(async () => true)
     vi.stubGlobal('window', Object.assign(window, { dshDesktop: { openExternalUrl: openExternalStub } }))

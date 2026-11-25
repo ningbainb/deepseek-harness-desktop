@@ -2,6 +2,7 @@ import { officeAppsStore } from './office-apps-store.ts'
 
 const STYLE_ID = 'dsh-work-mode-switcher-styles'
 const HOST_ATTR = 'data-dsh-mode-switcher-host'
+const SIDEBAR_SELECTOR = '[data-pane="sidebar"], [class*="sidebarCol"]'
 
 const SWITCHER_CSS = `
 [${HOST_ATTR}] {
@@ -176,6 +177,7 @@ export function installSidebarModeSwitcher(
 
   let disposed = false
   let frame: number | undefined
+  let sidebar: Element | null = null
 
   const isEnglish = (): boolean => {
     const loc = options.locale?.() || doc.documentElement.lang || 'zh'
@@ -189,14 +191,17 @@ export function installSidebarModeSwitcher(
     const connectedCount = snap.snapshot?.connectedCount ?? 0
 
     host.setAttribute('aria-label', en ? 'Experience mode' : '使用模式切换')
-    devLabel.textContent = en ? 'Pro' : '专业模式'
-    officeLabel.textContent = en ? 'Office' : '办公模式'
+    const devText = en ? 'Pro' : '专业模式'
+    const officeText = en ? 'Office' : '办公模式'
+    if (devLabel.textContent !== devText) devLabel.textContent = devText
+    if (officeLabel.textContent !== officeText) officeLabel.textContent = officeText
     devBtn.title = en ? 'Full developer & agent tools' : '完整开发与全能工具模式（含办公能力）'
     officeBtn.title = en ? 'Simplified daily office mode' : '极简办公模式（聚焦办公任务与文档协作）'
     devBtn.setAttribute('aria-selected', String(!inOffice))
     officeBtn.setAttribute('aria-selected', String(inOffice))
     officeBadge.hidden = connectedCount <= 0
-    if (connectedCount > 0) officeBadge.textContent = String(connectedCount)
+    const badgeText = connectedCount > 0 ? String(connectedCount) : ''
+    if (officeBadge.textContent !== badgeText) officeBadge.textContent = badgeText
   }
 
   devBtn.addEventListener('click', () => {
@@ -215,7 +220,7 @@ export function installSidebarModeSwitcher(
   const mountOrSync = (): void => {
     frame = undefined
     if (disposed) return
-    const sidebar = doc.querySelector('[data-pane="sidebar"], [class*="sidebarCol"]')
+    if (!sidebar?.isConnected) sidebar = doc.querySelector(SIDEBAR_SELECTOR)
     if (!sidebar) return
 
     const newSessionBtn = [...sidebar.querySelectorAll<HTMLButtonElement>('button')].find((btn) =>
@@ -227,9 +232,10 @@ export function installSidebarModeSwitcher(
 
     if (anchor && anchor.parentElement) {
       const parent = anchor.parentElement
-      const targetBefore = newSessionBtn ? newSessionBtn.nextElementSibling : anchor
-      if (host.parentElement !== parent || host.nextElementSibling !== targetBefore) {
-        parent.insertBefore(host, targetBefore)
+      if (newSessionBtn) {
+        if (newSessionBtn.nextElementSibling !== host) newSessionBtn.after(host)
+      } else if (host.parentElement !== parent || host.nextElementSibling !== anchor) {
+        parent.insertBefore(host, anchor)
       }
     }
     syncLabelsAndSelection()
@@ -247,9 +253,22 @@ export function installSidebarModeSwitcher(
   const unsubscribeStore = officeAppsStore.subscribe(() => {
     syncLabelsAndSelection()
   })
-  const observer = new MutationObserver(() => schedule())
-  observer.observe(doc.body, { childList: true, subtree: true })
+  const observer = new MutationObserver(records => {
+    const currentSidebar = sidebar
+    if (currentSidebar?.isConnected) {
+      if (records.some(({ target }) => currentSidebar.contains(target) && !host.contains(target))) schedule()
+      return
+    }
+    if (currentSidebar || records.some(({ addedNodes }) => Array.from(addedNodes).some(node => {
+      if (node.nodeType !== Node.ELEMENT_NODE) return false
+      const element = node as Element
+      return element.matches(SIDEBAR_SELECTOR) || element.querySelector(SIDEBAR_SELECTOR) !== null
+    }))) schedule()
+  })
+  const localeObserver = new MutationObserver(syncLabelsAndSelection)
   mountOrSync()
+  observer.observe(doc.documentElement, { childList: true, subtree: true })
+  localeObserver.observe(doc.documentElement, { attributes: true, attributeFilter: ['lang'] })
 
   return () => {
     disposed = true
@@ -258,6 +277,7 @@ export function installSidebarModeSwitcher(
     }
     unsubscribeStore()
     observer.disconnect()
+    localeObserver.disconnect()
     host.remove()
   }
 }
