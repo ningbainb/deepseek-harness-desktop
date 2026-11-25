@@ -22,6 +22,15 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare confined native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
       - run: pnpm verify
 
   e2e:

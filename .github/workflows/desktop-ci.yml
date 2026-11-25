@@ -26,6 +26,15 @@ jobs:
       - name: Enforce the desktop version release floor
         run: node scripts/verify-desktop-version-floor.mjs
       - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare confined native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
       - name: Feature preservation baseline check
         run: pnpm feature-baseline:check
       - run: pnpm typecheck

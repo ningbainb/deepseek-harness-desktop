@@ -7,6 +7,84 @@ export const RELEASE_GUIDE_VERSION = JSON.parse(readFileSync(new URL('../package
 export const RELEASE_GUIDE_SURFACE_ID = 'dsh-desktop-release-guide'
 
 export const RELEASE_GUIDES = Object.freeze({
+  '5.5.0': Object.freeze({
+    zh: Object.freeze({
+      badge: '版本新功能',
+      title: '欢迎使用 DeepSeek Harness Desktop',
+      subtitle: '在原生对话中使用办公连接器，并按所在地区选择更新下载线路。',
+      hint: '可在顶部「帮助 → 本版本新功能」随时查看',
+      done: '开始使用',
+      closeLabel: '关闭版本新功能引导',
+      items: Object.freeze([
+        Object.freeze({
+          id: 'work-mode',
+          icon: 'layout',
+          title: '办公模式',
+          description: '在侧边栏切换到办公模式，从输入框上方连接飞书等八款办公应用。',
+        }),
+        Object.freeze({
+          id: 'acp-local',
+          icon: 'terminal',
+          title: 'ACP v1 与本机 Antigravity',
+          description: '支持符合 ACP v1 的本地 Agent。Antigravity 账号授权仅用于本机人工交互。',
+          actionLabel: '查看模型设置',
+          actionKind: 'models',
+        }),
+        Object.freeze({
+          id: 'plugin-attribution',
+          icon: 'inbox',
+          title: '内置插件归属',
+          description: '在拓展坞查看内置插件的来源与维护者。',
+          actionLabel: '打开拓展坞',
+          actionKind: 'dock',
+        }),
+        Object.freeze({
+          id: 'update-downloads',
+          icon: 'sparkles',
+          title: '更新下载线路',
+          description: '在更新面板自动或手动选线。默认使用 GitHub，配置 CDN 后可按地区优先尝试。',
+        }),
+      ]),
+    }),
+    en: Object.freeze({
+      badge: "What's New",
+      title: 'Welcome to DeepSeek Harness Desktop',
+      subtitle: 'Use office connectors in native conversations and choose an update download route for your region.',
+      hint: "Reopen anytime via Help → What's New",
+      done: 'Get started',
+      closeLabel: "Close What's New guide",
+      items: Object.freeze([
+        Object.freeze({
+          id: 'work-mode',
+          icon: 'layout',
+          title: 'Work Mode',
+          description: 'Switch to Work Mode in the sidebar and connect Feishu and seven other office apps above the composer.',
+        }),
+        Object.freeze({
+          id: 'acp-local',
+          icon: 'terminal',
+          title: 'ACP v1 and local Antigravity',
+          description: 'Connect local ACP v1 agents. Antigravity account authorization requires direct local interaction.',
+          actionLabel: 'Open Model Settings',
+          actionKind: 'models',
+        }),
+        Object.freeze({
+          id: 'plugin-attribution',
+          icon: 'inbox',
+          title: 'Built-in plugin attribution',
+          description: 'Find source and maintainer details for built-in plugins in the Extension Dock.',
+          actionLabel: 'Open Extension Dock',
+          actionKind: 'dock',
+        }),
+        Object.freeze({
+          id: 'update-downloads',
+          icon: 'sparkles',
+          title: 'Update download routes',
+          description: 'Choose an automatic or manual route in the update panel. GitHub is the default, with regional priority for a configured CDN.',
+        }),
+      ]),
+    }),
+  }),
   '5.4.0': Object.freeze({
     zh: Object.freeze({
       badge: '版本新功能',
@@ -521,14 +599,16 @@ export function createReleaseGuideSurfaceScript({
       const desc = document.createElement('p');
       desc.textContent = item.description;
 
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'dsh-rg-action';
-      btn.textContent = item.actionLabel + ' →';
-      btn.addEventListener('click', () => runAction(item.actionKind));
-      actionButtons.push(btn);
-
-      card.append(head, desc, btn);
+      card.append(head, desc);
+      if (item.actionKind) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dsh-rg-action';
+        btn.textContent = item.actionLabel + ' →';
+        btn.addEventListener('click', () => runAction(item.actionKind));
+        actionButtons.push(btn);
+        card.append(btn);
+      }
       grid.append(card);
     }
 

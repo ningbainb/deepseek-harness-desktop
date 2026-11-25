@@ -60,7 +60,7 @@ The actual public Windows Setup, macOS ZIP and Linux DEB payloads were independe
 
 See [Work Mode and office connectors](work-mode-and-connectors.md) for the conversation sidebar and connector setup, and the [ACP and Antigravity guide](acp-and-antigravity.md) for local ACP sessions and credential boundaries.
 
-To enable a first-party download mirror, set `DSH_DESKTOP_UPDATE_MIRRORS` to its HTTPS base URL before launching Desktop. A base URL ending in `/releases/` serves objects at `/releases/<tag>/<asset>` and can point to a Cloudflare R2-backed domain. The existing installer verification applies to both GitHub and mirror downloads.
+Desktop 5.5.0 ships with GitHub as its download source. To enable a first-party download mirror, set `DSH_DESKTOP_UPDATE_MIRRORS` to its HTTPS base URL before launching Desktop. Automatic routing can prefer a reachable configured mirror in mainland China, and prefers GitHub elsewhere. A base URL ending in `/releases/` serves objects at `/releases/<tag>/<asset>` and can point to a Cloudflare R2-backed domain. The existing installer verification applies to both GitHub and mirror downloads.
 
 ## Windows startup and recovery
 

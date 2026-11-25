@@ -1283,6 +1283,16 @@
       ]
     },
     {
+      "id": "release-guide",
+      "name": "当前版本新功能引导与帮助菜单入口",
+      "uiSelector": "#dsh-desktop-release-guide",
+      "features": [
+        "bilingual-current-version-cards",
+        "shown-once-per-version",
+        "reopen-from-help-menu"
+      ]
+    },
+    {
       "id": "star-prompt",
       "name": "3.5.0 升级后每个本机用户显示一次 Star 提示",
       "uiSelector": "#dsh-desktop-star-prompt",
