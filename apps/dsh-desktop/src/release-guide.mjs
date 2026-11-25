@@ -113,31 +113,60 @@ export class ReleaseGuideStore {
     this.targetVersion = targetVersion
   }
 
-  claim(currentVersion) {
-    const operation = this.#operation.then(() => this.#claim(currentVersion))
+  claim(currentVersion, options = {}) {
+    const operation = this.#operation.then(() => this.#claim(currentVersion, options))
     this.#operation = operation.catch(() => {})
     return operation
   }
 
-  async #claim(currentVersion) {
-    if (currentVersion !== this.targetVersion || !getReleaseGuide(currentVersion)) return false
+  markPending(currentVersion) {
+    const operation = this.#operation.then(() => this.#markPending(currentVersion))
+    this.#operation = operation.catch(() => {})
+    return operation
+  }
+
+  async #readState() {
     let shownVersions = []
+    let pendingVersion
     try {
       const state = JSON.parse(await readFile(this.path, 'utf8'))
       shownVersions = normalizeShownVersions(state?.shownVersions)
+      if (typeof state?.pendingVersion === 'string') pendingVersion = state.pendingVersion
     } catch (error) {
       if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error
     }
-    if (shownVersions.includes(currentVersion)) return false
+    return { shownVersions, pendingVersion }
+  }
 
-    const nextState = {
-      schemaVersion: 1,
-      shownVersions: normalizeShownVersions([...shownVersions, currentVersion]),
-    }
+  async #writeState(nextState) {
     await mkdir(dirname(this.path), { recursive: true })
     const temporaryPath = `${this.path}.${process.pid}.${Date.now()}.tmp`
     await writeFile(temporaryPath, `${JSON.stringify(nextState, null, 2)}\n`, 'utf8')
     await rename(temporaryPath, this.path)
+  }
+
+  async #markPending(currentVersion) {
+    if (currentVersion !== this.targetVersion || !getReleaseGuide(currentVersion)) return false
+    const { shownVersions } = await this.#readState()
+    if (shownVersions.includes(currentVersion)) return false
+    await this.#writeState({
+      schemaVersion: 1,
+      shownVersions,
+      pendingVersion: currentVersion,
+    })
+    return true
+  }
+
+  async #claim(currentVersion, { suppressIfUnmarked = false } = {}) {
+    if (currentVersion !== this.targetVersion || !getReleaseGuide(currentVersion)) return false
+    const { shownVersions, pendingVersion } = await this.#readState()
+    if (shownVersions.includes(currentVersion)) return false
+    if (suppressIfUnmarked && pendingVersion !== currentVersion) return false
+
+    await this.#writeState({
+      schemaVersion: 1,
+      shownVersions: normalizeShownVersions([...shownVersions, currentVersion]),
+    })
     return true
   }
 }
@@ -387,7 +416,7 @@ const FEATURE_ICON_PATHS = {
 export function createReleaseGuideSurfaceScript({
   version = RELEASE_GUIDE_VERSION,
   forceVisible = false,
-  showDelayMs = 600,
+  showDelayMs = 1_400,
 } = {}) {
   const guide = getReleaseGuide(version)
   if (!guide) return 'false'

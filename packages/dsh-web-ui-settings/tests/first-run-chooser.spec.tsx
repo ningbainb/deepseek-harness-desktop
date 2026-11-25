@@ -42,7 +42,7 @@ describe('FirstRunChooser', () => {
       }))
     })
 
-    const dialog = await screen.findByRole('dialog', { name: translate('firstRunTitle') })
+    const dialog = await screen.findByRole('region', { name: translate('firstRunTitle') })
     expect(dialog).toBeTruthy()
     expect(screen.getByText(translate('firstRunOfficialTitle'))).toBeTruthy()
     expect(screen.getByText(translate('firstRunRelayTitle'))).toBeTruthy()
@@ -51,7 +51,7 @@ describe('FirstRunChooser', () => {
     fireEvent.click(screen.getByRole('button', { name: translate('firstRunRelayAction') }))
     await waitFor(() => expect(signIn).toHaveBeenCalledTimes(1))
     expect(localStorage.getItem(FIRST_RUN_DISMISSED_KEY)).toBe('1')
-    expect(screen.queryByRole('dialog', { name: translate('firstRunTitle') })).toBeNull()
+    expect(screen.queryByRole('region', { name: translate('firstRunTitle') })).toBeNull()
     expect(openModelsSettings).not.toHaveBeenCalled()
   })
 
@@ -64,7 +64,7 @@ describe('FirstRunChooser', () => {
       }))
     })
     await waitFor(() => expect(readNotFirstRun).toHaveBeenCalledTimes(1))
-    expect(screen.queryByRole('dialog', { name: translate('firstRunTitle') })).toBeNull()
+    expect(screen.queryByRole('region', { name: translate('firstRunTitle') })).toBeNull()
 
     localStorage.setItem(FIRST_RUN_DISMISSED_KEY, '1')
     const readShouldSkip = vi.fn(async () => firstRunStatus)
@@ -86,7 +86,7 @@ describe('FirstRunChooser', () => {
         readStatus: async () => firstRunStatus,
       }))
     })
-    await screen.findByRole('dialog', { name: translate('firstRunTitle') })
+    await screen.findByRole('region', { name: translate('firstRunTitle') })
     fireEvent.click(screen.getByRole('button', { name: translate('firstRunLocalAction') }))
     expect(openModelsSettings).toHaveBeenCalledTimes(1)
     expect(localStorage.getItem(FIRST_RUN_DISMISSED_KEY)).toBe('1')

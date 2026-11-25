@@ -28,12 +28,11 @@ export function FirstRunChooser({
   onLocal: () => void
   onDismiss: () => void
 }) {
-  const dialogRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
-    dialogRef.current?.querySelector<HTMLButtonElement>('[data-first-run-primary="true"]')?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && dialogRef.current?.contains(document.activeElement)) {
         event.preventDefault()
         event.stopImmediatePropagation()
         onDismiss()
@@ -47,11 +46,10 @@ export function FirstRunChooser({
 
   return (
     <div className={css.firstRunBackdrop}>
-      <div
+      <section
         ref={dialogRef}
         className={css.firstRunDialog}
-        role="dialog"
-        aria-modal="true"
+        role="region"
         aria-label={t('firstRunTitle')}
         data-dsh-first-run-chooser="true"
       >
@@ -140,9 +138,27 @@ export function FirstRunChooser({
             {t('firstRunLater')}
           </button>
         </footer>
-      </div>
+      </section>
     </div>
   )
+}
+
+function isElementVisible(element: Element | null, win: Window): element is HTMLElement {
+  if (!(element instanceof win.HTMLElement)) return false
+  if (element.closest('[hidden], [aria-hidden="true"]')) return false
+  const style = win.getComputedStyle(element)
+  if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false
+  const rect = element.getBoundingClientRect()
+  return rect.width > 0 && rect.height > 0
+}
+
+function composerHasText(doc: Document): boolean {
+  const inputs = doc.querySelectorAll('[data-composer-card] textarea, [data-composer-card] [data-composer-input]')
+  for (const input of inputs) {
+    const value = 'value' in input ? String((input as HTMLTextAreaElement).value) : input.textContent ?? ''
+    if (value.trim().length > 0) return true
+  }
+  return false
 }
 
 export function installFirstRunChooser(
@@ -160,16 +176,11 @@ export function installFirstRunChooser(
   doc.body.append(container)
   const root = createRoot(container)
   let disposed = false
+  let active = false
+  let rendered = false
+  let frame = 0
 
-  const dismiss = () => {
-    try { doc.defaultView?.localStorage?.setItem(FIRST_RUN_DISMISSED_KEY, '1') } catch {}
-    if (!disposed) root.render(null)
-  }
-
-  const readStatus = options.readStatus ?? (() => postRelay<RelayStatusResponse>(RELAY_STATUS_PATH))
-  void readStatus().then(status => {
-    if (disposed || !status.firstRun || status.configured || status.writable === false) return
-    if (doc.querySelector('[data-shortcut-modal="settings"]')) return
+  const renderCard = () => {
     root.render(
       <FirstRunChooser
         t={translate}
@@ -180,7 +191,7 @@ export function installFirstRunChooser(
         }}
         onRelay={() => {
           dismiss()
-          doc.dispatchEvent(new CustomEvent(RELAY_SIGN_IN_REQUIRED_EVENT, { detail: { source: 'first-run-chooser' } }))
+          doc.dispatchEvent(new CustomEvent(RELAY_SIGN_IN_REQUIRED_EVENT, { detail: { source: 'first-run-chooser', autoConnect: false } }))
         }}
         onLocal={() => {
           dismiss()
@@ -188,10 +199,157 @@ export function installFirstRunChooser(
         }}
       />,
     )
+  }
+
+  const clearContainerPlacement = () => {
+    container.style.cssText = ''
+    const wrapper = container.firstElementChild as HTMLElement | null
+    if (wrapper) {
+      wrapper.style.left = ''
+      wrapper.style.top = ''
+      wrapper.style.width = ''
+      wrapper.style.height = ''
+    }
+  }
+
+  const updatePlacement = () => {
+    frame = 0
+    if (disposed || !active) return
+    const win = doc.defaultView
+    if (!win) return
+
+    // In jsdom or non-layout environments, innerWidth/rects are 0; render directly without geometric gating.
+    const composerCard = doc.querySelector('[data-composer-card]')
+    const composerRect = composerCard?.getBoundingClientRect()
+    const hasRealViewport = win.innerWidth > 0 && win.innerHeight > 0 && composerRect && composerRect.width > 0
+    if (!hasRealViewport) {
+      if (!rendered) {
+        rendered = true
+        renderCard()
+      }
+      clearContainerPlacement()
+      return
+    }
+
+    const blockingSelector = [
+      '[role="dialog"]',
+      '[aria-modal="true"]',
+      'dialog[open]',
+      '#dsh-desktop-star-prompt[data-open="true"]',
+      '#dsh-desktop-release-guide[data-open="true"]',
+    ].join(', ')
+    const hasBlockingDialog = [...doc.querySelectorAll(blockingSelector)].some(el => !container.contains(el) && isElementVisible(el, win))
+    const hasSettingsOrConversation = Boolean(
+      doc.querySelector('[data-shortcut-modal="settings"], [data-message-id], [data-turn-id]')
+      || composerHasText(doc),
+    )
+
+    if (hasBlockingDialog || hasSettingsOrConversation || !isElementVisible(composerCard, win)) {
+      if (rendered) {
+        rendered = false
+        root.render(null)
+      }
+      return
+    }
+
+    let sidebarRight = 0
+    for (const el of doc.querySelectorAll('[data-pane="sidebar"], [class*="sidebarCol"], aside, [data-sidebar]')) {
+      if (!isElementVisible(el, win)) continue
+      const rect = el.getBoundingClientRect()
+      if (rect.left <= 48 && rect.right < composerRect.left + 40) {
+        sidebarRight = Math.max(sidebarRight, rect.right)
+      }
+    }
+
+    let paneRight = win.innerWidth - 16
+    for (const el of doc.querySelectorAll('[data-rightbar-col]')) {
+      if (!isElementVisible(el, win)) continue
+      const rect = el.getBoundingClientRect()
+      if (rect.right >= win.innerWidth - 48 && rect.left > sidebarRight + 200) {
+        paneRight = Math.min(paneRight, rect.left - 16)
+      }
+    }
+
+    let topSafe = 84
+    for (const el of doc.querySelectorAll('[data-dsh-responsive-part="sidebar-toggle"], [data-dsh-relay-model-entry]')) {
+      if (!isElementVisible(el, win)) continue
+      const rect = el.getBoundingClientRect()
+      if (rect.top < 120 && rect.bottom < composerRect.top - 180) {
+        topSafe = Math.max(topSafe, rect.bottom + 12)
+      }
+    }
+
+    const paneLeft = Math.max(sidebarRight + 16, 16)
+    const paneWidth = Math.max(0, paneRight - paneLeft)
+    const clearHeight = Math.max(0, composerRect.top - topSafe - 16)
+
+    if (clearHeight < 220 || paneWidth < 520) {
+      if (rendered) {
+        rendered = false
+        root.render(null)
+      }
+      return
+    }
+
+    if (!rendered) {
+      rendered = true
+      renderCard()
+    }
+    const wrapper = container.firstElementChild as HTMLElement | null
+    if (wrapper) {
+      wrapper.style.left = `${Math.round(paneLeft)}px`
+      wrapper.style.top = `${topSafe}px`
+      wrapper.style.width = `${Math.round(paneWidth)}px`
+      wrapper.style.height = `${Math.round(clearHeight)}px`
+    }
+  }
+
+  const schedulePlacement = () => {
+    if (disposed || !active) return
+    const win = doc.defaultView
+    if (win && typeof win.requestAnimationFrame === 'function') {
+      if (!frame) frame = win.requestAnimationFrame(updatePlacement)
+    } else {
+      updatePlacement()
+    }
+  }
+
+  function dismiss() {
+    try { doc.defaultView?.localStorage?.setItem(FIRST_RUN_DISMISSED_KEY, '1') } catch {}
+    active = false
+    rendered = false
+    if (!disposed) root.render(null)
+  }
+
+  const observer = typeof MutationObserver === 'function'
+    ? new MutationObserver(schedulePlacement)
+    : undefined
+  observer?.observe(doc.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'aria-modal', 'data-open', 'open'],
+  })
+  const win = doc.defaultView
+  win?.addEventListener('resize', schedulePlacement)
+  doc.addEventListener('input', schedulePlacement, true)
+
+  const readStatus = options.readStatus ?? (() => postRelay<RelayStatusResponse>(RELAY_STATUS_PATH))
+  void readStatus().then(status => {
+    if (disposed || !status.firstRun || status.configured || status.writable === false) return
+    if (doc.querySelector('[data-shortcut-modal="settings"]')) return
+    active = true
+    updatePlacement()
   }).catch(() => {})
 
   return () => {
     disposed = true
+    active = false
+    rendered = false
+    if (frame && win && typeof win.cancelAnimationFrame === 'function') win.cancelAnimationFrame(frame)
+    observer?.disconnect()
+    win?.removeEventListener('resize', schedulePlacement)
+    doc.removeEventListener('input', schedulePlacement, true)
     root.unmount()
     container.remove()
   }

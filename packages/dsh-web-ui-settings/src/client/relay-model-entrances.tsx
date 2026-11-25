@@ -203,7 +203,10 @@ export function installRelayModelEntrances(doc: Document, translate: Translate):
         && entry.dataset.dshRelayProvider === 'project-relay') show(false)
     }).catch(() => {}).finally(() => { checking = false })
   }
-  const onSignInRequired = (event: Event) => show(false, event instanceof CustomEvent && event.detail?.reason === 'relay-auth')
+  const onSignInRequired = (event: Event) => {
+    const detail = event instanceof CustomEvent ? event.detail : undefined
+    show(detail?.autoConnect !== false, detail?.reason === 'relay-auth')
+  }
   doc.addEventListener('click', onClick, true)
   doc.addEventListener(RELAY_SIGN_IN_REQUIRED_EVENT, onSignInRequired)
   return () => { disposed = true; doc.removeEventListener('click', onClick, true); doc.removeEventListener(RELAY_SIGN_IN_REQUIRED_EVENT, onSignInRequired); root.unmount(); container.remove(); doc.dispatchEvent(new Event('dsh-relay-access-changed')) }

@@ -122,7 +122,7 @@ async function openSettings(page) {
     throw new Error(`model catalog did not expose openai-codex: ${text || '<empty card>'}`, { cause: error })
   }
   const relay = settings.locator('[data-relay-onboarding-card="true"]')
-  await relay.getByRole('heading', { name: 'bai 供应商', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
+  await relay.getByRole('heading', { name: '聚合模型中转（bai）', exact: true }).waitFor({ state: 'visible', timeout: 30_000 })
   const [relayBounds, baiBounds] = await Promise.all([relay.boundingBox(), baiProvider.boundingBox()])
   assert.ok(relayBounds && baiBounds && relayBounds.y < baiBounds.y, 'bai onboarding is visible before the provider list')
   if (process.env.DSH_DESKTOP_DOCK_SCREENSHOTS) {

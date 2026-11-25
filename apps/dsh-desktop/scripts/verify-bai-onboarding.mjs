@@ -69,7 +69,7 @@ try {
   await dismissRuntimeOnboarding(page)
   const entry = page.locator('button[data-dsh-relay-model-entry]').first()
   await entry.waitFor({ state: 'visible', timeout: 30_000 })
-  await entry.filter({ hasText: /bai（登录后获取模型）|bai \(models after sign-in\)/u }).waitFor({ state: 'visible', timeout: 60_000 })
+  await entry.filter({ hasText: /聚合中转（登录解锁模型）|Relay Hub \(sign in to unlock\)|bai（登录后获取模型）|bai \(models after sign-in\)/u }).waitFor({ state: 'visible', timeout: 60_000 })
   assert.equal(await page.locator('[data-composer-card] [data-dsh-relay-connect]').count(), 0, 'chat has no independent bai promotion button')
   await entry.click()
   await page.getByRole('menuitem', { name: /^(模型|Model)/u }).waitFor({ state: 'visible', timeout: 30_000 })
@@ -82,7 +82,7 @@ try {
   await editor.press('Enter')
   const dialog = page.locator('[role="dialog"]').filter({ has: page.locator('button').filter({ hasText: /充值|Top up/u }) })
   await dialog.waitFor({ state: 'visible', timeout: 30_000 })
-  await dialog.getByText(/暂未登录|Not signed in/u).waitFor({ timeout: 30_000 })
+  await dialog.getByText(/登录聚合模型中转（bai）|Sign in to Multi-Model Relay \(bai\)|暂未登录|Not signed in/u).waitFor({ timeout: 30_000 })
   const browserDeadline = Date.now() + 30_000
   while (await application.evaluate(() => globalThis.baiBrowserLinks.length) === 0 && Date.now() < browserDeadline) {
     await page.waitForTimeout(100)
@@ -111,7 +111,7 @@ try {
   await editor.fill('bai-first-turn-fixture')
   await editor.press('Enter')
   await dialog.waitFor({ state: 'visible', timeout: 60_000 })
-  await dialog.getByText(/暂未登录|Not signed in/u).waitFor({ state: 'visible', timeout: 30_000 })
+  await dialog.getByText(/登录聚合模型中转（bai）|Sign in to Multi-Model Relay \(bai\)|暂未登录|Not signed in/u).waitFor({ state: 'visible', timeout: 30_000 })
   await dialog.getByRole('button', { name: /取消连接|Cancel connection/u }).waitFor({ state: 'visible', timeout: 30_000 })
   const retainedDraft = await editor.evaluate(element => 'value' in element ? element.value : element.textContent)
   assert.equal(retainedDraft, 'bai-first-turn-fixture')
@@ -154,7 +154,7 @@ try {
   await dialog.waitFor({ state: 'visible', timeout: 60_000 })
   await dialog.getByRole('button', { name: /取消连接|Cancel connection/u }).waitFor({ state: 'visible', timeout: 30_000 })
   await page.getByText(/^(?:API 密钥无效|Invalid API key|AUTH)$/u).first().waitFor({ state: 'visible', timeout: 30_000 })
-  await dialog.getByText(/暂未登录|Not signed in/u).waitFor({ state: 'visible', timeout: 30_000 })
+  await dialog.getByText(/登录聚合模型中转（bai）|Sign in to Multi-Model Relay \(bai\)|暂未登录|Not signed in/u).waitFor({ state: 'visible', timeout: 30_000 })
   const rejectedCalls = (await probe('metrics')).body
   assert.equal(rejectedCalls.inferenceRequests, 2, 'the prompt and official first-prompt title both use locally simulated HTTP 401, no real provider traffic')
   assert.equal(rejectedCalls.logicalCalls.length, 2, 'exactly two SDK calls must reach the simulated provider')

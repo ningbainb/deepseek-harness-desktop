@@ -53,6 +53,16 @@ test('ReleaseGuideStore claims only once per version, handles concurrency, and t
     assert.equal(await new ReleaseGuideStore({ path }).claim(RELEASE_GUIDE_VERSION), true)
     assert.equal(await new ReleaseGuideStore({ path }).claim(RELEASE_GUIDE_VERSION), false)
     assert.deepEqual(JSON.parse(await readFile(path, 'utf8')).shownVersions, ['5.3.0', RELEASE_GUIDE_VERSION])
+
+    // Simulate pre-seeded star-prompt profile without pending release-guide claim, then explicit markPending().
+    const suppressedPath = join(directory, 'suppressed.json')
+    const suppressedStore = new ReleaseGuideStore({ path: suppressedPath })
+    assert.equal(await suppressedStore.claim(RELEASE_GUIDE_VERSION, { suppressIfUnmarked: true }), false)
+    assert.equal(await suppressedStore.markPending(RELEASE_GUIDE_VERSION), true)
+    assert.equal(await suppressedStore.claim(RELEASE_GUIDE_VERSION, { suppressIfUnmarked: true }), true)
+    assert.equal(await suppressedStore.claim(RELEASE_GUIDE_VERSION, { suppressIfUnmarked: true }), false)
+    const finalSuppressedState = JSON.parse(await readFile(suppressedPath, 'utf8'))
+    assert.deepEqual(finalSuppressedState, { schemaVersion: 1, shownVersions: [RELEASE_GUIDE_VERSION] })
   } finally {
     await rm(directory, { recursive: true, force: true })
   }

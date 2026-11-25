@@ -1426,6 +1426,18 @@ form, .skill-actions, .migration-card, .recovery-primary, .environment-repair { 
   border-top: 0;
   border-left: 1px solid var(--harness-border);
 }
+@media (max-height: 720px) {
+  .settings-sidebar { padding: 6px 12px 6px; }
+  .settings-sidebar header { padding: 0 10px 4px; }
+  .settings-sidebar .dock-search { margin-bottom: 4px; }
+  .settings-sidebar .dock-search input { height: 26px; min-height: 26px; padding: 0 10px; }
+  .settings-sidebar > nav:not(.page-tabs) { gap: 1px; }
+  .settings-sidebar > nav:not(.page-tabs) button.tab { height: 26px; min-height: 26px; padding-block: 2px; }
+  .settings-sidebar nav.page-tabs { gap: 1px; margin: 5px 0 2px; padding-top: 5px; }
+  .settings-sidebar nav.page-tabs button { height: 24px; min-height: 24px; font-size: 12px; }
+  .settings-sidebar nav.page-tabs.page-sub-tabs { margin: 1px 0 0 12px; padding: 1px 0 1px 10px; }
+  .settings-sidebar nav.page-tabs.page-sub-tabs button { height: 23px; min-height: 23px; }
+}
 .desktop-storage-locations { padding: 10px 12px; font-size: 12px; }
 .desktop-storage-locations dd { margin: 3px 0 10px; overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
 .desktop-storage-locations dt { font-weight: 600; }

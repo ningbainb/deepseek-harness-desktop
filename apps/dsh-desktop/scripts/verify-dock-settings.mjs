@@ -326,7 +326,7 @@ try {
       assert.equal(await dock.locator('.settings-sidebar').isVisible(), true)
       assert.deepEqual(await relayWindow.evaluate(window => window.getBounds()), beforeCollapse, 'relay collapse never changes window geometry')
       await relay.getByRole('button', { name: '展开中转设置', exact: true }).click()
-      await relay.getByRole('button', { name: '登录或注册，自动连接 bai', exact: true }).click()
+      await relay.getByRole('button', { name: '一键浏览器登录并解锁模型', exact: true }).click()
       await relay.getByRole('button', { name: '在浏览器继续', exact: true }).waitFor()
       for (let attempt = 0; attempt < 40 && !await app.evaluate(() => globalThis.dockExternalUrl); attempt++) await new Promise(resolve => setTimeout(resolve, 100))
       const externalUrl = await app.evaluate(() => globalThis.dockExternalUrl)

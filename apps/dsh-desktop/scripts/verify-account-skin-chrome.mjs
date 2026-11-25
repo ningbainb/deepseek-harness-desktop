@@ -120,14 +120,14 @@ try {
   const officialDetail = menu.locator('[data-dsh-account-official]')
   assert.match(await officialDetail.innerText(), /(?:DeepSeek 官方直连|Connect directly to DeepSeek)/u)
   const recommended = menu.locator('[data-dsh-account-relay]')
-  assert.match(await recommended.innerText(), /(?:第三方模型供应商.*性价比|third-party model provider.*cost is a priority)/u)
+  assert.match(await recommended.innerText(), /(?:国内直连.*Claude \/ GPT|Direct access to Claude, GPT)/u)
   await page.screenshot({ path: join(temporary, 'account-menu-xp.png') })
   await app.evaluate(({ shell }) => {
     globalThis.baiAccountBrowserLinks = []
     shell.openExternal = async target => { globalThis.baiAccountBrowserLinks.push(target) }
   })
   const windowsBeforeBai = app.windows().length
-  await recommended.getByRole('menuitem', { name: /^(?:bai 供应商登录|Sign in to bai)$/u }).click()
+  await recommended.getByRole('menuitem', { name: /^(?:登录聚合模型中转（bai）|Sign in to Relay \(bai\))$/u }).click()
   const baiDialog = page.locator('[data-dsh-relay-access-root]').getByRole('dialog')
   const cancelBai = baiDialog.getByRole('button', { name: /^(?:取消连接|Cancel connection)$/u })
   await cancelBai.waitFor({ timeout: 30_000 })

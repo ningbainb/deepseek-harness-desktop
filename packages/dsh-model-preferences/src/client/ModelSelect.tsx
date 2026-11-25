@@ -336,7 +336,7 @@ export function ModelSelect(props: ModelSelectProps) {
                         className={styles.option}
                         onClick={() => {
                           close()
-                          document.dispatchEvent(new CustomEvent('dsh-relay-sign-in-required', { detail: { source: 'model-picker', tier } }))
+                          document.dispatchEvent(new CustomEvent('dsh-relay-sign-in-required', { detail: { source: 'model-picker', tier, autoConnect: false } }))
                         }}
                       >
                         <span className={styles.optionCopy}>

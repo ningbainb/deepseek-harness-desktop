@@ -260,26 +260,29 @@
 
 .firstRunBackdrop {
   position: fixed;
-  inset: 0;
-  z-index: 2147482900;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgb(0 0 0 / 45%);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  box-sizing: border-box;
+  pointer-events: none;
 }
 .firstRunDialog {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   box-sizing: border-box;
-  width: min(780px, 100%);
-  max-height: calc(100vh - 40px);
+  width: min(720px, 100%);
+  max-width: 100%;
+  max-height: 100%;
   overflow: auto;
-  padding: 24px;
+  padding: 18px 20px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 16px;
   background: var(--dsw-alias-bg-layer-1, #ffffff);
   color: var(--dsw-alias-label-primary);
-  box-shadow: 0 18px 48px rgb(0 0 0 / 24%);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 10%);
+  pointer-events: auto;
 }
 .firstRunHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .firstRunHeader h2 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.4; }

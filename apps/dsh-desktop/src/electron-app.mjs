@@ -1272,8 +1272,20 @@ export async function startElectronApp(metadata) {
     await logStore.append(`[plugins] revoked legacy full-user trust count=${revokedCount}`).catch(() => {})
     return true
   }
-  const starPromptStore = new StarPromptStore({ path: join(userData, 'star-prompt-state.json') })
+  const starPromptStatePath = join(userData, 'star-prompt-state.json')
+  const starPromptStore = new StarPromptStore({ path: starPromptStatePath })
   const releaseGuideStore = new ReleaseGuideStore({ path: join(userData, 'release-guide-state.json') })
+  let starPromptPreSeededForCurrentRelease = false
+  try {
+    const parsedStarState = JSON.parse(await readFile(starPromptStatePath, 'utf8'))
+    starPromptPreSeededForCurrentRelease = Array.isArray(parsedStarState?.shownVersions)
+      && parsedStarState.shownVersions.includes(STAR_PROMPT_VERSION)
+  } catch (error) {
+    if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) {
+      await logStore.append(`[star-prompt] failed to inspect pre-seeded state: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  let starPromptClaimedThisSession = false
   const closePreferencesStore = new DesktopClosePreferencesStore(desktopPreferencesPath)
   const updateChannelStore = new DesktopUpdateChannelStore(updateChannelPreferencesPath)
   let closeBehavior = (await closePreferencesStore.load()).closeBehavior
@@ -2194,7 +2206,12 @@ export async function startElectronApp(metadata) {
     },
     claimStarPrompt: async () => {
       try {
-        return await starPromptStore.claim(STAR_PROMPT_VERSION)
+        const claimed = await starPromptStore.claim(STAR_PROMPT_VERSION)
+        if (claimed) {
+          starPromptClaimedThisSession = true
+          await releaseGuideStore.markPending(RELEASE_GUIDE_VERSION).catch(() => {})
+        }
+        return claimed
       } catch (error) {
         await logStore.append(`[star-prompt] failed to persist display state: ${error instanceof Error ? error.message : String(error)}`)
         return false
@@ -2202,7 +2219,10 @@ export async function startElectronApp(metadata) {
     },
     claimReleaseGuide: async () => {
       try {
-        return await releaseGuideStore.claim(RELEASE_GUIDE_VERSION)
+        if (starPromptClaimedThisSession) return false
+        return await releaseGuideStore.claim(RELEASE_GUIDE_VERSION, {
+          suppressIfUnmarked: starPromptPreSeededForCurrentRelease,
+        })
       } catch (error) {
         await logStore.append(`[release-guide] failed to persist display state: ${error instanceof Error ? error.message : String(error)}`)
         return false
