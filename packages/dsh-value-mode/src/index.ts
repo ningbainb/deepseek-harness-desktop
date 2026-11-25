@@ -64,11 +64,15 @@ type DefaultModelService = {
   currentSelection?: () => DefaultModelSelection
 }
 
+const VALUE_MODE_RESTRICTED_PROVIDERS = new Set(['antigravity-cli'])
+
 function readDefaultExpert(ctx: Context): DefaultModelSelection | undefined {
   const service = (ctx as unknown as { agentDefaultModel?: DefaultModelService }).agentDefaultModel
   try {
     const selection = service?.currentSelection?.()
-    return isCompleteModelRoute(selection) ? { ...selection } : undefined
+    if (!isCompleteModelRoute(selection)) return undefined
+    if (VALUE_MODE_RESTRICTED_PROVIDERS.has(selection.provider.trim())) return undefined
+    return { ...selection }
   } catch {
     return undefined
   }
@@ -190,7 +194,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
     }
 
     const route = isSubagent ? effectiveConfig.executor : effectiveConfig.expert
-    if (!isCompleteModelRoute(route)) {
+    if (!isCompleteModelRoute(route) || VALUE_MODE_RESTRICTED_PROVIDERS.has(route.provider.trim())) {
       return resolved
     }
 

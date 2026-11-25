@@ -1000,11 +1000,14 @@ const inject = [
 function bundledPresetsRoot() {
 	return fileURLToPath(new URL("../presets/", import.meta.url));
 }
+const VALUE_MODE_RESTRICTED_PROVIDERS = /* @__PURE__ */ new Set(["antigravity-cli"]);
 function readDefaultExpert(ctx) {
 	const service = ctx.agentDefaultModel;
 	try {
 		const selection = service?.currentSelection?.();
-		return isCompleteModelRoute(selection) ? { ...selection } : void 0;
+		if (!isCompleteModelRoute(selection)) return void 0;
+		if (VALUE_MODE_RESTRICTED_PROVIDERS.has(selection.provider.trim())) return void 0;
+		return { ...selection };
 	} catch {
 		return;
 	}
@@ -1070,7 +1073,7 @@ function apply(ctx, initialConfig = {}) {
 		const isSubagent = payload.agent.session?.header?.origin === "subagent";
 		if (!isSubagent && valueModeState.getDepth(sessionId) > 0) return resolved;
 		const route = isSubagent ? effectiveConfig.executor : effectiveConfig.expert;
-		if (!isCompleteModelRoute(route)) return resolved;
+		if (!isCompleteModelRoute(route) || VALUE_MODE_RESTRICTED_PROVIDERS.has(route.provider.trim())) return resolved;
 		if (isSubagent) valueModeState.recordSubagentCall(sessionId);
 		else valueModeState.recordControllerCall(sessionId);
 		const key = requestKey(payload);

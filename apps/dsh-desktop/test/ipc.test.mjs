@@ -555,6 +555,12 @@ test('window action IPC returns a clone-safe acknowledgement instead of BrowserW
     channel: 'beta',
     noAutomaticDowngrade: true,
   })
+  assert.deepEqual(await handlers.get('desktop:update-download-route-get')({ sender }), { route: 'auto' })
+  assert.deepEqual(await handlers.get('desktop:update-download-route-set')({ sender }, 'cdn'), { route: 'cdn' })
+  await assert.rejects(
+    handlers.get('desktop:update-download-route-set')({ sender }, 'proxy'),
+    (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,
+  )
   await assert.rejects(
     handlers.get('desktop:update-channel-set')({ sender }, 'nightly'),
     (error) => error.code === DESKTOP_ERROR_CODES.INVALID_ARGUMENT,

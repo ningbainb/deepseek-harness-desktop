@@ -7,7 +7,7 @@ import type { GenerateOptions } from '@deepseek-ai/dsh-llm/types'
 import { describe, expect, it } from 'vitest'
 import { AntigravityAdapter, providerId, registerProvider } from '../src/provider.ts'
 import { CliRunner, findCli, parseModels } from '../src/core/cli-runner.ts'
-import type { Diagnostic } from '../src/config.ts'
+import { defaults, type Diagnostic } from '../src/config.ts'
 import { ToolBridge } from '../src/core/tool-bridge.ts'
 
 const mock = fileURLToPath(new URL('./mock-agy.mjs', import.meta.url))
@@ -19,7 +19,7 @@ const options: GenerateOptions = {
 }
 const runner = () => new CliRunner(spawnMock)
 const config = { enabled: true, cliPath: process.execPath, transport: 'stream-json' as const,
-  effort: 'auto' as const, timeoutSeconds: 5, extraModels: '' }
+  authMode: 'gemini-api-key' as const, effort: 'auto' as const, timeoutSeconds: 5, extraModels: '' }
 const collect = async (adapter: Pick<AntigravityAdapter, 'stream'>, request = options) =>
   Array.fromAsync(adapter.stream(request))
 
@@ -48,7 +48,7 @@ describe('Antigravity CLI provider', () => {
 
   for (const transport of ['stream-json', 'acp'] as const) {
     it(`streams reasoning and text through ${transport}`, async () => {
-      const adapter = new AntigravityAdapter(runner(), () => ({ ...config, transport }))
+      const adapter = new AntigravityAdapter(runner(), () => ({ ...config, transport }), undefined, () => true)
       expect(await collect(adapter)).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'reasoning-delta', text: 'thinking' }),
         expect.objectContaining({ type: 'text-delta', text: 'hello back' }),
@@ -58,7 +58,7 @@ describe('Antigravity CLI provider', () => {
   }
 
   it.each(['stream-json', 'acp'] as const)('refuses a native tool event in %s', async transport => {
-    const adapter = new AntigravityAdapter(runner(), () => ({ ...config, transport }))
+    const adapter = new AntigravityAdapter(runner(), () => ({ ...config, transport }), undefined, () => true)
     const chunks = await collect(adapter, { ...options,
       messages: [{ role: 'user', content: [{ type: 'text', text: 'attempt-native-tool' }] }],
     })
@@ -68,7 +68,7 @@ describe('Antigravity CLI provider', () => {
   })
 
   it('returns declared calls as DSH blocks and preserves their arguments', async () => {
-    const adapter = new AntigravityAdapter(runner(), () => config)
+    const adapter = new AntigravityAdapter(runner(), () => config, undefined, () => true)
     const chunks = await collect(adapter, { ...options, tools: [
       { name: 'lookup', description: 'Find an entry', parameters: { type: 'object' } },
     ] })
@@ -95,7 +95,7 @@ describe('Antigravity CLI provider', () => {
     const delayed = Promise.withResolvers<Diagnostic>()
     cli.probe = () => delayed.promise
     const changed = Promise.withResolvers<void>()
-    const adapter = new AntigravityAdapter(cli, () => config, changed.resolve)
+    const adapter = new AntigravityAdapter(cli, () => config, changed.resolve, () => true)
     const listed = adapter.listModels(providerId)
     try {
       expect(await Promise.race([listed, new Promise(resolve => setTimeout(() => resolve('blocked'), 100))])).toEqual([])
@@ -121,7 +121,7 @@ describe('Antigravity CLI provider', () => {
   it('terminates a subprocess that exceeds its timeout', async () => {
     const wait = ((_: string, args: string[], settings: object) =>
       spawnMock(_, ['wait', ...args], settings)) as typeof spawn
-    const adapter = new AntigravityAdapter(new CliRunner(wait), () => ({ ...config, timeoutSeconds: 0.1 }))
+    const adapter = new AntigravityAdapter(new CliRunner(wait), () => ({ ...config, timeoutSeconds: 0.1 }), undefined, () => true)
     expect((await collect(adapter)).at(-1)).toMatchObject({ type: 'finish', reason: {
       kind: 'error', failure: { message: 'Antigravity CLI request timed out.' },
     } })
@@ -136,7 +136,7 @@ describe('Antigravity CLI provider', () => {
       controller.abort()
       return process
     }) as typeof spawn
-    const adapter = new AntigravityAdapter(new CliRunner(spawnWaiting), () => config)
+    const adapter = new AntigravityAdapter(new CliRunner(spawnWaiting), () => config, undefined, () => true)
     const chunks = await collect(adapter, { ...options, signal: controller.signal })
     expect(exited).toBeDefined()
     await exited
@@ -146,7 +146,7 @@ describe('Antigravity CLI provider', () => {
   it('exposes the route, model catalog and stream through LlmRuntime', async () => {
     const ctx = new Context()
     const runtime = new LlmRuntime(ctx)
-    const adapter = new AntigravityAdapter(runner(), () => ({ ...config, extraModels: 'gemini-local' }))
+    const adapter = new AntigravityAdapter(runner(), () => ({ ...config, extraModels: 'gemini-local' }), undefined, () => true)
     const registration = registerProvider(runtime, adapter)
     try {
       expect(runtime.listProviders()).toContainEqual({ id: providerId, name: 'Antigravity CLI (Gemini)' })
@@ -155,5 +155,36 @@ describe('Antigravity CLI provider', () => {
       expect((await runtime.listModels(providerId)).map(model => model.id)).toEqual(['gemini-test', 'gemini-local'])
       expect((await collect(runtime)).at(-1)).toEqual({ type: 'finish', reason: { kind: 'stop' } })
     } finally { registration() }
+  })
+
+  it('defaults to disabled OAuth over ACP and blocks all unverified harness credentials', async () => {
+    expect(defaults.enabled).toBe(false)
+    expect(defaults.authMode).toBe('oauth-personal')
+    expect(defaults.transport).toBe('acp')
+
+    for (const authMode of ['oauth-personal', 'oauth-business', 'gemini-api-key', 'agent-platform'] as const) {
+      let spawned = false
+      const trackingSpawn = ((...args: Parameters<typeof spawnMock>) => {
+        spawned = true
+        return spawnMock(...args)
+      }) as typeof spawn
+      const adapter = new AntigravityAdapter(new CliRunner(trackingSpawn), () => ({ ...config, authMode }))
+      expect(await adapter.listModels(providerId)).toEqual([])
+      const status = await adapter.status()
+      expect(status).toMatchObject({ state: 'ready', authMode, harnessLlmAllowed: false })
+
+      spawned = false
+      const chunks = await collect(adapter)
+      expect(spawned).toBe(false)
+      expect(chunks).toEqual([
+        expect.objectContaining({
+          type: 'finish',
+          reason: {
+            kind: 'error',
+            failure: expect.objectContaining({ message: expect.stringContaining('Terms Section 6') }),
+          },
+        }),
+      ])
+    }
   })
 })

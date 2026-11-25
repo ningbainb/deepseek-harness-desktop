@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import z from '@deepseek-ai/schemastery'
-import { defaults, efforts, namespace, statusPath, type Settings } from './config.ts'
+import { authModes, defaults, efforts, namespace, statusPath, type Settings } from './config.ts'
 import { CliRunner } from './core/cli-runner.ts'
 import { AntigravityAdapter, providerId, registerProvider } from './provider.ts'
 
@@ -13,6 +13,7 @@ export const Config = z.object({
   enabled: z.boolean().default(defaults.enabled).volatile(),
   cliPath: z.string().max(4096).default(defaults.cliPath).volatile(),
   transport: z.union(['stream-json', 'acp']).default(defaults.transport).volatile(),
+  authMode: z.union([...authModes]).default(defaults.authMode).volatile(),
   effort: z.union(['auto', ...efforts]).default(defaults.effort).volatile(),
   timeoutSeconds: z.number().step(1).min(1).max(1800).default(defaults.timeoutSeconds).volatile(),
   extraModels: z.string().max(8192).default(defaults.extraModels).volatile(),

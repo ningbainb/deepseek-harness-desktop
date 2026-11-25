@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import vm from 'node:vm'
 
 import {
   applyStarPromptSurface,
@@ -18,6 +19,7 @@ import QRCode from 'qrcode'
 
 test('star prompt is accessible, animated, dependency-free, and honest about its action', async () => {
   const script = createStarPromptSurfaceScript()
+  new vm.Script(script)
   const desktopVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version
   assert.equal(STAR_PROMPT_VERSION, desktopVersion, 'the once-per-release prompt must follow the Desktop version')
   assert.ok(script.includes(`${STAR_PROMPT_VERSION} · 社区支持`))

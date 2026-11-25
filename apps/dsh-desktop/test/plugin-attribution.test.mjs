@@ -22,6 +22,9 @@ const CONFIRMED_NINGBAINB_MANIFESTS = [
   'packages/dsh-particle-theme/package.json',
   'packages/dsh-mode-switcher/package.json',
   'packages/dsh-liangshen/package.json',
+  'packages/dsh-web-ui-settings/package.json',
+  'packages/dsh-remote-web-ui/package.json',
+  'packages/dsh-llm-antigravity/package.json',
   'apps/dsh-desktop/package.json',
 ]
 

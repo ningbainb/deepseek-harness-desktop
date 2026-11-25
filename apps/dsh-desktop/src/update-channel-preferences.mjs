@@ -6,8 +6,15 @@ import {
   UPDATE_CHANNELS,
   normalizeUpdateChannel,
 } from './release-channel.mjs'
+import {
+  DEFAULT_UPDATE_DOWNLOAD_ROUTE,
+  UPDATE_DOWNLOAD_ROUTES,
+  assertUpdateDownloadRoute,
+  normalizeUpdateDownloadRoute,
+} from './update-mirrors.mjs'
 
 const UPDATE_CHANNEL_SET = new Set(UPDATE_CHANNELS)
+const UPDATE_DOWNLOAD_ROUTE_SET = new Set(UPDATE_DOWNLOAD_ROUTES)
 
 /** Return the conservative Stable default for absent or malformed Desktop state. */
 export function normalizeUpdateChannelPreference(input) {
@@ -92,12 +99,50 @@ export class DesktopUpdateChannelStore {
     return (await this.loadState()).channel
   }
 
+  async loadDownloadRoute() {
+    try {
+      const raw = JSON.parse(await readFile(this.path, 'utf8'))
+      return normalizeUpdateDownloadRoute(raw?.downloadRoute, DEFAULT_UPDATE_DOWNLOAD_ROUTE)
+    } catch {
+      return DEFAULT_UPDATE_DOWNLOAD_ROUTE
+    }
+  }
+
+  async #readExistingRaw() {
+    try {
+      const raw = JSON.parse(await readFile(this.path, 'utf8'))
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+    } catch {
+      return {}
+    }
+  }
+
   save(channel) {
     const normalized = assertUpdateChannel(channel)
-    const operation = this.writeQueue.then(() => atomicWrite(
-      this.path,
-      `${JSON.stringify({ schemaVersion: 1, channel: normalized }, null, 2)}\n`,
-    ))
+    const operation = this.writeQueue.then(async () => {
+      const existing = await this.#readExistingRaw()
+      const route = typeof existing.downloadRoute === 'string' && UPDATE_DOWNLOAD_ROUTE_SET.has(existing.downloadRoute.trim().toLowerCase())
+        ? existing.downloadRoute.trim().toLowerCase()
+        : undefined
+      await atomicWrite(
+        this.path,
+        `${JSON.stringify({ schemaVersion: 1, channel: normalized, ...(route ? { downloadRoute: route } : {}) }, null, 2)}\n`,
+      )
+    })
+    this.writeQueue = operation.catch(() => {})
+    return operation.then(() => normalized)
+  }
+
+  saveDownloadRoute(route) {
+    const normalized = assertUpdateDownloadRoute(route)
+    const operation = this.writeQueue.then(async () => {
+      const existing = await this.#readExistingRaw()
+      const channel = normalizeUpdateChannelPreference(existing).channel
+      await atomicWrite(
+        this.path,
+        `${JSON.stringify({ schemaVersion: 1, channel, downloadRoute: normalized }, null, 2)}\n`,
+      )
+    })
     this.writeQueue = operation.catch(() => {})
     return operation.then(() => normalized)
   }

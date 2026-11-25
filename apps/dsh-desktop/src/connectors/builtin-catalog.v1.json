@@ -1,0 +1,719 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026.11.25-1",
+  "updatedAt": "2026-11-25T12:00:00.000Z",
+  "connectors": [
+    {
+      "id": "feishu",
+      "name": {
+        "zh": "飞书",
+        "en": "Feishu / Lark"
+      },
+      "summary": {
+        "zh": "读写飞书文档、多维表格、日历、任务、邮件与会话消息，附带官方 Agent Skills。",
+        "en": "Read and write Feishu docs, Bitable, calendar, tasks, mail, and messages with official Agent Skills."
+      },
+      "category": "office-suite",
+      "icon": "feishu",
+      "color": "#3370ff",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "repo": "https://github.com/larksuite/cli",
+        "docs": "https://github.com/larksuite/cli#readme",
+        "openPlatform": "https://open.feishu.cn/"
+      },
+      "drivers": [
+        {
+          "kind": "cli",
+          "id": "feishu-cli",
+          "binary": "lark-cli",
+          "installSource": {
+            "kind": "npm",
+            "package": "@larksuite/cli"
+          },
+          "versionArgs": ["--version"],
+          "skillsSource": {
+            "kind": "repo-path",
+            "repo": "larksuite/cli",
+            "path": "skills"
+          }
+        },
+        {
+          "kind": "mcp-stdio",
+          "id": "feishu-openapi-mcp",
+          "command": "npx",
+          "args": ["-y", "@larksuiteoapi/lark-mcp"],
+          "installSource": {
+            "kind": "npm",
+            "package": "@larksuiteoapi/lark-mcp"
+          },
+          "toolLoading": "on-demand"
+        }
+      ],
+      "auth": {
+        "mode": "cli-native",
+        "manualUrl": "https://open.feishu.cn/app",
+        "cliLoginCommand": ["lark-cli", "auth", "login"],
+        "requiresEnterpriseAdmin": false,
+        "guideSteps": {
+          "zh": [
+            "点击安装飞书官方 CLI（lark-cli）并同步官方办公 Skills。",
+            "如需操作自建企业应用权限，请在飞书开放平台创建应用并开通对应文档或消息权限。",
+            "通过官方登录命令完成个人或企业账号授权，凭证将安全保存在系统钥匙串中。"
+          ],
+          "en": [
+            "Install the official Feishu CLI (lark-cli) and register its bundled Agent Skills.",
+            "For custom app scopes, create an app on the Feishu Open Platform and grant doc or message permissions.",
+            "Complete the native login command so credentials stay inside your OS keychain."
+          ]
+        }
+      },
+      "healthCheck": {
+        "kind": "cli-command",
+        "args": ["--version"],
+        "timeoutMs": 10000
+      },
+      "riskRules": [
+        { "actionPattern": "docs.read|search|calendar.list", "level": "L0", "label": { "zh": "搜索与读取文档和日程", "en": "Search and read docs or calendar" } },
+        { "actionPattern": "docs.create|task.create", "level": "L1", "label": { "zh": "新建草稿与个人待办", "en": "Create drafts or personal tasks" } },
+        { "actionPattern": "calendar.update|docs.delete|base.batch", "level": "L2", "label": { "zh": "修改日程或批量更新表格", "en": "Modify calendar events or batch table writes" } },
+        { "actionPattern": "im.send|mail.send|drive.share", "level": "L3", "label": { "zh": "发送飞书消息或对外分享文档", "en": "Send Feishu messages or share external links" } }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "整理今日会议纪要", "en": "Summarize today's meeting notes" },
+          "prompt": { "zh": "帮我查找今天飞书里的会议纪要文档，整理成待办清单发我确认。", "en": "Find today's meeting notes in Feishu and draft an action-item checklist for review." }
+        },
+        {
+          "title": { "zh": "同步多维表格进展", "en": "Summarize Bitable project updates" },
+          "prompt": { "zh": "读取飞书多维表格中本周到期的高优先级任务并汇总延期风险。", "en": "Read high-priority tasks due this week from Feishu Bitable and summarize risks." }
+        }
+      ],
+      "troubleshooting": [
+        {
+          "code": "FEISHU_AUTH_REQUIRED",
+          "matchPattern": "not logged in|unauthorized|login required",
+          "cause": { "zh": "飞书登录态已过期或尚未完成授权。", "en": "Feishu CLI session has expired or is not signed in." },
+          "fix": { "zh": "点击连接向导中的「重新授权」并按提示完成飞书扫码登录。", "en": "Click Re-authorize in the connector wizard and sign in to Feishu." }
+        }
+      ]
+    },
+    {
+      "id": "tencent-docs",
+      "name": {
+        "zh": "腾讯文档",
+        "en": "Tencent Docs"
+      },
+      "summary": {
+        "zh": "通过官方远程 MCP 检索、阅读、编辑腾讯文档与智能表格，零本地程序安装。",
+        "en": "Search, read, and edit Tencent Docs and Smart Sheets via official remote MCP with zero local install."
+      },
+      "category": "meeting-docs",
+      "icon": "tencent-docs",
+      "color": "#0052d9",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "docs": "https://docs.qq.com/open/document/mcp/",
+        "openPlatform": "https://docs.qq.com/open/auth/mcp.html"
+      },
+      "drivers": [
+        {
+          "kind": "mcp-remote",
+          "id": "tencent-docs-mcp",
+          "url": "https://mcp.docs.qq.com/mcp",
+          "remoteTransport": "streamable-http",
+          "toolLoading": "on-demand",
+          "headersTemplate": {
+            "Authorization": "Bearer ${credential:connector/tencent-docs/default/token}"
+          },
+          "allowedTools": [
+            "smartcanvas.read",
+            "smartcanvas.edit",
+            "smartcanvas.find",
+            "manage.create_file",
+            "manage.export_file",
+            "manage.search_file",
+            "manage.folder_list",
+            "manage.set_privilege"
+          ]
+        }
+      ],
+      "auth": {
+        "mode": "personal-token",
+        "quickAuthUrl": "https://docs.qq.com/open/auth/mcp.html",
+        "manualUrl": "https://docs.qq.com/open/document/mcp/",
+        "guideSteps": {
+          "zh": [
+            "点击打开腾讯文档官方 MCP 授权页并登录您的账号。",
+            "生成并复制个人访问 Token（仅需复制一次）。",
+            "将 Token 粘贴到下方输入框并点击验证连接，凭证将使用系统安全加密保存。"
+          ],
+          "en": [
+            "Open the official Tencent Docs MCP authorization page and sign in.",
+            "Generate and copy your personal access token.",
+            "Paste the token below and verify the connection. Credentials are encrypted by your OS."
+          ]
+        },
+        "fields": [
+          {
+            "key": "token",
+            "label": { "zh": "MCP 访问令牌", "en": "MCP Access Token" },
+            "fieldType": "password",
+            "required": true,
+            "secret": true
+          }
+        ]
+      },
+      "healthCheck": {
+        "kind": "mcp-probe",
+        "timeoutMs": 10000
+      },
+      "riskRules": [
+        { "actionPattern": "read|find|search|folder_list", "level": "L0", "label": { "zh": "检索与读取云文档", "en": "Search and read documents" } },
+        { "actionPattern": "create_file|edit", "level": "L1", "label": { "zh": "创建或写入文档内容", "en": "Create or edit documents" } },
+        { "actionPattern": "set_privilege", "level": "L3", "label": { "zh": "变更文档外部权限与分享", "en": "Change document sharing privileges" } }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "生成并保存工作周报", "en": "Save weekly status report" },
+          "prompt": { "zh": "根据我提供的本周要点，在腾讯文档新建一份工作周报并整理好排版。", "en": "Create a formatted weekly status report in Tencent Docs from my key bullet points." }
+        }
+      ],
+      "troubleshooting": [
+        {
+          "code": "TENCENT_DOCS_UNAUTHORIZED",
+          "matchPattern": "401|invalid token|expired",
+          "cause": { "zh": "腾讯文档 MCP Token 无效或已失效。", "en": "Tencent Docs MCP token is invalid or expired." },
+          "fix": { "zh": "重新访问腾讯文档 MCP 授权页生成新 Token 并更新保存。", "en": "Generate a fresh token on the Tencent Docs MCP auth page and update it." }
+        }
+      ]
+    },
+    {
+      "id": "yuque",
+      "name": {
+        "zh": "语雀",
+        "en": "Yuque"
+      },
+      "summary": {
+        "zh": "通过官方本地 MCP Server 检索与读写语雀知识库、文档，支持个人与团队空间。",
+        "en": "Search, read, and write Yuque knowledge bases and docs via the official stdio MCP server."
+      },
+      "category": "knowledge-notes",
+      "icon": "yuque",
+      "color": "#22ab28",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "repo": "https://github.com/yuque/yuque-mcp-server",
+        "docs": "https://github.com/yuque/yuque-mcp-server#readme",
+        "openPlatform": "https://www.yuque.com/settings/tokens"
+      },
+      "drivers": [
+        {
+          "kind": "mcp-stdio",
+          "id": "yuque-mcp-stdio",
+          "command": "yuque-mcp",
+          "args": [],
+          "installSource": {
+            "kind": "npm",
+            "package": "yuque-mcp"
+          },
+          "envTemplate": {
+            "YUQUE_TOKEN": "${credential:connector/yuque/default/token}",
+            "YUQUE_BASE_URL": "${credential:connector/yuque/default/host}"
+          },
+          "toolLoading": "on-demand"
+        }
+      ],
+      "auth": {
+        "mode": "personal-token",
+        "quickAuthUrl": "https://www.yuque.com/settings/tokens",
+        "guideSteps": {
+          "zh": [
+            "打开语雀「开发者设置 -> 个人令牌」页面并新建一个 Token，按需勾选文档读写权限。",
+            "如果使用企业/团队空间，请同时填写空间域名（如 https://team.yuque.com），个人空间可留空。",
+            "保存配置并测试连接，DSH 将自动按需启动官方语雀 MCP。"
+          ],
+          "en": [
+            "Create a personal access token in Yuque Developer Settings.",
+            "Optionally provide your team space host URL (leave blank for personal spaces).",
+            "Save and verify; DSH manages the official Yuque stdio MCP process on demand."
+          ]
+        },
+        "fields": [
+          {
+            "key": "token",
+            "label": { "zh": "语雀个人令牌 (Token)", "en": "Yuque Personal Token" },
+            "fieldType": "password",
+            "required": true,
+            "secret": true
+          },
+          {
+            "key": "host",
+            "label": { "zh": "团队空间域名（可选）", "en": "Team Space Host (optional)" },
+            "fieldType": "url",
+            "required": false,
+            "secret": false,
+            "placeholder": { "zh": "https://your-space.yuque.com", "en": "https://your-space.yuque.com" }
+          }
+        ]
+      },
+      "healthCheck": {
+        "kind": "mcp-probe",
+        "timeoutMs": 12000
+      },
+      "riskRules": [
+        { "actionPattern": "search|get|list", "level": "L0", "label": { "zh": "检索知识库与文档", "en": "Search books and read documents" } },
+        { "actionPattern": "create|update", "level": "L1", "label": { "zh": "新建或更新知识库文档", "en": "Create or update documents" } },
+        { "actionPattern": "delete", "level": "L2", "label": { "zh": "删除知识库文档", "en": "Delete documents" } }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "整理语雀调研汇总", "en": "Summarize research from Yuque" },
+          "prompt": { "zh": "在我的语雀知识库中搜索近期的技术调研文档，输出一份一页纸摘要。", "en": "Search my Yuque knowledge base for recent research docs and produce a one-page summary." }
+        }
+      ],
+      "troubleshooting": [
+        {
+          "code": "YUQUE_TOKEN_INVALID",
+          "matchPattern": "401|Unauthorized|invalid token",
+          "cause": { "zh": "语雀 Token 无效或缺少对应知识库权限。", "en": "Yuque token is invalid or lacks permission for the target book." },
+          "fix": { "zh": "检查令牌权限范围与团队空间域名是否匹配。", "en": "Verify token scopes and confirm the optional team host URL." }
+        }
+      ]
+    },
+    {
+      "id": "kdocs",
+      "name": {
+        "zh": "金山文档",
+        "en": "Kingsoft Docs (KDocs)"
+      },
+      "summary": {
+        "zh": "通过金山文档官方 Skill 新建、编辑、搜索与整理云文档。",
+        "en": "Create, edit, search, and organize WPS Cloud Docs via the official KDocs Agent Skill."
+      },
+      "category": "meeting-docs",
+      "icon": "kdocs",
+      "color": "#e53935",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "repo": "https://github.com/kdocs-app/kdocs-skill",
+        "docs": "https://github.com/kdocs-app/kdocs-skill#readme"
+      },
+      "drivers": [
+        {
+          "kind": "skill",
+          "id": "kdocs-official-skill",
+          "skillName": "kdocs-skill",
+          "source": {
+            "kind": "github-repo",
+            "ref": "kdocs-app/kdocs-skill"
+          }
+        }
+      ],
+      "auth": {
+        "mode": "personal-token",
+        "manualUrl": "https://github.com/kdocs-app/kdocs-skill",
+        "guideSteps": {
+          "zh": [
+            "点击安装并启用金山文档官方 Skill。",
+            "按官方 Skill 引导完成金山文档账号授权与令牌配置。",
+            "验证后即可直接在工作模式中检索或生成云文档内容。"
+          ],
+          "en": [
+            "Install and enable the official KDocs Skill.",
+            "Follow the official KDocs auth setup guide to obtain your token.",
+            "Verify status and start querying or creating cloud docs in Work Mode."
+          ]
+        },
+        "fields": [
+          {
+            "key": "token",
+            "label": { "zh": "金山文档授权令牌", "en": "KDocs Token" },
+            "fieldType": "password",
+            "required": false,
+            "secret": true
+          }
+        ]
+      },
+      "healthCheck": {
+        "kind": "skill-present",
+        "timeoutMs": 5000
+      },
+      "riskRules": [
+        { "actionPattern": "search|read", "level": "L0" },
+        { "actionPattern": "create|edit", "level": "L1" },
+        { "actionPattern": "share", "level": "L3" }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "检索并汇总云文档", "en": "Summarize cloud spreadsheets" },
+          "prompt": { "zh": "查找我金山文档里最近的月度总结并提取关键数据指标。", "en": "Find recent monthly summary files in KDocs and extract key metrics." }
+        }
+      ],
+      "troubleshooting": []
+    },
+    {
+      "id": "wecom",
+      "name": {
+        "zh": "企业微信",
+        "en": "WeCom"
+      },
+      "summary": {
+        "zh": "通过官方 wecom-cli 操作企业微信文档、智能表格、待办、日程、会议、邮件与微盘。",
+        "en": "Manage WeCom docs, smart sheets, tasks, calendar, meetings, mail, and drive via the official wecom-cli."
+      },
+      "category": "office-suite",
+      "icon": "wecom",
+      "color": "#2f7bf6",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "repo": "https://github.com/WecomTeam/wecom-cli",
+        "docs": "https://work.weixin.qq.com/nl/index/aicli",
+        "openPlatform": "https://developer.work.weixin.qq.com/"
+      },
+      "drivers": [
+        {
+          "kind": "cli",
+          "id": "wecom-cli",
+          "binary": "wecom-cli",
+          "installSource": {
+            "kind": "npm",
+            "package": "@wecom/cli"
+          },
+          "versionArgs": ["--version"],
+          "skillsSource": {
+            "kind": "bundled-in-package"
+          }
+        }
+      ],
+      "auth": {
+        "mode": "cli-native",
+        "manualUrl": "https://open.work.weixin.qq.com/help2/pc/cat?doc_id=21677",
+        "cliLoginCommand": ["wecom-cli", "auth", "init"],
+        "requiresEnterpriseAdmin": true,
+        "guideSteps": {
+          "zh": [
+            "点击安装企业微信官方 CLI（@wecom/cli）。",
+            "完成企业微信账号登录；如需通过智能机器人发送通知，可按企业微信指引填写 Bot ID 与 Secret。",
+            "企业敏感数据权限需经企业微信管理员授权开通。"
+          ],
+          "en": [
+            "Install the official WeCom CLI (@wecom/cli).",
+            "Sign in with your WeCom account; optionally configure Bot ID and Secret for smart bot messaging.",
+            "Enterprise admin approval may be required depending on workspace policy."
+          ]
+        },
+        "fields": [
+          {
+            "key": "botId",
+            "label": { "zh": "智能机器人 Bot ID（可选）", "en": "Smart Bot ID (optional)" },
+            "fieldType": "text",
+            "required": false,
+            "secret": false
+          },
+          {
+            "key": "botSecret",
+            "label": { "zh": "智能机器人 Secret（可选）", "en": "Smart Bot Secret (optional)" },
+            "fieldType": "password",
+            "required": false,
+            "secret": true
+          }
+        ]
+      },
+      "healthCheck": {
+        "kind": "cli-command",
+        "args": ["--version"],
+        "timeoutMs": 10000
+      },
+      "riskRules": [
+        { "actionPattern": "doc.read|calendar.list|todo.list|wedrive.search", "level": "L0" },
+        { "actionPattern": "todo.create|doc.create", "level": "L1" },
+        { "actionPattern": "meeting.cancel|calendar.update|todo.delete", "level": "L2" },
+        { "actionPattern": "msg.send|mail.send", "level": "L3" }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "创建企业微信待办", "en": "Create WeCom follow-up tasks" },
+          "prompt": { "zh": "帮我在企业微信中为明天的版本评审创建一个待办并列出所需准备项。", "en": "Create a WeCom to-do item for tomorrow's release review with a checklist." }
+        }
+      ],
+      "troubleshooting": []
+    },
+    {
+      "id": "dingtalk",
+      "name": {
+        "zh": "钉钉",
+        "en": "DingTalk Workspace"
+      },
+      "summary": {
+        "zh": "通过官方钉钉 Workspace CLI（dws）操作通讯录、聊天、日程、待办、文档与多维表格。",
+        "en": "Operate DingTalk contacts, chats, calendar, tasks, docs, and AI tables via the official dws CLI."
+      },
+      "category": "office-suite",
+      "icon": "dingtalk",
+      "color": "#3296fa",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "repo": "https://github.com/DingTalk-Real-AI/dingtalk-workspace-cli",
+        "docs": "https://github.com/DingTalk-Real-AI/dingtalk-workspace-cli#getting-started",
+        "openPlatform": "https://open.dingtalk.com/"
+      },
+      "drivers": [
+        {
+          "kind": "cli",
+          "id": "dingtalk-dws-cli",
+          "binary": "dws",
+          "installSource": {
+            "kind": "github-release",
+            "repo": "DingTalk-Real-AI/dingtalk-workspace-cli",
+            "assetTemplates": {
+              "win32-x64": "dws-windows-amd64.zip",
+              "win32-arm64": "dws-windows-arm64.zip",
+              "darwin-arm64": "dws-darwin-arm64.tar.gz",
+              "darwin-x64": "dws-darwin-amd64.tar.gz",
+              "linux-x64": "dws-linux-amd64.tar.gz",
+              "linux-arm64": "dws-linux-arm64.tar.gz"
+            },
+            "checksumAsset": "checksums.txt"
+          },
+          "versionArgs": ["--version"],
+          "skillsSource": {
+            "kind": "release-asset",
+            "assetName": "dws-skills.zip",
+            "repo": "DingTalk-Real-AI/dingtalk-workspace-cli"
+          }
+        }
+      ],
+      "auth": {
+        "mode": "cli-native",
+        "manualUrl": "https://open-dev.dingtalk.com/fe/app#/corp/app",
+        "cliLoginCommand": ["dws", "auth", "login", "--device", "--no-browser"],
+        "requiresEnterpriseAdmin": true,
+        "guideSteps": {
+          "zh": [
+            "下载并校验官方钉钉 dws CLI 及配套 dws-skills 能力包。",
+            "运行官方登录授权；若所在企业开启了应用管控，请联系钉钉管理员审批开通权限。",
+            "如使用自建企业内部应用，可在下方高级选项填写 AppKey 与 AppSecret，留空则默认使用钉钉官方应用。"
+          ],
+          "en": [
+            "Download and verify the official DingTalk dws binary and dws-skills archive.",
+            "Authorize your DingTalk account; if your organization enforces app governance, request DingTalk admin approval.",
+            "Leave custom AppKey and AppSecret empty to use DingTalk's official client."
+          ]
+        },
+        "fields": [
+          {
+            "key": "clientId",
+            "label": { "zh": "自建应用 AppKey（可选）", "en": "Custom AppKey (optional)" },
+            "fieldType": "text",
+            "required": false,
+            "secret": false
+          },
+          {
+            "key": "clientSecret",
+            "label": { "zh": "自建应用 AppSecret（可选）", "en": "Custom AppSecret (optional)" },
+            "fieldType": "password",
+            "required": false,
+            "secret": true
+          }
+        ]
+      },
+      "healthCheck": {
+        "kind": "cli-command",
+        "args": ["--version"],
+        "timeoutMs": 10000
+      },
+      "riskRules": [
+        { "actionPattern": "read|search|list", "level": "L0" },
+        { "actionPattern": "todo.create|doc.create", "level": "L1" },
+        { "actionPattern": "calendar.update|delete", "level": "L2" },
+        { "actionPattern": "ding.send|chat.send", "level": "L3" }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "检索钉钉项目资料", "en": "Search DingTalk project docs" },
+          "prompt": { "zh": "查询钉钉中与当前季度目标相关的文档和日程安排并汇总重点。", "en": "Search DingTalk for quarterly goal documents and upcoming calendar items." }
+        }
+      ],
+      "troubleshooting": [
+        {
+          "code": "DINGTALK_ADMIN_APPROVAL_REQUIRED",
+          "matchPattern": "admin|approval|forbidden|scope denied",
+          "cause": { "zh": "当前钉钉组织尚未对您的账号开放相应企业应用权限。", "en": "Your DingTalk organization admin has not approved this app scope yet." },
+          "fix": { "zh": "请联系企业钉钉管理员在工作台管理后台批准授权后重试。", "en": "Ask your DingTalk organization administrator to approve the authorization." }
+        }
+      ]
+    },
+    {
+      "id": "tencent-meeting",
+      "name": {
+        "zh": "腾讯会议",
+        "en": "Tencent Meeting"
+      },
+      "summary": {
+        "zh": "基于腾讯会议开放平台 OAuth2 设备码授权，支持会议日程、云录制、逐字稿与智能纪要。",
+        "en": "Manage Tencent Meeting schedules, cloud recordings, transcripts, and AI summaries via official OAuth2 CLI."
+      },
+      "category": "meeting-docs",
+      "icon": "tencent-meeting",
+      "color": "#006eff",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "repo": "https://github.com/TencentCloud/tencentmeeting-cli",
+        "docs": "https://meeting.tencent.com/meeting-cli/index.html"
+      },
+      "drivers": [
+        {
+          "kind": "cli",
+          "id": "tencentmeeting-tmeet",
+          "binary": "tmeet",
+          "installSource": {
+            "kind": "npm",
+            "package": "@tencentcloud/tmeet"
+          },
+          "versionArgs": ["--version"],
+          "skillsSource": {
+            "kind": "repo-path",
+            "repo": "TencentCloud/tencentmeeting-cli",
+            "path": "skills"
+          }
+        }
+      ],
+      "auth": {
+        "mode": "cli-native",
+        "manualUrl": "https://meeting.tencent.com/meeting-cli/index.html",
+        "cliLoginCommand": ["tmeet", "auth", "login", "--no-browser"],
+        "paidTierNote": {
+          "zh": "云录制与智能纪要能力受腾讯会议账号版本与录制权限限制。",
+          "en": "Cloud recording and AI summary features depend on your Tencent Meeting plan tier and host permissions."
+        },
+        "guideSteps": {
+          "zh": [
+            "点击安装官方腾讯会议 CLI（@tencentcloud/tmeet）。",
+            "使用 OAuth2 设备码流程完成账号扫码授权，凭证由 tmeet 使用 AES-256-GCM 加密存储。",
+            "验证通过后即可查询本周会议列表、参会报告与智能纪要。"
+          ],
+          "en": [
+            "Install the official Tencent Meeting CLI (@tencentcloud/tmeet).",
+            "Sign in via the OAuth2 device code flow; tokens are encrypted locally by tmeet.",
+            "Verify to search schedules, recordings, transcripts, and AI summaries."
+          ]
+        }
+      },
+      "healthCheck": {
+        "kind": "cli-command",
+        "args": ["--version"],
+        "timeoutMs": 10000
+      },
+      "riskRules": [
+        { "actionPattern": "meeting.list|recording.summary|transcript", "level": "L0" },
+        { "actionPattern": "meeting.create|meeting.update|meeting.cancel|invite", "level": "L2" },
+        { "actionPattern": "recording.share", "level": "L3" }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "汇总本周腾讯会议记录", "en": "Summarize this week's meetings" },
+          "prompt": { "zh": "列出我本周的腾讯会议记录和智能纪要，按项目归纳决策结论与待办人。", "en": "List my Tencent Meeting summaries from this week grouped by decisions and owners." }
+        }
+      ],
+      "troubleshooting": []
+    },
+    {
+      "id": "wps365",
+      "name": {
+        "zh": "WPS 365",
+        "en": "WPS 365"
+      },
+      "summary": {
+        "zh": "WPS 365 官方 CLI，覆盖云文档、智能文档、智能表格、多维表、日历、邮箱、通讯录与会议。",
+        "en": "Official WPS 365 CLI covering cloud docs, smart docs/sheets, Bitable, calendar, mail, contacts, and meetings."
+      },
+      "category": "office-suite",
+      "icon": "wps365",
+      "color": "#e5484d",
+      "maintainer": "official",
+      "platforms": ["win32", "darwin", "linux"],
+      "minDesktopVersion": "5.4.0",
+      "officialUrls": {
+        "repo": "https://github.com/wps365-open/cli",
+        "docs": "https://open.wps.cn/documents/app-integration-dev/mcp-server/introduction",
+        "openPlatform": "https://open.wps.cn/"
+      },
+      "drivers": [
+        {
+          "kind": "cli",
+          "id": "wps365-cli",
+          "binary": "wps365-cli",
+          "installSource": {
+            "kind": "github-release",
+            "repo": "wps365-open/cli",
+            "assetTemplates": {
+              "win32-x64": "wps365-cli-x86_64-pc-windows-gnu.zip",
+              "win32-arm64": "wps365-cli-aarch64-pc-windows-gnu.zip",
+              "darwin-arm64": "wps365-cli-aarch64-apple-darwin.tar.gz",
+              "darwin-x64": "wps365-cli-x86_64-apple-darwin.tar.gz",
+              "linux-x64": "wps365-cli-x86_64-unknown-linux-gnu.tar.gz",
+              "linux-arm64": "wps365-cli-aarch64-unknown-linux-gnu.tar.gz"
+            }
+          },
+          "versionArgs": ["--version"],
+          "skillsSource": {
+            "kind": "repo-path",
+            "repo": "wps365-open/cli",
+            "path": "skills"
+          }
+        }
+      ],
+      "auth": {
+        "mode": "cli-native",
+        "manualUrl": "https://open.wps.cn/",
+        "cliLoginCommand": ["wps365-cli", "auth", "login", "--device"],
+        "requiresEnterpriseAdmin": false,
+        "guideSteps": {
+          "zh": [
+            "安装 WPS 365 官方 CLI（wps365-cli）。",
+            "运行官方认证命令登录 WPS 365 账号，凭证保存在系统钥匙串或加密存储中。",
+            "支持结合 --dry-run 预览写入变更，并配合本地 Office 转换工具联动。"
+          ],
+          "en": [
+            "Install the official WPS 365 CLI (wps365-cli).",
+            "Authenticate with your WPS 365 account; tokens are stored in OS keychain or AES-256-GCM storage.",
+            "Verify connection to work with WPS cloud docs, spreadsheets, calendar, and mail."
+          ]
+        }
+      },
+      "healthCheck": {
+        "kind": "cli-command",
+        "args": ["--version"],
+        "timeoutMs": 10000
+      },
+      "riskRules": [
+        { "actionPattern": "list|search|read|get", "level": "L0" },
+        { "actionPattern": "create|draft|append", "level": "L1" },
+        { "actionPattern": "delete|calendar.update|meeting.end", "level": "L2" },
+        { "actionPattern": "mail.send|im.send|share", "level": "L3" }
+      ],
+      "examples": [
+        {
+          "title": { "zh": "汇总云文档与日程", "en": "Summarize WPS docs and calendar" },
+          "prompt": { "zh": "查看我最近更新的 WPS 云文档并结合明日日程生成准备提纲。", "en": "Review my recently updated WPS cloud docs alongside tomorrow's calendar to prepare a brief." }
+        }
+      ],
+      "troubleshooting": []
+    }
+  ]
+}

@@ -1,16 +1,19 @@
 import { FRIENDLY_CANCELLED_MESSAGE, createQueueRecoveryScheduler, normalizeCancellationDecision, recoverQueuedTurns } from "./recovery.js";
 import { DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV, isDesktopWorkspaceFileOpenToken, isSafeDesktopWorkspaceFileOpenPath } from "./workspace-file-open-policy.js";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createRequire } from "node:module";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { installModelSelection } from "@deepseek-ai/dsh-agent";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { defineTool, validateJsonSchemaValue } from "@deepseek-ai/dsh-tools";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { accessSync, chmodSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, win32 } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { Service } from "@deepseek-ai/cordis";
-import { realpath, stat } from "node:fs/promises";
+import { chmod, copyFile, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline";
 //#region src/background-scheduler-runner.ts
 /**
 * Desktop-owned Task Board runner for the durable Host scheduler.
@@ -118,6 +121,7 @@ function defaultSessionId(executionKey) {
 * for the browser scheduler, which may have a different viable execution
 * path. Keep this in lockstep with the early guards in `run` below.
 */
+const AUTOMATION_RESTRICTED_PROVIDERS = /* @__PURE__ */ new Set(["antigravity-cli"]);
 async function canDesktopRunnerOwnTask(input, options) {
 	const project = input.project;
 	if (project === void 0 || input.task.prompt.trim() === "") return false;
@@ -125,7 +129,8 @@ async function canDesktopRunnerOwnTask(input, options) {
 	const workspace = options.workspaceRegistry.get(project.workspaceId);
 	if (workspace === void 0 || await workspace.status() !== "ok") return false;
 	const selection = options.defaultModel.currentSelection();
-	return selection.provider.trim() !== "" && selection.model.trim() !== "";
+	const provider = selection.provider.trim();
+	return provider !== "" && selection.model.trim() !== "" && !AUTOMATION_RESTRICTED_PROVIDERS.has(provider);
 }
 /**
 * Build a real Host runner. Callers should expose it only after the user has
@@ -150,7 +155,9 @@ function createDesktopTaskBoardHostScheduleRunner(options) {
 			if (workspace === void 0) return failure$2(input, "scheduled task workspace is no longer registered");
 			if (await workspace.status() !== "ok") return failure$2(input, "scheduled task workspace directory is unavailable");
 			const selection = options.defaultModel.currentSelection();
-			if (selection.provider.trim() === "" || selection.model.trim() === "") return failure$2(input, "no default DSH model is configured for background automation");
+			const provider = selection.provider.trim();
+			if (provider === "" || selection.model.trim() === "") return failure$2(input, "no default DSH model is configured for background automation");
+			if (AUTOMATION_RESTRICTED_PROVIDERS.has(provider)) return failure$2(input, `provider "${provider}" is not permitted for unattended background scheduling`);
 			let handle;
 			try {
 				const sessionId = sessionIdForExecutionKey(input.executionKey, createSessionId);
@@ -748,7 +755,7 @@ function installTranscriptBalanceGuard(ctx) {
 //#region src/conversation-import-route.ts
 /** Loopback-only Host route for importing an external transcript as a DSH session. */
 const DESKTOP_CONVERSATION_IMPORT_PATH = "/desktop/conversation-import";
-const MAX_BODY_BYTES$1 = 32 * 1024 * 1024;
+const MAX_BODY_BYTES$3 = 32 * 1024 * 1024;
 const MAX_CWD_LENGTH = 32767;
 const MAX_TITLE_LENGTH = 512;
 const MAX_IMPORT_ID_LENGTH = 256;
@@ -836,13 +843,13 @@ function capabilityTokenMatches$1(expected, supplied) {
 	suppliedBytes.copy(padded, 0, 0, expectedBytes.length);
 	return suppliedBytes.length === expectedBytes.length && timingSafeEqual(expectedBytes, padded);
 }
-async function readJsonBody$1(request) {
+async function readJsonBody$3(request) {
 	const chunks = [];
 	let size = 0;
 	for await (const chunk of request) {
 		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
 		size += buffer.length;
-		if (size > MAX_BODY_BYTES$1) return void 0;
+		if (size > MAX_BODY_BYTES$3) return void 0;
 		chunks.push(buffer);
 	}
 	try {
@@ -851,7 +858,7 @@ async function readJsonBody$1(request) {
 		return;
 	}
 }
-function isPlainObject(value) {
+function isPlainObject$1(value) {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
 	const prototype = Object.getPrototypeOf(value);
 	return prototype === Object.prototype || prototype === null;
@@ -876,7 +883,7 @@ function persistSessionTitle(ctx, session, title) {
 	return title;
 }
 function normalizeRequest$1(value) {
-	if (!isPlainObject(value)) return void 0;
+	if (!isPlainObject$1(value)) return void 0;
 	const allowed = /* @__PURE__ */ new Set([
 		"projectCwd",
 		"title",
@@ -909,7 +916,7 @@ function normalizeRequest$1(value) {
 		createdAt = value.createdAt;
 	}
 	if (!Array.isArray(value.seed) || value.seed.length > MAX_SEED_EVENTS) return void 0;
-	if (value.seed.some((event) => !isPlainObject(event))) return void 0;
+	if (value.seed.some((event) => !isPlainObject$1(event))) return void 0;
 	return {
 		projectCwd,
 		title,
@@ -998,7 +1005,7 @@ function createDesktopConversationImportRoute(ctx, { capabilityToken = process.e
 				writeJson$1(response, 415, failure$1("invalid-content-type", "application/json is required"));
 				return;
 			}
-			const requestValue = normalizeRequest$1(await readJsonBody$1(request));
+			const requestValue = normalizeRequest$1(await readJsonBody$3(request));
 			if (requestValue === void 0) {
 				writeJson$1(response, 400, failure$1("bad-request", "malformed conversation import request"));
 				return;
@@ -1021,7 +1028,7 @@ function registerDesktopConversationImportRoute(ctx) {
 const DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH = "/desktop/workspace-file-open-target";
 const MAX_ROOT_LENGTH = 32767;
 const MAX_RELATIVE_PATH_LENGTH = 4096;
-const MAX_BODY_BYTES = 1 << 20;
+const MAX_BODY_BYTES$2 = 1 << 20;
 function failure(code, message) {
 	return {
 		ok: false,
@@ -1094,13 +1101,13 @@ function capabilityTokenMatches(expected, supplied) {
 	const equal = timingSafeEqual(expectedBytes, paddedSupplied);
 	return suppliedBytes.length === expectedBytes.length && equal;
 }
-async function readJsonBody(request) {
+async function readJsonBody$2(request) {
 	const chunks = [];
 	let size = 0;
 	for await (const chunk of request) {
 		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
 		size += buffer.length;
-		if (size > MAX_BODY_BYTES) return void 0;
+		if (size > MAX_BODY_BYTES$2) return void 0;
 		chunks.push(buffer);
 	}
 	try {
@@ -1193,7 +1200,7 @@ function createDesktopWorkspaceFileOpenRoute(workspaceRegistry, { capabilityToke
 				writeJson(response, 415, failure("invalid-content-type", "application/json is required"));
 				return;
 			}
-			const requestValue = normalizeRequest(await readJsonBody(request));
+			const requestValue = normalizeRequest(await readJsonBody$2(request));
 			if (requestValue === void 0) {
 				writeJson(response, 400, failure("bad-request", "malformed workspace file request"));
 				return;
@@ -1232,6 +1239,10 @@ function checkpointBlank(snapshot) {
 	const metadata = Reflect.get(snapshot?.values ?? {}, "sessionListMetadata");
 	return typeof metadata === "object" && metadata !== null && "blank" in metadata && typeof metadata.blank === "boolean" ? metadata.blank : void 0;
 }
+function checkpointTitle(snapshot) {
+	const title = Reflect.get(snapshot?.values ?? {}, "title");
+	return typeof title === "string" ? title : void 0;
+}
 async function refreshBlankSessionCheckpoints(services, signal) {
 	const snapshots = await services.persistence.list({ signal });
 	const result = {
@@ -1248,19 +1259,20 @@ async function refreshBlankSessionCheckpoints(services, signal) {
 			const readSignal = AbortSignal.any([signal, AbortSignal.timeout(1e4)]);
 			try {
 				const cached = services.cache.cachedSnapshot(header);
-				if (cached === void 0 || checkpointBlank(cached) !== true) continue;
+				const predecessor = cached === void 0 ? services.cache.cachedPredecessorTitle?.(header) : void 0;
+				if (checkpointBlank(cached) !== true && predecessor === void 0) continue;
 				const handle = await services.persistence.open(header.id, "read", { signal: readSignal });
 				try {
 					const { events } = await handle.read(0, void 0, { signal: readSignal });
 					readSignal.throwIfAborted();
 					if (services.sessions.get(header.id) !== void 0) continue;
 					const lastSeq = events.at(-1)?.seq ?? -1;
-					if (cached.asOfSeq >= lastSeq) continue;
+					if (cached !== void 0 && cached.asOfSeq >= lastSeq) continue;
 					const restored = services.cache.coldSnapshot(handle.header, handle.inheritedEventCount, events);
 					while (true) {
 						readSignal.throwIfAborted();
 						const durable = services.cache.cachedSnapshot(handle.header);
-						if (durable !== void 0 && durable.asOfSeq >= restored.asOfSeq && checkpointBlank(durable) === checkpointBlank(restored)) break;
+						if (durable !== void 0 && durable.asOfSeq >= restored.asOfSeq && checkpointBlank(durable) === checkpointBlank(restored) && checkpointTitle(durable) === checkpointTitle(restored)) break;
 						await new Promise((resolveWait) => setTimeout(resolveWait, 25));
 					}
 					result.refreshed += 1;
@@ -1389,10 +1401,29 @@ function controlToolApprovalDecision(name, wslPermission = "ask") {
 		reason: "鼠标、键盘或电脑输入操作需要本次授权。"
 	};
 }
-/** Require one-shot approval for mutating Browser Use and Computer Use actions. */
-function installControlToolApproval(ctx) {
+/** Classify office connector MCP calls into L0-L3 approval gates. */
+function connectorToolApprovalDecision(name, lookupRisk) {
+	if (!lookupRisk) return void 0;
+	const risk = lookupRisk(name);
+	if (!risk || risk.level === "L0") return void 0;
+	const detail = risk.label?.zh ? `（${risk.label.zh}）` : "";
+	if (risk.level === "L3") return {
+		kind: "ask",
+		reason: `高风险外部操作${detail}：涉及发送消息、邮件、外部分享或付费操作，必须经人工确认后执行。`
+	};
+	if (risk.level === "L2") return {
+		kind: "ask",
+		reason: `受控办公变更操作${detail}：涉及删除、批量写入或修改日程会议，请确认操作对象。`
+	};
+	return {
+		kind: "ask",
+		reason: `办公写操作${detail}：将创建或更新目标内容，需要本次确认。`
+	};
+}
+/** Require one-shot approval for mutating Browser Use, Computer Use, WSL, and office connector actions. */
+function installControlToolApproval(ctx, options = {}) {
 	ctx.on("tools/pre-execute", async (exec, next) => {
-		return controlToolApprovalDecision(exec.name, exec.name === "desktop_wsl" ? currentAgentWslPermission() : "ask") ?? next();
+		return controlToolApprovalDecision(exec.name, exec.name === "desktop_wsl" ? currentAgentWslPermission() : "ask") ?? connectorToolApprovalDecision(exec.name, options.lookupConnectorRisk) ?? next();
 	});
 }
 //#endregion
@@ -1636,6 +1667,3320 @@ function installAgentWslTool(ctx) {
 		}
 	}));
 }
+//#endregion
+//#region src/connectors/builtin-catalog.ts
+const EMBEDDED_FALLBACK_CATALOG = {
+	schemaVersion: 1,
+	catalogVersion: "2026.11.25-1",
+	updatedAt: "2026-11-25T12:00:00.000Z",
+	connectors: [
+		{
+			id: "feishu",
+			name: {
+				zh: "飞书",
+				en: "Feishu / Lark"
+			},
+			summary: {
+				zh: "读写飞书文档、多维表格、日历、任务、邮件与会话消息，附带官方 Agent Skills。",
+				en: "Read and write Feishu docs, Bitable, calendar, tasks, mail, and messages with official Agent Skills."
+			},
+			category: "office-suite",
+			icon: "feishu",
+			color: "#3370ff",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				repo: "https://github.com/larksuite/cli",
+				docs: "https://github.com/larksuite/cli#readme",
+				openPlatform: "https://open.feishu.cn/"
+			},
+			drivers: [{
+				kind: "cli",
+				id: "feishu-cli",
+				binary: "lark-cli",
+				installSource: {
+					kind: "npm",
+					package: "@larksuite/cli"
+				},
+				versionArgs: ["--version"]
+			}, {
+				kind: "mcp-stdio",
+				id: "feishu-openapi-mcp",
+				command: "npx",
+				args: ["-y", "@larksuiteoapi/lark-mcp"],
+				toolLoading: "on-demand"
+			}],
+			auth: {
+				mode: "cli-native",
+				cliLoginCommand: [
+					"lark-cli",
+					"auth",
+					"login"
+				],
+				guideSteps: {
+					zh: ["安装飞书官方 CLI（lark-cli）并同步官方办公 Skills。", "通过官方登录命令完成授权。"],
+					en: ["Install the official Feishu CLI (lark-cli).", "Complete the native login command."]
+				}
+			},
+			healthCheck: {
+				kind: "cli-command",
+				args: ["--version"],
+				timeoutMs: 1e4
+			},
+			riskRules: [
+				{
+					actionPattern: "docs.read|search|calendar.list",
+					level: "L0"
+				},
+				{
+					actionPattern: "docs.create|task.create",
+					level: "L1"
+				},
+				{
+					actionPattern: "calendar.update|docs.delete|base.batch",
+					level: "L2"
+				},
+				{
+					actionPattern: "im.send|mail.send|drive.share",
+					level: "L3"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "整理今日会议纪要",
+					en: "Summarize today meeting notes"
+				},
+				prompt: {
+					zh: "查找今天飞书里的会议纪要并整理待办。",
+					en: "Find today Feishu meeting notes and extract action items."
+				}
+			}],
+			troubleshooting: []
+		},
+		{
+			id: "tencent-docs",
+			name: {
+				zh: "腾讯文档",
+				en: "Tencent Docs"
+			},
+			summary: {
+				zh: "通过官方远程 MCP 检索、阅读、编辑腾讯文档与智能表格，零本地程序安装。",
+				en: "Search, read, and edit Tencent Docs via official remote MCP with zero local install."
+			},
+			category: "meeting-docs",
+			icon: "tencent-docs",
+			color: "#0052d9",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				docs: "https://docs.qq.com/open/document/mcp/",
+				openPlatform: "https://docs.qq.com/open/auth/mcp.html"
+			},
+			drivers: [{
+				kind: "mcp-remote",
+				id: "tencent-docs-mcp",
+				url: "https://mcp.docs.qq.com/mcp",
+				remoteTransport: "streamable-http",
+				toolLoading: "on-demand",
+				headersTemplate: { Authorization: "Bearer ${credential:connector/tencent-docs/default/token}" },
+				allowedTools: [
+					"smartcanvas.read",
+					"smartcanvas.edit",
+					"smartcanvas.find",
+					"manage.create_file",
+					"manage.export_file",
+					"manage.search_file",
+					"manage.folder_list",
+					"manage.set_privilege"
+				]
+			}],
+			auth: {
+				mode: "personal-token",
+				quickAuthUrl: "https://docs.qq.com/open/auth/mcp.html",
+				guideSteps: {
+					zh: ["打开腾讯文档官方 MCP 授权页登录。", "复制个人访问 Token 粘贴保存并验证连接。"],
+					en: ["Open the Tencent Docs MCP auth page and sign in.", "Paste your personal token below and verify."]
+				},
+				fields: [{
+					key: "token",
+					label: {
+						zh: "MCP 访问令牌",
+						en: "MCP Access Token"
+					},
+					fieldType: "password",
+					required: true,
+					secret: true
+				}]
+			},
+			healthCheck: {
+				kind: "mcp-probe",
+				timeoutMs: 1e4
+			},
+			riskRules: [
+				{
+					actionPattern: "read|find|search|folder_list",
+					level: "L0"
+				},
+				{
+					actionPattern: "create_file|edit",
+					level: "L1"
+				},
+				{
+					actionPattern: "set_privilege",
+					level: "L3"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "保存工作周报",
+					en: "Save weekly report"
+				},
+				prompt: {
+					zh: "在腾讯文档中创建本周工作周报。",
+					en: "Create a weekly status report in Tencent Docs."
+				}
+			}],
+			troubleshooting: []
+		},
+		{
+			id: "yuque",
+			name: {
+				zh: "语雀",
+				en: "Yuque"
+			},
+			summary: {
+				zh: "通过官方本地 MCP Server 检索与读写语雀知识库和文档。",
+				en: "Search, read, and write Yuque books and docs via the official stdio MCP server."
+			},
+			category: "knowledge-notes",
+			icon: "yuque",
+			color: "#22ab28",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				repo: "https://github.com/yuque/yuque-mcp-server",
+				docs: "https://github.com/yuque/yuque-mcp-server#readme",
+				openPlatform: "https://www.yuque.com/settings/tokens"
+			},
+			drivers: [{
+				kind: "mcp-stdio",
+				id: "yuque-mcp-stdio",
+				command: "yuque-mcp",
+				args: [],
+				installSource: {
+					kind: "npm",
+					package: "yuque-mcp"
+				},
+				envTemplate: {
+					YUQUE_TOKEN: "${credential:connector/yuque/default/token}",
+					YUQUE_BASE_URL: "${credential:connector/yuque/default/host}"
+				},
+				toolLoading: "on-demand"
+			}],
+			auth: {
+				mode: "personal-token",
+				quickAuthUrl: "https://www.yuque.com/settings/tokens",
+				guideSteps: {
+					zh: ["在语雀开发者设置创建个人令牌。", "保存并测试连接，DSH 将按需启动官方语雀 MCP。"],
+					en: ["Create a personal token in Yuque settings.", "Save and verify to connect via official stdio MCP."]
+				},
+				fields: [{
+					key: "token",
+					label: {
+						zh: "语雀个人令牌",
+						en: "Yuque Personal Token"
+					},
+					fieldType: "password",
+					required: true,
+					secret: true
+				}, {
+					key: "host",
+					label: {
+						zh: "团队空间域名（可选）",
+						en: "Team Space Host (optional)"
+					},
+					fieldType: "url",
+					required: false,
+					secret: false
+				}]
+			},
+			healthCheck: {
+				kind: "mcp-probe",
+				timeoutMs: 12e3
+			},
+			riskRules: [
+				{
+					actionPattern: "search|get|list",
+					level: "L0"
+				},
+				{
+					actionPattern: "create|update",
+					level: "L1"
+				},
+				{
+					actionPattern: "delete",
+					level: "L2"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "汇总调研文档",
+					en: "Summarize research"
+				},
+				prompt: {
+					zh: "检索我的语雀知识库并整理调研摘要。",
+					en: "Search Yuque for research docs and summarize them."
+				}
+			}],
+			troubleshooting: []
+		},
+		{
+			id: "kdocs",
+			name: {
+				zh: "金山文档",
+				en: "Kingsoft Docs (KDocs)"
+			},
+			summary: {
+				zh: "通过金山文档官方 Skill 新建、编辑、搜索与整理云文档。",
+				en: "Create, edit, and search cloud docs via official KDocs Skill."
+			},
+			category: "meeting-docs",
+			icon: "kdocs",
+			color: "#e53935",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				repo: "https://github.com/kdocs-app/kdocs-skill",
+				docs: "https://github.com/kdocs-app/kdocs-skill#readme"
+			},
+			drivers: [{
+				kind: "skill",
+				id: "kdocs-official-skill",
+				skillName: "kdocs-skill",
+				source: {
+					kind: "github-repo",
+					ref: "kdocs-app/kdocs-skill"
+				}
+			}],
+			auth: {
+				mode: "personal-token",
+				guideSteps: {
+					zh: ["启用金山文档官方 Skill 并完成账号授权配置。"],
+					en: ["Enable the official KDocs Skill and complete account authorization."]
+				}
+			},
+			healthCheck: {
+				kind: "skill-present",
+				timeoutMs: 5e3
+			},
+			riskRules: [
+				{
+					actionPattern: "search|read",
+					level: "L0"
+				},
+				{
+					actionPattern: "create|edit",
+					level: "L1"
+				},
+				{
+					actionPattern: "share",
+					level: "L3"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "检索云文档",
+					en: "Search cloud docs"
+				},
+				prompt: {
+					zh: "查找我金山文档里最近的月度总结并提取关键指标。",
+					en: "Find my recent monthly summary in KDocs."
+				}
+			}],
+			troubleshooting: []
+		},
+		{
+			id: "wecom",
+			name: {
+				zh: "企业微信",
+				en: "WeCom"
+			},
+			summary: {
+				zh: "通过官方 wecom-cli 操作企业微信文档、日程、待办、会议、邮件与微盘。",
+				en: "Manage WeCom docs, calendar, tasks, meetings, and drive via wecom-cli."
+			},
+			category: "office-suite",
+			icon: "wecom",
+			color: "#2f7bf6",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				repo: "https://github.com/WecomTeam/wecom-cli",
+				docs: "https://work.weixin.qq.com/nl/index/aicli"
+			},
+			drivers: [{
+				kind: "cli",
+				id: "wecom-cli",
+				binary: "wecom-cli",
+				installSource: {
+					kind: "npm",
+					package: "@wecom/cli"
+				},
+				versionArgs: ["--version"]
+			}],
+			auth: {
+				mode: "cli-native",
+				cliLoginCommand: [
+					"wecom-cli",
+					"auth",
+					"init"
+				],
+				requiresEnterpriseAdmin: true,
+				guideSteps: {
+					zh: ["安装 @wecom/cli 并完成企业微信账号登录。"],
+					en: ["Install @wecom/cli and complete WeCom sign-in."]
+				}
+			},
+			healthCheck: {
+				kind: "cli-command",
+				args: ["--version"],
+				timeoutMs: 1e4
+			},
+			riskRules: [
+				{
+					actionPattern: "read|list|search",
+					level: "L0"
+				},
+				{
+					actionPattern: "create",
+					level: "L1"
+				},
+				{
+					actionPattern: "delete|cancel|update",
+					level: "L2"
+				},
+				{
+					actionPattern: "send|share",
+					level: "L3"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "创建企业微信待办",
+					en: "Create WeCom task"
+				},
+				prompt: {
+					zh: "在企业微信中创建明天的版本评审待办。",
+					en: "Create a WeCom task for tomorrow release review."
+				}
+			}],
+			troubleshooting: []
+		},
+		{
+			id: "dingtalk",
+			name: {
+				zh: "钉钉",
+				en: "DingTalk Workspace"
+			},
+			summary: {
+				zh: "通过官方钉钉 dws CLI 操作通讯录、聊天、日程、待办、文档与表格。",
+				en: "Operate DingTalk contacts, chat, calendar, tasks, and docs via official dws CLI."
+			},
+			category: "office-suite",
+			icon: "dingtalk",
+			color: "#3296fa",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				repo: "https://github.com/DingTalk-Real-AI/dingtalk-workspace-cli",
+				docs: "https://github.com/DingTalk-Real-AI/dingtalk-workspace-cli#getting-started"
+			},
+			drivers: [{
+				kind: "cli",
+				id: "dingtalk-dws-cli",
+				binary: "dws",
+				installSource: {
+					kind: "github-release",
+					repo: "DingTalk-Real-AI/dingtalk-workspace-cli"
+				},
+				versionArgs: ["--version"]
+			}],
+			auth: {
+				mode: "cli-native",
+				cliLoginCommand: [
+					"dws",
+					"auth",
+					"login",
+					"--device",
+					"--no-browser"
+				],
+				requiresEnterpriseAdmin: true,
+				guideSteps: {
+					zh: ["安装钉钉 dws CLI，联系企业管理员批准权限后完成登录授权。"],
+					en: ["Install DingTalk dws CLI and request admin approval before signing in."]
+				}
+			},
+			healthCheck: {
+				kind: "cli-command",
+				args: ["--version"],
+				timeoutMs: 1e4
+			},
+			riskRules: [
+				{
+					actionPattern: "read|search|list",
+					level: "L0"
+				},
+				{
+					actionPattern: "create",
+					level: "L1"
+				},
+				{
+					actionPattern: "update|delete",
+					level: "L2"
+				},
+				{
+					actionPattern: "send",
+					level: "L3"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "检索钉钉资料",
+					en: "Search DingTalk"
+				},
+				prompt: {
+					zh: "查询钉钉中与项目有关的最新文档。",
+					en: "Search DingTalk for recent project documents."
+				}
+			}],
+			troubleshooting: []
+		},
+		{
+			id: "tencent-meeting",
+			name: {
+				zh: "腾讯会议",
+				en: "Tencent Meeting"
+			},
+			summary: {
+				zh: "基于开放平台 OAuth2 授权管理腾讯会议、录制与智能纪要。",
+				en: "Manage Tencent Meeting schedules, recordings, and AI summaries via OAuth2 CLI."
+			},
+			category: "meeting-docs",
+			icon: "tencent-meeting",
+			color: "#006eff",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				repo: "https://github.com/TencentCloud/tencentmeeting-cli",
+				docs: "https://meeting.tencent.com/meeting-cli/index.html"
+			},
+			drivers: [{
+				kind: "cli",
+				id: "tencentmeeting-tmeet",
+				binary: "tmeet",
+				installSource: {
+					kind: "npm",
+					package: "@tencentcloud/tmeet"
+				},
+				versionArgs: ["--version"]
+			}],
+			auth: {
+				mode: "cli-native",
+				cliLoginCommand: [
+					"tmeet",
+					"auth",
+					"login",
+					"--no-browser"
+				],
+				guideSteps: {
+					zh: ["安装 @tencentcloud/tmeet 并通过 OAuth2 设备码扫码授权。"],
+					en: ["Install @tencentcloud/tmeet and authorize via OAuth2 device code."]
+				}
+			},
+			healthCheck: {
+				kind: "cli-command",
+				args: ["--version"],
+				timeoutMs: 1e4
+			},
+			riskRules: [
+				{
+					actionPattern: "list|summary|transcript",
+					level: "L0"
+				},
+				{
+					actionPattern: "create|update|cancel",
+					level: "L2"
+				},
+				{
+					actionPattern: "share",
+					level: "L3"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "汇总本周会议纪要",
+					en: "Summarize weekly meetings"
+				},
+				prompt: {
+					zh: "汇总本周腾讯会议的相关记录与待办。",
+					en: "Summarize this week Tencent Meeting transcripts and action items."
+				}
+			}],
+			troubleshooting: []
+		},
+		{
+			id: "wps365",
+			name: {
+				zh: "WPS 365",
+				en: "WPS 365"
+			},
+			summary: {
+				zh: "WPS 365 官方 CLI，覆盖云文档、智能表格、多维表、日历与会议。",
+				en: "Official WPS 365 CLI covering cloud docs, sheets, calendar, and meetings."
+			},
+			category: "office-suite",
+			icon: "wps365",
+			color: "#e5484d",
+			maintainer: "official",
+			platforms: [
+				"win32",
+				"darwin",
+				"linux"
+			],
+			minDesktopVersion: "5.4.0",
+			officialUrls: {
+				repo: "https://github.com/wps365-open/cli",
+				docs: "https://open.wps.cn/documents/app-integration-dev/mcp-server/introduction"
+			},
+			drivers: [{
+				kind: "cli",
+				id: "wps365-cli",
+				binary: "wps365-cli",
+				installSource: {
+					kind: "github-release",
+					repo: "wps365-open/cli"
+				},
+				versionArgs: ["--version"]
+			}],
+			auth: {
+				mode: "cli-native",
+				cliLoginCommand: [
+					"wps365-cli",
+					"auth",
+					"login",
+					"--device"
+				],
+				guideSteps: {
+					zh: ["安装 wps365-cli 并完成官方账号授权。"],
+					en: ["Install wps365-cli and complete official login."]
+				}
+			},
+			healthCheck: {
+				kind: "cli-command",
+				args: ["--version"],
+				timeoutMs: 1e4
+			},
+			riskRules: [
+				{
+					actionPattern: "list|search|read|get",
+					level: "L0"
+				},
+				{
+					actionPattern: "create|draft|append",
+					level: "L1"
+				},
+				{
+					actionPattern: "delete|update|end",
+					level: "L2"
+				},
+				{
+					actionPattern: "send|share",
+					level: "L3"
+				}
+			],
+			examples: [{
+				title: {
+					zh: "整理 WPS 云文档",
+					en: "Summarize WPS docs"
+				},
+				prompt: {
+					zh: "查看最近更新的 WPS 云文档并生成汇报提纲。",
+					en: "Summarize my recently updated WPS 365 docs."
+				}
+			}],
+			troubleshooting: []
+		}
+	]
+};
+function loadBuiltinCatalog() {
+	const here = dirname(fileURLToPath(import.meta.url));
+	const candidates = [resolve(here, "../../../../apps/dsh-desktop/src/connectors/builtin-catalog.v1.json"), resolve(here, "../../../apps/dsh-desktop/src/connectors/builtin-catalog.v1.json")];
+	for (const candidate of candidates) {
+		if (!existsSync(candidate)) continue;
+		try {
+			const parsed = JSON.parse(readFileSync(candidate, "utf8"));
+			if (parsed.schemaVersion === 1 && Array.isArray(parsed.connectors) && parsed.connectors.length > 0) return parsed;
+		} catch {}
+	}
+	return EMBEDDED_FALLBACK_CATALOG;
+}
+//#endregion
+//#region src/connectors/secret-vault.ts
+async function atomicWriteSecure(filePath, content) {
+	await mkdir(dirname(filePath), { recursive: true });
+	const temp = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	const backup = `${filePath}.bak-${process.pid}-${Date.now()}`;
+	await writeFile(temp, content, {
+		encoding: "utf8",
+		mode: 384,
+		flag: "wx"
+	});
+	let moved = false;
+	try {
+		try {
+			await rename(filePath, backup);
+			moved = true;
+		} catch (error) {
+			if (error?.code !== "ENOENT") throw error;
+		}
+		await rename(temp, filePath);
+		if (moved) await rm(backup, { force: true });
+	} catch (error) {
+		await rm(temp, { force: true });
+		if (moved) {
+			await rm(filePath, { force: true });
+			await rename(backup, filePath);
+		}
+		throw error;
+	}
+}
+function makeRecordKey(connectorId, profileId, fieldKey) {
+	return `${connectorId}/${profileId || "default"}/${fieldKey}`;
+}
+var ConnectorSecretVault = class {
+	customCipher;
+	vaultPath;
+	keyPath;
+	key;
+	entries = {};
+	loaded = false;
+	constructor(homeDir, customCipher) {
+		this.customCipher = customCipher;
+		this.vaultPath = join(homeDir, "connectors", "secrets.enc.json");
+		this.keyPath = join(homeDir, "connectors", ".vault.key");
+	}
+	async ensureKey() {
+		if (this.key) return this.key;
+		const raw = await readFile(this.keyPath, "utf8").catch(() => void 0);
+		if (raw) {
+			const parsed = Buffer.from(raw.trim(), "hex");
+			if (parsed.length === 32) {
+				this.key = parsed;
+				return parsed;
+			}
+		}
+		const generated = randomBytes(32);
+		await atomicWriteSecure(this.keyPath, `${generated.toString("hex")}\n`);
+		this.key = generated;
+		return generated;
+	}
+	async encryptValue(plaintext) {
+		if (this.customCipher) return this.customCipher.encrypt(plaintext);
+		const key = await this.ensureKey();
+		const iv = randomBytes(12);
+		const cipher = createCipheriv("aes-256-gcm", key, iv);
+		const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+		return {
+			iv: iv.toString("base64"),
+			tag: cipher.getAuthTag().toString("base64"),
+			data: encrypted.toString("base64")
+		};
+	}
+	async decryptValue(blob) {
+		if (this.customCipher) return this.customCipher.decrypt(blob);
+		const key = await this.ensureKey();
+		try {
+			const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(blob.iv, "base64"));
+			decipher.setAuthTag(Buffer.from(blob.tag, "base64"));
+			return Buffer.concat([decipher.update(Buffer.from(blob.data, "base64")), decipher.final()]).toString("utf8");
+		} catch {
+			return;
+		}
+	}
+	async ensureLoaded() {
+		if (this.loaded) return;
+		const raw = await readFile(this.vaultPath, "utf8").catch(() => void 0);
+		if (raw) try {
+			const parsed = JSON.parse(raw);
+			if (parsed.version === 1 && parsed.entries && typeof parsed.entries === "object") this.entries = { ...parsed.entries };
+		} catch {
+			this.entries = {};
+		}
+		this.loaded = true;
+	}
+	async save() {
+		await atomicWriteSecure(this.vaultPath, `${JSON.stringify({
+			version: 1,
+			entries: this.entries
+		}, null, 2)}\n`);
+	}
+	async setSecret(connectorId, profileId, fieldKey, value) {
+		await this.ensureLoaded();
+		const key = makeRecordKey(connectorId, profileId, fieldKey);
+		const trimmed = value.trim();
+		if (!trimmed) return;
+		this.entries[key] = await this.encryptValue(trimmed);
+		await this.save();
+	}
+	async hasSecret(connectorId, profileId, fieldKey) {
+		await this.ensureLoaded();
+		return Boolean(this.entries[makeRecordKey(connectorId, profileId, fieldKey)]);
+	}
+	async getSecret(connectorId, profileId, fieldKey) {
+		await this.ensureLoaded();
+		const blob = this.entries[makeRecordKey(connectorId, profileId, fieldKey)];
+		if (!blob) return void 0;
+		return this.decryptValue(blob);
+	}
+	async listPresentKeys(connectorId, profileId) {
+		await this.ensureLoaded();
+		const prefix = `${connectorId}/${profileId || "default"}/`;
+		const result = {};
+		for (const fullKey of Object.keys(this.entries)) if (fullKey.startsWith(prefix)) result[fullKey.slice(prefix.length)] = true;
+		return result;
+	}
+	async deleteConnectorSecrets(connectorId) {
+		await this.ensureLoaded();
+		const prefix = `${connectorId}/`;
+		let changed = false;
+		for (const fullKey of Object.keys(this.entries)) if (fullKey.startsWith(prefix)) {
+			delete this.entries[fullKey];
+			changed = true;
+		}
+		if (changed) await this.save();
+	}
+	async resolveTemplates(template, connectorId, profileId, nonSecretFields) {
+		await this.ensureLoaded();
+		const resolved = {};
+		const placeholder = /\$\{credential:connector\/([^/]+)\/([^/]+)\/([^}]+)\}/gu;
+		for (const [headerOrEnv, rawPattern] of Object.entries(template)) {
+			let missing = false;
+			const parts = [];
+			let lastIndex = 0;
+			placeholder.lastIndex = 0;
+			for (const match of rawPattern.matchAll(placeholder)) {
+				const index = match.index ?? 0;
+				parts.push(rawPattern.slice(lastIndex, index));
+				const [, targetConn, targetProfile, fieldKey] = match;
+				const secretVal = await this.getSecret(targetConn || connectorId, targetProfile || profileId, fieldKey);
+				const fallbackNonSecret = nonSecretFields?.[fieldKey];
+				const value = secretVal ?? fallbackNonSecret;
+				if (!value) missing = true;
+				parts.push(value ?? "");
+				lastIndex = index + match[0].length;
+			}
+			parts.push(rawPattern.slice(lastIndex));
+			const finalValue = parts.join("");
+			if (!missing && finalValue.trim().length > 0) resolved[headerOrEnv] = finalValue;
+		}
+		return resolved;
+	}
+};
+//#endregion
+//#region src/connectors/types.ts
+const CONNECTOR_API_PREFIX = "/api/dsh-connectors";
+const WORK_OFFICE_PRESET_ID = "work-office";
+//#endregion
+//#region src/connectors/connector-registry-service.ts
+function resolveConnectorsHome(explicitHome) {
+	if (explicitHome && explicitHome.trim().length > 0) return explicitHome;
+	const envHome = process.env.DSH_HOME;
+	if (envHome && envHome.trim().length > 0) return envHome.trim();
+	return join(homedir(), ".dsh");
+}
+function defaultUserConfig(entry) {
+	return {
+		enabled: false,
+		selectedDriverId: entry.drivers[0]?.id,
+		activeProfileId: "default",
+		profiles: { default: { id: "default" } },
+		consentAccepted: false
+	};
+}
+async function atomicWriteUtf8(filePath, content) {
+	await mkdir(dirname(filePath), { recursive: true });
+	const temp = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	const backup = `${filePath}.bak-${process.pid}-${Date.now()}`;
+	await writeFile(temp, content, {
+		encoding: "utf8",
+		mode: 384,
+		flag: "wx"
+	});
+	let moved = false;
+	try {
+		try {
+			await rename(filePath, backup);
+			moved = true;
+		} catch (error) {
+			if (error?.code !== "ENOENT") throw error;
+		}
+		await rename(temp, filePath);
+		if (moved) await rm(backup, { force: true });
+	} catch (error) {
+		await rm(temp, { force: true });
+		if (moved) {
+			await rm(filePath, { force: true });
+			await rename(backup, filePath);
+		}
+		throw error;
+	}
+}
+function isExecutableFile(target, platform) {
+	if (!isAbsolute(target) || !existsSync(target)) return false;
+	if (platform === "win32") return /\.(?:exe|cmd|bat)$/iu.test(target);
+	try {
+		accessSync(target, constants.X_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
+function binaryCandidates(binary, platform) {
+	if (platform === "win32") return binary.endsWith(".exe") ? [binary] : [
+		`${binary}.exe`,
+		`${binary}.cmd`,
+		binary
+	];
+	return [binary];
+}
+const DIRECT_NATIVE_PATHS = {
+	"lark-cli": (pkgRoot) => [join(pkgRoot, "node_modules", "@larksuite", "cli", "bin", "lark-cli.exe")],
+	tmeet: (pkgRoot, arch) => [join(pkgRoot, "node_modules", "@tencentcloud", "tmeet", "dist", arch === "arm64" ? "tmeet-Windows-ARM64.exe" : "tmeet-Windows-x86_64.exe"), join(pkgRoot, "node_modules", "@tencentcloud", "tmeet", "dist", "tmeet-Windows-x86_64.exe")],
+	"wecom-cli": (pkgRoot, arch) => [
+		join(pkgRoot, "node_modules", `@wecom/cli-win32-${arch === "arm64" ? "arm64" : "x64"}`, "wecom-cli.exe"),
+		join(pkgRoot, "node_modules", `@wecom/cli-win32-${arch === "arm64" ? "arm64" : "x64"}`, "bin", "wecom-cli.exe"),
+		join(pkgRoot, "node_modules", "@wecom", "cli", "bin", "wecom-cli.exe")
+	]
+};
+function findManagedBinary(homeDir, connectorId, binary, platform) {
+	const pkgRoot = join(homeDir, "connectors", "packages", connectorId);
+	if (platform === "win32") {
+		const directFn = DIRECT_NATIVE_PATHS[binary];
+		if (directFn) {
+			for (const candidate of directFn(pkgRoot, process.arch)) if (isExecutableFile(candidate, platform)) return candidate;
+		}
+	}
+	const candidates = binaryCandidates(binary, platform);
+	const dirs = [join(pkgRoot, "bin"), join(pkgRoot, "node_modules", ".bin")];
+	for (const dir of dirs) for (const file of candidates) {
+		const full = join(dir, file);
+		if (isExecutableFile(full, platform)) return full;
+	}
+}
+async function unwrapWindowsCmdToNode(cmdPath) {
+	if (!/\.(?:cmd|bat)$/iu.test(cmdPath) || !existsSync(cmdPath)) return void 0;
+	try {
+		const content = await readFile(cmdPath, "utf8");
+		const binDir = dirname(cmdPath);
+		const match = /"(?:%dp0%|%~dp0)[\\/]([^"]+\.(?:cjs|mjs|js))"/iu.exec(content);
+		if (!match) return void 0;
+		const candidate = join(binDir, match[1].replace(/\\/gu, "/"));
+		return existsSync(candidate) ? candidate : void 0;
+	} catch {
+		return;
+	}
+}
+async function resolveDirectCommand(command, args, env, platform = process.platform) {
+	if (platform === "win32" && /\.(?:cmd|bat)$/iu.test(command)) {
+		const unwrapped = await unwrapWindowsCmdToNode(command);
+		if (unwrapped) return {
+			command: process.execPath,
+			args: [unwrapped, ...args],
+			env: {
+				...env,
+				...process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}
+			},
+			shell: false
+		};
+		return {
+			command,
+			args,
+			env,
+			shell: true
+		};
+	}
+	return {
+		command,
+		args,
+		env,
+		shell: false
+	};
+}
+function findBinaryOnPath(binary, platform) {
+	const candidates = binaryCandidates(binary, platform);
+	const dirs = (process.env.PATH ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean);
+	for (const dir of dirs) for (const file of candidates) {
+		const full = join(dir, file);
+		if (isExecutableFile(full, platform)) return full;
+	}
+}
+async function ensureManagedNodeShim(homeDir, platform = process.platform, execPath = process.execPath, isElectronRuntime = Boolean(process.versions.electron)) {
+	const binDir = join(homeDir, "connectors", "bin");
+	await mkdir(binDir, { recursive: true });
+	if (platform === "win32") {
+		const shimPath = join(binDir, "node.cmd");
+		let commandLine = `"${execPath}" %*`;
+		if (/[\u0080-\uFFFF%]/u.test(execPath)) {
+			await writeFile(join(binDir, "dsh-node-unicode.ps1"), `\uFEFF${[
+				isElectronRuntime ? "$env:ELECTRON_RUN_AS_NODE = '1'" : "",
+				`& '${execPath.replace(/'/gu, "''")}' @args`,
+				"exit $LASTEXITCODE"
+			].filter(Boolean).join("\r\n")}\r\n`, "utf8");
+			commandLine = "\"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -ExecutionPolicy Bypass -File \"%~dp0dsh-node-unicode.ps1\" %*";
+		}
+		await writeFile(shimPath, `${[
+			"@echo off",
+			"setlocal",
+			isElectronRuntime ? "set ELECTRON_RUN_AS_NODE=1" : "",
+			commandLine
+		].filter(Boolean).join("\r\n")}\r\n`, "utf8");
+		return binDir;
+	}
+	const shimPath = join(binDir, "node");
+	const quoted = `'${execPath.replace(/'/gu, "'\\''")}'`;
+	await writeFile(shimPath, `${[
+		"#!/bin/sh",
+		isElectronRuntime ? "export ELECTRON_RUN_AS_NODE=1" : "",
+		`exec ${quoted} "$@"`
+	].filter(Boolean).join("\n")}\n`, "utf8");
+	await chmod(shimPath, 493);
+	return binDir;
+}
+function withManagedBinPath(baseEnv, binDir, platform = process.platform) {
+	const sep = platform === "win32" ? ";" : ":";
+	const nextEnv = { ...baseEnv };
+	const pathKey = platform === "win32" ? Object.keys(nextEnv).find((key) => key.toLowerCase() === "path") ?? "PATH" : "PATH";
+	nextEnv[pathKey] = [binDir, ...(nextEnv[pathKey] ?? nextEnv.PATH ?? "").split(sep).filter(Boolean).filter((part) => part.toLowerCase() !== binDir.toLowerCase())].join(sep);
+	if (pathKey !== "PATH") nextEnv.PATH = nextEnv[pathKey];
+	return nextEnv;
+}
+function resolveBundledPnpmCli(platform = process.platform) {
+	const pnpmRelCandidates = [
+		"pnpm/bin/pnpm.mjs",
+		"pnpm/bin/pnpm.cjs",
+		"pnpm/dist/pnpm.mjs",
+		"pnpm/dist/pnpm.cjs"
+	];
+	const req = createRequire(import.meta.url);
+	for (const spec of pnpmRelCandidates) try {
+		const resolved = req.resolve(spec);
+		if (resolved && existsSync(resolved)) return resolved;
+	} catch {}
+	const probeRoots = [];
+	const resourcesPath = process.resourcesPath;
+	if (typeof resourcesPath === "string" && resourcesPath.length > 0) probeRoots.push(join(resourcesPath, "app.asar.unpacked"), resourcesPath);
+	let dir = dirname(fileURLToPath(import.meta.url));
+	for (let i = 0; i < 7; i += 1) {
+		probeRoots.push(dir, join(dir, "apps", "dsh-desktop"));
+		const parent = dirname(dir);
+		if (parent === dir) break;
+		dir = parent;
+	}
+	for (const root of probeRoots) for (const rel of pnpmRelCandidates) {
+		const candidate = join(root, "node_modules", rel);
+		if (existsSync(candidate)) return candidate;
+	}
+	return findBinaryOnPath("pnpm", platform);
+}
+function classifyInstallError(rawError) {
+	const text = rawError.trim();
+	if (/\b(?:ENOENT|EINVAL|not recognized as an internal or external command)\b|exited with code 1\b|npm\.cmd/iu.test(text) && !/https?:\/\/|\b(?:ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|404|E404)\b/iu.test(text)) return {
+		zh: "本机包管理器或 Node 运行时不可用，未能完成自动安装，请查看下方原始日志或前往官网手动安装。",
+		en: "Package manager or Node runtime is unavailable on this machine. Check diagnostic log or install from official docs."
+	};
+	if (/\b(?:404|E404|ERR_PNPM_FETCH_404|Not Found)\b|HTTP 404/iu.test(text)) return {
+		zh: "包仓库暂未找到该官方组件包，请查看下方原始日志或前往官方页面下载安装包。",
+		en: "Package was not found in registry. Check diagnostic log or open the official download page."
+	};
+	if (/\b(?:ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ERR_PNPM_META_FETCH_FAIL)\b|timed\s+out|fetch\s+failed|certificate|ssl/iu.test(text)) return {
+		zh: "无法连接包仓库，请检查当前网络或代理设置后重试，也可前往官方页面下载。",
+		en: "Could not reach package registry. Check network/proxy settings and retry, or open the official download page."
+	};
+	return {
+		zh: "自动安装官方组件未完成，可展开下方「查看原始日志」查看原因，或前往官方页面手动安装。",
+		en: "Automatic installation did not complete. Expand Diagnostic log below or open official install docs."
+	};
+}
+async function runSimpleProcess(command, args, options = {}) {
+	return await new Promise((resolvePromise) => {
+		let settled = false;
+		const finish = (result) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			resolvePromise(result);
+		};
+		let child;
+		try {
+			child = spawn(command, args, {
+				...options.cwd ? { cwd: options.cwd } : {},
+				...options.env ? { env: options.env } : {},
+				shell: options.shell ?? false,
+				windowsHide: true,
+				stdio: [
+					"ignore",
+					"pipe",
+					"pipe"
+				]
+			});
+		} catch (error) {
+			finish({
+				ok: false,
+				error: error instanceof Error ? error.message : String(error)
+			});
+			return;
+		}
+		let output = "";
+		const append = (chunk) => {
+			if (output.length < 16384) output += chunk.toString("utf8");
+		};
+		child.stdout?.on("data", append);
+		child.stderr?.on("data", append);
+		const timer = setTimeout(() => {
+			child.kill("SIGTERM");
+			finish({
+				ok: false,
+				error: `${command} timed out`
+			});
+		}, options.timeoutMs ?? 12e4);
+		child.once("error", (error) => {
+			finish({
+				ok: false,
+				error: error.message
+			});
+		});
+		child.once("close", (code) => {
+			finish(code === 0 ? { ok: true } : {
+				ok: false,
+				error: output.trim() || `${command} exited with code ${code}`
+			});
+		});
+	});
+}
+async function findExtractedFile(rootDir, candidates, depth = 0) {
+	if (depth > 4 || !existsSync(rootDir)) return void 0;
+	const entries = await readdir(rootDir, { withFileTypes: true });
+	const lowerCandidates = new Set(candidates.map((c) => c.toLowerCase()));
+	for (const entry of entries) if (entry.isFile() && lowerCandidates.has(entry.name.toLowerCase())) return join(rootDir, entry.name);
+	for (const entry of entries) if (entry.isDirectory()) {
+		const nested = await findExtractedFile(join(rootDir, entry.name), candidates, depth + 1);
+		if (nested) return nested;
+	}
+}
+async function runGithubReleaseInstallAttempt(spec, platform, childEnv) {
+	const platformKey = `${platform}-${process.arch}`;
+	const assetName = spec.assetTemplates?.[platformKey];
+	if (!assetName) return {
+		ok: false,
+		error: `no release asset template for ${platformKey}`
+	};
+	const downloadUrl = `https://github.com/${spec.target}/releases/latest/download/${assetName}`;
+	const archivePath = join(spec.managedDir, assetName);
+	const binDir = join(spec.managedDir, "bin");
+	await mkdir(binDir, { recursive: true });
+	try {
+		const response = await fetch(downloadUrl, {
+			headers: { "user-agent": "deepseek-harness-desktop" },
+			redirect: "follow",
+			signal: AbortSignal.timeout(12e4)
+		});
+		if (!response.ok) return {
+			ok: false,
+			error: `HTTP ${response.status} downloading ${downloadUrl}`
+		};
+		await writeFile(archivePath, Buffer.from(await response.arrayBuffer()));
+	} catch (error) {
+		return {
+			ok: false,
+			error: `fetch failed for ${downloadUrl}: ${error instanceof Error ? error.message : String(error)}`
+		};
+	}
+	let extracted;
+	if (/\.zip$/iu.test(assetName)) if (platform === "win32") {
+		extracted = await runSimpleProcess("tar.exe", [
+			"-xf",
+			archivePath,
+			"-C",
+			binDir
+		], { env: childEnv });
+		if (!extracted.ok) extracted = await runSimpleProcess("powershell.exe", [
+			"-NoProfile",
+			"-NonInteractive",
+			"-Command",
+			`Expand-Archive -LiteralPath '${archivePath.replace(/'/gu, "''")}' -DestinationPath '${binDir.replace(/'/gu, "''")}' -Force`
+		], { env: childEnv });
+	} else extracted = await runSimpleProcess("unzip", [
+		"-o",
+		archivePath,
+		"-d",
+		binDir
+	], { env: childEnv });
+	else extracted = await runSimpleProcess(platform === "win32" ? "tar.exe" : "tar", [
+		"-xzf",
+		archivePath,
+		"-C",
+		binDir
+	], { env: childEnv });
+	await rm(archivePath, { force: true }).catch(() => {});
+	if (!extracted.ok) return {
+		ok: false,
+		error: `extract failed for ${assetName}: ${extracted.error}`
+	};
+	const binary = spec.binary ?? spec.connectorId;
+	const candidates = binaryCandidates(binary, platform);
+	let resolvedPath = candidates.map((name) => join(binDir, name)).find((path) => existsSync(path));
+	if (!resolvedPath) {
+		const nested = await findExtractedFile(binDir, candidates);
+		if (nested) {
+			const promoted = join(binDir, platform === "win32" ? binary.endsWith(".exe") ? binary : `${binary}.exe` : binary);
+			await copyFile(nested, promoted);
+			resolvedPath = promoted;
+		}
+	}
+	if (!resolvedPath) return {
+		ok: false,
+		error: `extracted ${assetName} but executable ${binary} was not found`
+	};
+	if (platform !== "win32") await chmod(resolvedPath, 493).catch(() => {});
+	return {
+		ok: true,
+		binaryPath: resolvedPath,
+		sourceUsed: "github-release"
+	};
+}
+async function runPackageNodePostinstall(managedDir, pkg, childEnv) {
+	const pkgDir = join(managedDir, "node_modules", pkg.startsWith("@") ? pkg.replace(/^(?:@[^/]+\/[^@]+)(?:@.*)?$/u, (m) => m.split(/(?<=[^/])@/u)[0]) : pkg.split("@")[0]);
+	const manifestPath = join(pkgDir, "package.json");
+	if (!existsSync(manifestPath)) return { ok: true };
+	try {
+		const postinstall = JSON.parse(await readFile(manifestPath, "utf8")).scripts?.postinstall?.trim();
+		if (!postinstall) return { ok: true };
+		const match = /^node\s+([^\s;|&<>]+)(?:\s+(.*))?$/u.exec(postinstall);
+		if (!match) return { ok: true };
+		const scriptPath = join(pkgDir, match[1]);
+		if (!existsSync(scriptPath)) return { ok: true };
+		const extraArgs = match[2] ? match[2].trim().split(/\s+/u).filter(Boolean) : [];
+		return await runSimpleProcess(process.execPath, [scriptPath, ...extraArgs], {
+			cwd: pkgDir,
+			env: childEnv,
+			shell: false,
+			timeoutMs: 12e4
+		});
+	} catch (error) {
+		return {
+			ok: false,
+			error: error instanceof Error ? error.message : String(error)
+		};
+	}
+}
+async function runPnpmInstallAttempt(pnpmCli, pkg, managedDir, platform, childEnv, registryUrl) {
+	const isScript = /\.(?:mjs|cjs|js)$/iu.test(pnpmCli);
+	const pnpmArgs = [
+		"add",
+		"--dir",
+		managedDir,
+		"--ignore-workspace",
+		`--allow-build=${pkg}`,
+		"--config.strict-dep-builds=false",
+		"--config.node-linker=hoisted",
+		"--config.ignore-scripts=true",
+		"--config.package-import-method=copy",
+		`--registry=${registryUrl}`,
+		pkg
+	];
+	const installRes = await runSimpleProcess(isScript ? process.execPath : pnpmCli, isScript ? [pnpmCli, ...pnpmArgs] : pnpmArgs, {
+		cwd: managedDir,
+		env: childEnv,
+		shell: !isScript && platform === "win32" && /\.(?:cmd|bat)$/iu.test(pnpmCli),
+		timeoutMs: 12e4
+	});
+	if (!installRes.ok) return installRes;
+	return await runPackageNodePostinstall(managedDir, pkg, childEnv);
+}
+async function runNpmInstallAttempt(pkg, managedDir, platform, childEnv, registryUrl) {
+	const npmCmd = platform === "win32" ? "npm.cmd" : "npm";
+	const args = [
+		"install",
+		"--prefix",
+		managedDir,
+		"--no-audit",
+		"--no-fund",
+		"--silent",
+		pkg
+	];
+	if (registryUrl) args.push(`--registry=${registryUrl}`);
+	return await runSimpleProcess(npmCmd, args, {
+		cwd: managedDir,
+		env: childEnv,
+		shell: platform === "win32",
+		timeoutMs: 12e4
+	});
+}
+async function defaultInstallRunner(spec, platform, homeDir) {
+	await mkdir(spec.managedDir, { recursive: true });
+	const binDir = await ensureManagedNodeShim(homeDir, platform);
+	const childEnv = {
+		...withManagedBinPath(process.env, binDir, platform),
+		...process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}
+	};
+	if (spec.kind === "github-release") return await runGithubReleaseInstallAttempt(spec, platform, childEnv);
+	if (spec.kind !== "npm") return {
+		ok: false,
+		error: `unsupported automatic installer kind: ${spec.kind}`
+	};
+	const manifestPath = join(spec.managedDir, "package.json");
+	if (!existsSync(manifestPath)) await writeFile(manifestPath, `${JSON.stringify({
+		name: `dsh-connector-${spec.connectorId}`,
+		private: true
+	}, null, 2)}\n`, "utf8");
+	const pnpmCli = resolveBundledPnpmCli(platform);
+	const registries = [{
+		url: "https://registry.npmmirror.com",
+		label: "npmmirror"
+	}, {
+		url: "https://registry.npmjs.org",
+		label: "npmjs"
+	}];
+	const errors = [];
+	for (const reg of registries) {
+		const attempt = pnpmCli ? await runPnpmInstallAttempt(pnpmCli, spec.target, spec.managedDir, platform, childEnv, reg.url) : await runNpmInstallAttempt(spec.target, spec.managedDir, platform, childEnv, reg.url);
+		if (attempt.ok) return {
+			ok: true,
+			sourceUsed: `${pnpmCli ? "pnpm" : "npm"}:${reg.label}`
+		};
+		if (attempt.error) errors.push(`[${reg.label}] ${attempt.error}`);
+	}
+	return {
+		ok: false,
+		error: errors.join("\n\n")
+	};
+}
+function defaultLoginLauncher(command, args, env) {
+	if (process.platform === "win32" && /\.(?:cmd|bat)$/iu.test(command)) return spawn(command, args, {
+		env,
+		shell: true,
+		windowsHide: true,
+		stdio: [
+			"ignore",
+			"pipe",
+			"pipe"
+		]
+	});
+	return spawn(command, args, {
+		env,
+		shell: false,
+		windowsHide: true,
+		stdio: [
+			"ignore",
+			"pipe",
+			"pipe"
+		]
+	});
+}
+async function defaultProbeCli(command, args, timeoutMs, env) {
+	const resolved = await resolveDirectCommand(command, args, env ?? process.env);
+	return await new Promise((resolvePromise) => {
+		let settled = false;
+		const finish = (result) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			resolvePromise(result);
+		};
+		let child;
+		try {
+			child = spawn(resolved.command, resolved.args, {
+				env: resolved.env,
+				shell: resolved.shell,
+				windowsHide: true,
+				stdio: [
+					"ignore",
+					"pipe",
+					"pipe"
+				]
+			});
+		} catch (error) {
+			finish({
+				ok: false,
+				stdout: "",
+				stderr: error instanceof Error ? error.message : String(error)
+			});
+			return;
+		}
+		let stdout = "";
+		let stderr = "";
+		child.stdout?.on("data", (chunk) => {
+			if (stdout.length < 8192) stdout += chunk.toString("utf8");
+		});
+		child.stderr?.on("data", (chunk) => {
+			if (stderr.length < 8192) stderr += chunk.toString("utf8");
+		});
+		const timer = setTimeout(() => {
+			child.kill("SIGTERM");
+			finish({
+				ok: false,
+				stdout,
+				stderr: `${stderr}\ncommand timed out`.trim()
+			});
+		}, timeoutMs);
+		child.once("error", (error) => {
+			finish({
+				ok: false,
+				stdout,
+				stderr: error.message
+			});
+		});
+		child.once("close", (code) => {
+			finish({
+				ok: code === 0,
+				stdout,
+				stderr
+			});
+		});
+	});
+}
+function safePatternMatch(pattern, input) {
+	try {
+		return new RegExp(pattern, "iu").test(input);
+	} catch {
+		return input.toLowerCase().includes(pattern.toLowerCase());
+	}
+}
+function classifyConnectorFailure(entry, rawError) {
+	for (const rule of entry.troubleshooting) if (safePatternMatch(rule.matchPattern, rawError)) {
+		const lowerCode = rule.code.toLowerCase();
+		return {
+			status: lowerCode.includes("admin") ? "awaiting_admin_approval" : lowerCode.includes("auth") || lowerCode.includes("token") ? "auth_expired" : "error",
+			friendlyCause: rule.cause,
+			friendlyFix: rule.fix
+		};
+	}
+	if (/admin|approval|corp\s*deny/iu.test(rawError)) return {
+		status: "awaiting_admin_approval",
+		friendlyCause: {
+			zh: "需要企业管理员审批开通该应用权限。",
+			en: "Organization administrator approval is required."
+		},
+		friendlyFix: {
+			zh: "请联系管理员在开放平台工作台批准授权后再次验证。",
+			en: "Ask your organization admin to approve the app and verify again."
+		}
+	};
+	if (/401|unauthorized|expired|not\s+logged\s+in|login\s+required/iu.test(rawError)) return {
+		status: "auth_expired",
+		friendlyCause: {
+			zh: "尚未登录或授权令牌已失效。",
+			en: "Not signed in or authorization token expired."
+		},
+		friendlyFix: {
+			zh: "按向导重新完成登录授权后再次点击验证连接。",
+			en: "Complete sign-in in the guide and click Verify connection again."
+		}
+	};
+	return {
+		status: "error",
+		friendlyCause: {
+			zh: "连接验证未通过，可能是网络不可达或参数有误。",
+			en: "Connection check failed due to unreachable endpoint or invalid parameters."
+		},
+		friendlyFix: {
+			zh: "请核对网络环境、配置参数，或展开「高级设置与调试」查看原始日志。",
+			en: "Check network connectivity and parameters, or expand Advanced settings to inspect raw logs."
+		}
+	};
+}
+var ConnectorRegistryService = class {
+	ctx;
+	homeDir;
+	configPath;
+	platform;
+	probeCli;
+	installRunner;
+	loginLauncher;
+	secretVault;
+	catalog;
+	persisted = {
+		version: 1,
+		connectors: {}
+	};
+	statuses = /* @__PURE__ */ new Map();
+	diagnostics = /* @__PURE__ */ new Map();
+	mcpDisposers = /* @__PURE__ */ new Map();
+	loginSessions = /* @__PURE__ */ new Map();
+	loginChildren = /* @__PURE__ */ new Map();
+	skillControl;
+	loaded = false;
+	constructor(ctx, deps = {}) {
+		this.ctx = ctx;
+		this.homeDir = resolveConnectorsHome(deps.dshHome);
+		this.configPath = join(this.homeDir, "connectors", "config.json");
+		this.platform = deps.platform ?? process.platform;
+		this.probeCli = deps.probeCli ?? defaultProbeCli;
+		this.installRunner = deps.installRunner;
+		this.loginLauncher = deps.loginLauncher ?? defaultLoginLauncher;
+		this.secretVault = deps.secretVault ?? new ConnectorSecretVault(this.homeDir);
+		this.catalog = loadBuiltinCatalog();
+	}
+	async init() {
+		await this.ensureLoaded();
+		this.installSkillProvider();
+		this.installPromptSection();
+		await this.reconcileActiveConnectors();
+	}
+	dispose() {
+		for (const child of this.loginChildren.values()) try {
+			child.kill?.("SIGTERM");
+		} catch {}
+		this.loginChildren.clear();
+		for (const dispose of this.mcpDisposers.values()) try {
+			dispose();
+		} catch {}
+		this.mcpDisposers.clear();
+	}
+	async ensureLoaded() {
+		if (this.loaded) return;
+		const raw = await readFile(this.configPath, "utf8").catch((error) => {
+			if (error?.code === "ENOENT") return void 0;
+		});
+		if (raw) try {
+			const parsed = JSON.parse(raw);
+			if (parsed.version === 1 && parsed.connectors && typeof parsed.connectors === "object") this.persisted = {
+				version: 1,
+				connectors: parsed.connectors
+			};
+		} catch {
+			this.persisted = {
+				version: 1,
+				connectors: {}
+			};
+		}
+		for (const entry of this.catalog.connectors) {
+			const cfg = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+			this.persisted.connectors[entry.id] = cfg;
+			this.statuses.set(entry.id, cfg.enabled ? "installed_unauthenticated" : "not_installed");
+		}
+		this.loaded = true;
+	}
+	async saveConfig() {
+		const sanitized = {
+			version: 1,
+			connectors: {}
+		};
+		for (const [id, cfg] of Object.entries(this.persisted.connectors)) {
+			const profiles = {};
+			for (const [pid, profile] of Object.entries(cfg.profiles ?? {})) profiles[pid] = {
+				id: pid,
+				...profile.label ? { label: profile.label } : {},
+				...profile.accountLabel ? { accountLabel: profile.accountLabel } : {},
+				...profile.nonSecretFields ? { nonSecretFields: { ...profile.nonSecretFields } } : {}
+			};
+			sanitized.connectors[id] = {
+				enabled: Boolean(cfg.enabled),
+				selectedDriverId: cfg.selectedDriverId,
+				customBinaryPath: cfg.customBinaryPath,
+				activeProfileId: cfg.activeProfileId || "default",
+				profiles,
+				consentAccepted: Boolean(cfg.consentAccepted),
+				...cfg.pinnedVersion ? { pinnedVersion: cfg.pinnedVersion } : {}
+			};
+		}
+		await atomicWriteUtf8(this.configPath, `${JSON.stringify(sanitized, null, 2)}\n`);
+	}
+	activeDriverFor(entry, config) {
+		return entry.drivers.find((driver) => driver.id === config.selectedDriverId) ?? entry.drivers[0];
+	}
+	getEntryOrThrow(connectorId) {
+		const entry = this.catalog.connectors.find((item) => item.id === connectorId);
+		if (!entry) throw new Error(`unknown connector: ${connectorId}`);
+		return entry;
+	}
+	installSkillProvider() {
+		const skills = this.ctx.get?.("skills");
+		if (!skills?.registerProvider) return;
+		const unregister = skills.registerProvider((control) => {
+			this.skillControl = control;
+			return {
+				name: "desktop-connectors",
+				discover: async () => ({
+					complete: true,
+					candidates: this.connectedEntries().map((item) => ({
+						name: `connector-${item.entry.id}`,
+						description: `${item.entry.name.zh} (${item.entry.name.en}): ${item.entry.summary.zh}`,
+						whenToUse: item.entry.examples.map((ex) => ex.prompt.zh).join(" / "),
+						invocation: {
+							modelInvocable: true,
+							userInvocable: true
+						},
+						source: "bundled",
+						provider: "desktop-connectors",
+						rank: 550,
+						locator: item.entry.id
+					}))
+				}),
+				get: async (locator) => {
+					const item = this.connectedEntries().find((candidate) => candidate.entry.id === locator);
+					if (!item) return void 0;
+					const guide = item.entry.auth.guideSteps.zh.join("\n");
+					const examples = item.entry.examples.map((ex) => `- ${ex.title.zh}: ${ex.prompt.zh}`).join("\n");
+					return {
+						name: `connector-${item.entry.id}`,
+						description: item.entry.summary.zh,
+						invocation: {
+							modelInvocable: true,
+							userInvocable: true
+						},
+						source: "bundled",
+						provider: "desktop-connectors",
+						content: `# ${item.entry.name.zh} (${item.entry.name.en})\n\nDriver: ${item.activeDriver.kind} (${item.activeDriver.id})\n\n## Usage\n${guide}\n\n## Examples\n${examples}`
+					};
+				}
+			};
+		});
+		this.ctx.effect(() => unregister, "dsh-connectors: skill provider");
+	}
+	installPromptSection() {
+		const systemPrompt = this.ctx.get?.("systemPrompt");
+		if (!systemPrompt?.section) return;
+		const unregister = systemPrompt.section({
+			name: "desktop:connectors-index",
+			order: 65,
+			text: () => {
+				const connected = this.connectedEntries();
+				if (connected.length === 0) return "";
+				return `Connected work-mode services (on-demand only; confirm before mutating/external actions):\n${connected.map((item) => `- ${item.entry.id} (${item.entry.name.zh} / ${item.entry.name.en}, mode=${item.activeDriver.kind}): load skill "connector-${item.entry.id}" or discover its on-demand MCP tools only when the user asks about this service.`).join("\n")}`;
+			}
+		});
+		this.ctx.effect(() => unregister, "dsh-connectors: compact capability index");
+	}
+	async reconcileActiveConnectors() {
+		for (const entry of this.catalog.connectors) {
+			const cfg = this.persisted.connectors[entry.id];
+			if (!cfg?.enabled) {
+				this.unmountMcp(entry.id);
+				continue;
+			}
+			if (this.statuses.get(entry.id) === "connected") await this.mountMcpIfApplicable(entry, cfg);
+		}
+		this.skillControl?.invalidate();
+	}
+	async mountMcpIfApplicable(entry, cfg) {
+		const driver = this.activeDriverFor(entry, cfg);
+		const mcpManager = this.ctx.get?.("mcpManager");
+		if (!mcpManager?.register) return;
+		this.unmountMcp(entry.id);
+		const serverName = `connector_${entry.id}`;
+		const profileId = cfg.activeProfileId || "default";
+		const nonSecretFields = cfg.profiles?.[profileId]?.nonSecretFields;
+		if (driver.kind === "mcp-remote") {
+			const headers = await this.secretVault.resolveTemplates(driver.headersTemplate ?? {}, entry.id, profileId, nonSecretFields);
+			const dispose = mcpManager.register(serverName, {
+				transport: "streamable-http",
+				url: driver.url,
+				headers,
+				toolLoading: driver.toolLoading ?? "on-demand",
+				startupTimeoutMs: entry.healthCheck.timeoutMs ?? 15e3
+			});
+			this.mcpDisposers.set(entry.id, dispose);
+		} else if (driver.kind === "mcp-stdio") {
+			const resolvedEnv = await this.secretVault.resolveTemplates(driver.envTemplate ?? {}, entry.id, profileId, nonSecretFields);
+			const binDir = await ensureManagedNodeShim(this.homeDir, this.platform).catch(() => join(this.homeDir, "connectors", "bin"));
+			const env = {
+				...withManagedBinPath(process.env, binDir, this.platform),
+				...resolvedEnv
+			};
+			const managedCommand = findManagedBinary(this.homeDir, entry.id, driver.command, this.platform);
+			const dispose = mcpManager.register(serverName, {
+				transport: "stdio",
+				command: managedCommand ?? driver.command,
+				args: driver.args,
+				env,
+				toolLoading: driver.toolLoading ?? "on-demand",
+				startupTimeoutMs: entry.healthCheck.timeoutMs ?? 15e3
+			});
+			this.mcpDisposers.set(entry.id, dispose);
+		}
+	}
+	unmountMcp(connectorId) {
+		const existing = this.mcpDisposers.get(connectorId);
+		if (!existing) return;
+		this.mcpDisposers.delete(connectorId);
+		try {
+			existing();
+		} catch {}
+	}
+	connectedEntries() {
+		return this.catalog.connectors.map((entry) => {
+			const config = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+			return {
+				entry,
+				config,
+				status: this.statuses.get(entry.id) ?? (config.enabled ? "installed_unauthenticated" : "not_installed"),
+				activeDriver: this.activeDriverFor(entry, config),
+				diagnostic: this.diagnostics.get(entry.id)
+			};
+		}).filter((item) => item.config.enabled && item.status === "connected");
+	}
+	async snapshot() {
+		await this.ensureLoaded();
+		const items = await Promise.all(this.catalog.connectors.map(async (entry) => {
+			const config = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+			const status = this.statuses.get(entry.id) ?? "not_installed";
+			const hasSecrets = await this.secretVault.listPresentKeys(entry.id, config.activeProfileId || "default");
+			return {
+				entry,
+				config: structuredClone(config),
+				status,
+				activeDriver: this.activeDriverFor(entry, config),
+				diagnostic: this.diagnostics.get(entry.id),
+				hasSecrets
+			};
+		}));
+		return {
+			catalogVersion: this.catalog.catalogVersion,
+			workOfficePresetId: WORK_OFFICE_PRESET_ID,
+			connectedCount: items.filter((item) => item.config.enabled && item.status === "connected").length,
+			items
+		};
+	}
+	async detectEnvironment(connectorId) {
+		await this.ensureLoaded();
+		const entry = this.getEntryOrThrow(connectorId);
+		const cfg = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+		const driver = this.activeDriverFor(entry, cfg);
+		if (driver.kind === "mcp-remote") return {
+			installed: true,
+			driverId: driver.id,
+			driverKind: driver.kind,
+			note: "remote-zero-install"
+		};
+		if (driver.kind === "skill") {
+			const skillPath = join(this.homeDir, "skills", driver.skillName, "SKILL.md");
+			return {
+				installed: existsSync(skillPath) || cfg.enabled,
+				driverId: driver.id,
+				driverKind: driver.kind,
+				note: existsSync(skillPath) ? skillPath : "catalog-managed-skill"
+			};
+		}
+		if (driver.kind === "cli") {
+			const custom = cfg.customBinaryPath?.trim();
+			const candidate = custom && isExecutableFile(custom, this.platform) ? custom : findManagedBinary(this.homeDir, entry.id, driver.binary, this.platform) ?? findBinaryOnPath(driver.binary, this.platform);
+			if (!candidate) {
+				if (!cfg.enabled) this.statuses.set(entry.id, "not_installed");
+				return {
+					installed: false,
+					driverId: driver.id,
+					driverKind: driver.kind
+				};
+			}
+			const binDir = await ensureManagedNodeShim(this.homeDir, this.platform).catch(() => join(this.homeDir, "connectors", "bin"));
+			const probeEnv = withManagedBinPath(process.env, binDir, this.platform);
+			const probe = await this.probeCli(candidate, driver.versionArgs ?? ["--version"], entry.healthCheck.timeoutMs ?? 8e3, probeEnv);
+			return {
+				installed: probe.ok,
+				driverId: driver.id,
+				driverKind: driver.kind,
+				binaryPath: candidate,
+				version: probe.ok ? probe.stdout.trim().split(/\r?\n/u)[0] : void 0
+			};
+		}
+		const candidate = findManagedBinary(this.homeDir, entry.id, driver.command, this.platform) ?? findBinaryOnPath(driver.command, this.platform);
+		return {
+			installed: Boolean(candidate),
+			driverId: driver.id,
+			driverKind: driver.kind,
+			binaryPath: candidate
+		};
+	}
+	async installConnector(connectorId) {
+		await this.ensureLoaded();
+		const entry = this.getEntryOrThrow(connectorId);
+		const cfg = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+		const driver = this.activeDriverFor(entry, cfg);
+		if (driver.kind === "mcp-remote") return {
+			ok: true,
+			skipped: true,
+			installed: true,
+			sourceUsed: "remote-zero-install"
+		};
+		if (driver.kind === "skill") {
+			const skillMdPath = join(join(this.homeDir, "skills", driver.skillName), "SKILL.md");
+			if (!existsSync(skillMdPath)) {
+				const examples = entry.examples.map((ex) => `- ${ex.title.zh}: ${ex.prompt.zh}`).join("\n");
+				await atomicWriteUtf8(skillMdPath, [
+					`# ${entry.name.zh} (${entry.name.en})`,
+					"",
+					entry.summary.zh,
+					"",
+					`Official docs: ${entry.officialUrls.docs}`,
+					"",
+					"## Examples",
+					examples,
+					""
+				].join("\n"));
+			}
+			cfg.enabled = true;
+			this.persisted.connectors[entry.id] = cfg;
+			if (this.statuses.get(entry.id) === "not_installed" || this.statuses.get(entry.id) === "disabled") this.statuses.set(entry.id, "installed_unauthenticated");
+			await this.saveConfig();
+			return {
+				ok: true,
+				installed: true,
+				sourceUsed: "managed-skill"
+			};
+		}
+		const existingEnv = await this.detectEnvironment(entry.id);
+		if (existingEnv.installed) {
+			cfg.enabled = true;
+			this.persisted.connectors[entry.id] = cfg;
+			if (this.statuses.get(entry.id) === "not_installed" || this.statuses.get(entry.id) === "disabled") this.statuses.set(entry.id, "installed_unauthenticated");
+			await this.saveConfig();
+			return {
+				ok: true,
+				installed: true,
+				binaryPath: existingEnv.binaryPath,
+				version: existingEnv.version,
+				sourceUsed: "existing"
+			};
+		}
+		const installSource = driver.installSource;
+		const managedDir = join(this.homeDir, "connectors", "packages", entry.id);
+		const target = installSource?.package ?? installSource?.repo ?? driver.id;
+		if (!installSource || installSource.kind !== "npm" && installSource.kind !== "github-release" && !this.installRunner) return {
+			ok: false,
+			installed: false,
+			fallbackUrl: entry.officialUrls.docs,
+			friendlyError: {
+				zh: "暂不支持自动安装此驱动，请查看官方安装说明。",
+				en: "Automatic installation is not available for this driver; open official docs."
+			}
+		};
+		const runnerSpec = {
+			connectorId: entry.id,
+			kind: installSource.kind === "github-release" ? "github-release" : "npm",
+			target,
+			managedDir,
+			binary: driver.kind === "cli" ? driver.binary : driver.command,
+			...installSource.assetTemplates ? { assetTemplates: installSource.assetTemplates } : {}
+		};
+		const runResult = this.installRunner ? await this.installRunner(runnerSpec) : await defaultInstallRunner(runnerSpec, this.platform, this.homeDir);
+		if (!runResult.ok) {
+			const rawError = runResult.error?.slice(0, 1200);
+			return {
+				ok: false,
+				installed: false,
+				fallbackUrl: entry.officialUrls.docs,
+				friendlyError: classifyInstallError(rawError ?? ""),
+				rawError
+			};
+		}
+		const afterEnv = await this.detectEnvironment(entry.id);
+		const binaryPath = afterEnv.binaryPath ?? runResult.binaryPath;
+		const installed = afterEnv.installed || Boolean(binaryPath);
+		if (installed) {
+			cfg.enabled = true;
+			this.persisted.connectors[entry.id] = cfg;
+			if (this.statuses.get(entry.id) !== "connected") this.statuses.set(entry.id, "installed_unauthenticated");
+			this.diagnostics.delete(entry.id);
+			await this.saveConfig();
+		}
+		return {
+			ok: installed,
+			installed,
+			binaryPath,
+			version: afterEnv.version ?? runResult.version,
+			sourceUsed: runResult.sourceUsed ?? "npm",
+			...!installed ? {
+				fallbackUrl: entry.officialUrls.docs,
+				friendlyError: {
+					zh: "组件安装已完成，但未检测到可执行入口，请检查系统环境或查看文档。",
+					en: "Package installed, but executable entrypoint was not detected."
+				}
+			} : {}
+		};
+	}
+	async configure(connectorId, patch) {
+		await this.ensureLoaded();
+		const entry = this.getEntryOrThrow(connectorId);
+		const current = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+		const nextDriver = patch.selectedDriverId && entry.drivers.some((d) => d.id === patch.selectedDriverId) ? patch.selectedDriverId : current.selectedDriverId ?? entry.drivers[0].id;
+		const profileId = patch.activeProfileId?.trim() || current.activeProfileId || "default";
+		const existingProfile = current.profiles[profileId] ?? { id: profileId };
+		const mergedFields = { ...existingProfile.nonSecretFields };
+		if (patch.nonSecretFields) {
+			const allowedNonSecret = new Set((entry.auth.fields ?? []).filter((f) => !f.secret).map((f) => f.key));
+			for (const [key, val] of Object.entries(patch.nonSecretFields)) if (allowedNonSecret.has(key) && typeof val === "string") mergedFields[key] = val;
+		}
+		if (patch.secretFields) {
+			const allowedSecrets = new Set((entry.auth.fields ?? []).filter((f) => f.secret).map((f) => f.key));
+			for (const [key, val] of Object.entries(patch.secretFields)) if (allowedSecrets.has(key) && typeof val === "string" && val.trim().length > 0) await this.secretVault.setSecret(entry.id, profileId, key, val);
+		}
+		const nextConfig = {
+			...current,
+			...patch.enabled !== void 0 ? { enabled: Boolean(patch.enabled) } : {},
+			selectedDriverId: nextDriver,
+			...patch.customBinaryPath !== void 0 ? { customBinaryPath: patch.customBinaryPath.trim() } : {},
+			activeProfileId: profileId,
+			...patch.consentAccepted !== void 0 ? { consentAccepted: Boolean(patch.consentAccepted) } : {},
+			profiles: {
+				...current.profiles,
+				[profileId]: {
+					...existingProfile,
+					...patch.accountLabel !== void 0 ? { accountLabel: patch.accountLabel } : {},
+					nonSecretFields: mergedFields
+				}
+			}
+		};
+		this.persisted.connectors[entry.id] = nextConfig;
+		if (!nextConfig.enabled) {
+			this.statuses.set(entry.id, "disabled");
+			this.unmountMcp(entry.id);
+		} else if (this.statuses.get(entry.id) === "disabled" || this.statuses.get(entry.id) === "not_installed") this.statuses.set(entry.id, "installed_unauthenticated");
+		await this.saveConfig();
+		if (nextConfig.enabled && this.statuses.get(entry.id) === "connected") await this.mountMcpIfApplicable(entry, nextConfig);
+		this.skillControl?.invalidate();
+		return this.snapshot();
+	}
+	async startLogin(connectorId) {
+		await this.ensureLoaded();
+		const entry = this.getEntryOrThrow(connectorId);
+		const cfg = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+		if (this.activeDriverFor(entry, cfg).kind === "mcp-remote" || entry.auth.mode !== "cli-native" || !entry.auth.cliLoginCommand?.length) {
+			const session = {
+				connectorId: entry.id,
+				kind: "web-token",
+				state: "awaiting_user",
+				authUrl: entry.auth.quickAuthUrl ?? entry.officialUrls.openPlatform ?? entry.officialUrls.docs,
+				needsTokenInput: Boolean(entry.auth.fields?.length),
+				message: {
+					zh: "已为你打开官方授权网页，完成登录后请按提示确认或填入凭证。",
+					en: "Official authorization page opened. Complete sign-in and confirm or paste your credential."
+				}
+			};
+			this.loginSessions.set(entry.id, session);
+			return { ...session };
+		}
+		const env = await this.detectEnvironment(entry.id);
+		if (!env.installed || !env.binaryPath) {
+			const failed = {
+				connectorId: entry.id,
+				kind: "cli-browser",
+				state: "failed",
+				fallbackUrl: entry.officialUrls.docs,
+				message: {
+					zh: "尚未检测到官方组件，请先点击「一键安装官方组件」。",
+					en: "Official component is not installed yet. Click One-click install first."
+				}
+			};
+			this.loginSessions.set(entry.id, failed);
+			return { ...failed };
+		}
+		const previousChild = this.loginChildren.get(entry.id);
+		if (previousChild) {
+			this.loginChildren.delete(entry.id);
+			try {
+				previousChild.kill?.("SIGTERM");
+			} catch {}
+		}
+		const session = {
+			connectorId: entry.id,
+			kind: "cli-browser",
+			state: "pending",
+			message: {
+				zh: "正在启动官方网页登录授权，请在浏览器中确认登录。",
+				en: "Launching official browser sign-in. Confirm authorization in your browser."
+			},
+			rawOutput: ""
+		};
+		this.loginSessions.set(entry.id, session);
+		const baseArgs = entry.auth.cliLoginCommand.slice(1);
+		const binDir = await ensureManagedNodeShim(this.homeDir, this.platform).catch(() => join(this.homeDir, "connectors", "bin"));
+		const loginEnv = withManagedBinPath(process.env, binDir, this.platform);
+		const launchResolved = async (cmdArgs) => {
+			const resolved = this.platform === "win32" && /\.(?:cmd|bat)$/iu.test(env.binaryPath) ? await resolveDirectCommand(env.binaryPath, cmdArgs, loginEnv, this.platform) : {
+				command: env.binaryPath,
+				args: cmdArgs,
+				env: loginEnv,
+				shell: false
+			};
+			return this.loginLauncher(resolved.command, resolved.args, resolved.env);
+		};
+		const runLoginAttempt = async (cmdArgs, allowFeishuInitFallback) => {
+			let child;
+			try {
+				child = await launchResolved(cmdArgs);
+			} catch (error) {
+				session.state = "failed";
+				session.rawOutput = error instanceof Error ? error.message : String(error);
+				return { ...session };
+			}
+			this.loginChildren.set(entry.id, child);
+			const attemptOutcome = await new Promise((resolvePromise) => {
+				let settled = false;
+				const settleNow = (retryInit = false) => {
+					if (settled) return;
+					settled = true;
+					clearTimeout(initialTimer);
+					resolvePromise({
+						retryInit,
+						result: { ...session }
+					});
+				};
+				const onChunk = (chunk) => {
+					const text = (Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk)).replace(/\u001b\[[0-9;]*[a-zA-Z]/gu, "");
+					session.rawOutput = `${session.rawOutput ?? ""}${text}`.slice(-4096);
+					if (!session.deviceCode) {
+						const codeMatch = /[?&]user_code=([A-Z0-9]{4}-[A-Z0-9]{4,6})\b/iu.exec(session.rawOutput) ?? /\b([A-Z0-9]{4}-[A-Z0-9]{4,6})\b/u.exec(session.rawOutput);
+						if (codeMatch) session.deviceCode = codeMatch[1].toUpperCase();
+					}
+					if (!session.authUrl) {
+						const urlMatch = /https:\/\/[^\s"'<>]+/u.exec(session.rawOutput);
+						if (urlMatch) {
+							session.authUrl = urlMatch[0];
+							settleNow(false);
+						}
+					}
+				};
+				child.stdout?.on("data", onChunk);
+				child.stderr?.on("data", onChunk);
+				child.once("error", (error) => {
+					if (this.loginChildren.get(entry.id) === child) this.loginChildren.delete(entry.id);
+					session.state = "failed";
+					session.rawOutput = `${session.rawOutput ?? ""}\n${error.message}`.trim().slice(-4096);
+					settleNow(false);
+				});
+				child.once("close", (code) => {
+					if (this.loginChildren.get(entry.id) === child) this.loginChildren.delete(entry.id);
+					if (code === 0) this.verifyConnection(entry.id, { simulateOutcome: "ok" }).then(() => {
+						session.state = "succeeded";
+						session.message = {
+							zh: "网页授权已完成，连接已就绪。",
+							en: "Browser authorization succeeded."
+						};
+						settleNow(false);
+					}).catch(() => {
+						session.state = "succeeded";
+						settleNow(false);
+					});
+					else {
+						if (allowFeishuInitFallback && entry.id === "feishu" && /not_configured|not configured/iu.test(session.rawOutput ?? "")) {
+							settleNow(true);
+							return;
+						}
+						session.state = "failed";
+						session.message = {
+							zh: "登录授权未完成或已取消，可重新发起网页授权。",
+							en: "Authorization was cancelled or failed. You can retry."
+						};
+						settleNow(false);
+					}
+				});
+				const initialTimer = setTimeout(() => settleNow(false), 8e3);
+			});
+			if (attemptOutcome.retryInit) {
+				session.rawOutput = "";
+				session.state = "pending";
+				return await runLoginAttempt([
+					"config",
+					"init",
+					"--new"
+				], false);
+			}
+			return attemptOutcome.result;
+		};
+		let initialArgs = baseArgs;
+		if (entry.id === "feishu") {
+			const cfgProbe = await this.probeCli(env.binaryPath, ["config", "show"], 4e3, loginEnv);
+			const cfgText = `${cfgProbe.stdout}\n${cfgProbe.stderr}`;
+			if (!cfgProbe.ok || /not_configured|not configured|no config/iu.test(cfgText)) initialArgs = [
+				"config",
+				"init",
+				"--new"
+			];
+		}
+		return await runLoginAttempt(initialArgs, entry.id === "feishu");
+	}
+	async getLoginStatus(connectorId) {
+		await this.ensureLoaded();
+		const entry = this.getEntryOrThrow(connectorId);
+		const existing = this.loginSessions.get(entry.id);
+		if (existing) return { ...existing };
+		const currentStatus = this.statuses.get(entry.id) ?? "not_installed";
+		return {
+			connectorId: entry.id,
+			kind: entry.auth.mode === "cli-native" ? "cli-browser" : "web-token",
+			state: currentStatus === "connected" ? "succeeded" : "awaiting_user"
+		};
+	}
+	async verifyConnection(connectorId, opts = {}) {
+		await this.ensureLoaded();
+		const entry = this.getEntryOrThrow(connectorId);
+		const cfg = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+		cfg.enabled = true;
+		this.persisted.connectors[entry.id] = cfg;
+		const checkedAt = (/* @__PURE__ */ new Date()).toISOString();
+		const env = await this.detectEnvironment(connectorId);
+		const profileId = cfg.activeProfileId || "default";
+		let ok = true;
+		let rawError = "";
+		if (opts.simulateOutcome && opts.simulateOutcome !== "ok") {
+			ok = false;
+			rawError = opts.simulateOutcome;
+		} else if (opts.simulateOutcome === "ok") ok = true;
+		else {
+			const missingSecret = [];
+			for (const field of entry.auth.fields ?? []) if (field.required && field.secret) {
+				if (!await this.secretVault.hasSecret(entry.id, profileId, field.key)) missingSecret.push(field.label.zh);
+			}
+			if (missingSecret.length > 0) {
+				const result = {
+					status: "installed_unauthenticated",
+					checkedAt,
+					friendlyCause: {
+						zh: `尚未填写必需凭证：${missingSecret.join("、")}。`,
+						en: `Missing required credential field(s).`
+					},
+					friendlyFix: {
+						zh: "请先点击上方按钮前往官方网页完成登录并粘贴访问凭证。",
+						en: "Open the official auth page and paste your credential above."
+					},
+					environment: env
+				};
+				this.statuses.set(entry.id, "installed_unauthenticated");
+				this.diagnostics.set(entry.id, result);
+				await this.saveConfig();
+				return result;
+			}
+			if (entry.healthCheck.kind === "cli-command") if (!env.installed || !env.binaryPath) {
+				ok = false;
+				rawError = `CLI binary not installed (${env.driverId})`;
+			} else {
+				const binDir = await ensureManagedNodeShim(this.homeDir, this.platform).catch(() => join(this.homeDir, "connectors", "bin"));
+				const probeEnv = withManagedBinPath(process.env, binDir, this.platform);
+				const probe = await this.probeCli(env.binaryPath, entry.healthCheck.args ?? ["--version"], entry.healthCheck.timeoutMs ?? 1e4, probeEnv);
+				ok = probe.ok;
+				if (!probe.ok) rawError = probe.stderr || probe.stdout || "CLI health check failed";
+			}
+			else if (entry.healthCheck.kind === "mcp-probe") {
+				await this.mountMcpIfApplicable(entry, cfg);
+				const mcpManager = this.ctx.get?.("mcpManager");
+				if (mcpManager?.probe) {
+					const res = await mcpManager.probe(`connector_${entry.id}`);
+					if (res && res.ok === false) {
+						ok = false;
+						rawError = res.error ?? "MCP probe failed";
+					}
+				}
+			}
+		}
+		if (ok) {
+			await this.mountMcpIfApplicable(entry, cfg);
+			this.statuses.set(entry.id, "connected");
+			const result = {
+				status: "connected",
+				checkedAt,
+				environment: env
+			};
+			this.diagnostics.set(entry.id, result);
+			await this.saveConfig();
+			this.skillControl?.invalidate();
+			return result;
+		}
+		this.unmountMcp(entry.id);
+		const classified = env.installed === false && !opts.simulateOutcome ? {
+			status: "not_installed",
+			friendlyCause: {
+				zh: "本机尚未检测到官方 CLI 程序。",
+				en: "Official CLI executable was not found on this machine."
+			},
+			friendlyFix: {
+				zh: "请在向导中安装官方 CLI，或在高级配置中填写绝对路径。",
+				en: "Install the official CLI or set its absolute executable path in Advanced settings."
+			}
+		} : classifyConnectorFailure(entry, rawError);
+		this.statuses.set(entry.id, classified.status);
+		const result = {
+			status: classified.status,
+			checkedAt,
+			friendlyCause: classified.friendlyCause,
+			friendlyFix: classified.friendlyFix,
+			rawError: rawError.slice(0, 1e3),
+			environment: env
+		};
+		this.diagnostics.set(entry.id, result);
+		await this.saveConfig();
+		this.skillControl?.invalidate();
+		return result;
+	}
+	async disconnect(connectorId) {
+		await this.ensureLoaded();
+		const entry = this.getEntryOrThrow(connectorId);
+		const current = this.persisted.connectors[entry.id] ?? defaultUserConfig(entry);
+		this.persisted.connectors[entry.id] = {
+			...current,
+			enabled: false
+		};
+		this.statuses.set(entry.id, "disabled");
+		this.unmountMcp(entry.id);
+		this.diagnostics.delete(entry.id);
+		await this.saveConfig();
+		this.skillControl?.invalidate();
+		return this.snapshot();
+	}
+	matchToolRisk(toolName) {
+		const match = /^mcp__connector_([a-z0-9-]+)__(.+)$/u.exec(toolName);
+		if (!match) return void 0;
+		const [, connectorId, actionName] = match;
+		const entry = this.catalog.connectors.find((item) => item.id === connectorId);
+		if (!entry) return void 0;
+		for (const rule of entry.riskRules) if (safePatternMatch(rule.actionPattern, actionName)) return {
+			connectorId,
+			level: rule.level,
+			label: rule.label
+		};
+		return {
+			connectorId,
+			level: "L1"
+		};
+	}
+};
+//#endregion
+//#region src/connectors/connector-routes.ts
+const MAX_BODY_BYTES$1 = 128 * 1024;
+const LOOPBACK_HOSTS$1 = /* @__PURE__ */ new Set([
+	"127.0.0.1",
+	"::1",
+	"::ffff:127.0.0.1"
+]);
+function sendJson$1(response, statusCode, body) {
+	response.writeHead(statusCode, {
+		"content-type": "application/json; charset=utf-8",
+		"cache-control": "no-store"
+	});
+	response.end(JSON.stringify(body));
+}
+async function readJsonBody$1(request) {
+	const chunks = [];
+	let total = 0;
+	for await (const chunk of request) {
+		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+		total += buffer.length;
+		if (total > MAX_BODY_BYTES$1) throw new Error("request body too large");
+		chunks.push(buffer);
+	}
+	const text = Buffer.concat(chunks, total).toString("utf8").trim();
+	if (!text) return {};
+	const parsed = JSON.parse(text);
+	if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("request body must be a JSON object");
+	return parsed;
+}
+function isAuthorizedRequest$1(request, peer) {
+	const address = request.socket?.remoteAddress;
+	if (address !== void 0 && !LOOPBACK_HOSTS$1.has(address)) return false;
+	if (peer?.principal?.kind !== "owner") return false;
+	if (request.headers["x-dsh-connectors"] !== "1") return false;
+	if (request.headers["sec-fetch-site"] === "cross-site") return false;
+	return true;
+}
+function registerConnectorRoutes(ctx, service) {
+	const webServer = ctx.get?.("webServer");
+	if (!webServer?.register) return () => {};
+	const handler = async (request, response, peer) => {
+		if (!isAuthorizedRequest$1(request, peer)) {
+			response.writeHead(403).end();
+			return;
+		}
+		const action = new URL(request.url ?? "/", "http://localhost").pathname.slice(19);
+		try {
+			if (action === "/state" && request.method === "GET") {
+				sendJson$1(response, 200, await service.snapshot());
+				return;
+			}
+			if (action === "/login-status" && request.method === "GET") {
+				const connectorId = new URL(request.url ?? "/", "http://localhost").searchParams.get("connectorId")?.trim() ?? "";
+				if (!connectorId) {
+					sendJson$1(response, 400, { error: "connectorId is required" });
+					return;
+				}
+				sendJson$1(response, 200, {
+					login: await service.getLoginStatus(connectorId),
+					snapshot: await service.snapshot()
+				});
+				return;
+			}
+			if (request.method !== "POST") {
+				response.writeHead(405).end();
+				return;
+			}
+			const body = await readJsonBody$1(request);
+			const connectorId = typeof body.connectorId === "string" ? body.connectorId.trim() : "";
+			if (!connectorId) {
+				sendJson$1(response, 400, { error: "connectorId is required" });
+				return;
+			}
+			if (action === "/detect") {
+				sendJson$1(response, 200, await service.detectEnvironment(connectorId));
+				return;
+			}
+			if (action === "/install") {
+				sendJson$1(response, 200, {
+					result: await service.installConnector(connectorId),
+					snapshot: await service.snapshot()
+				});
+				return;
+			}
+			if (action === "/login") {
+				sendJson$1(response, 200, {
+					login: await service.startLogin(connectorId),
+					snapshot: await service.snapshot()
+				});
+				return;
+			}
+			if (action === "/configure") {
+				sendJson$1(response, 200, await service.configure(connectorId, {
+					enabled: typeof body.enabled === "boolean" ? body.enabled : void 0,
+					selectedDriverId: typeof body.selectedDriverId === "string" ? body.selectedDriverId : void 0,
+					customBinaryPath: typeof body.customBinaryPath === "string" ? body.customBinaryPath : void 0,
+					activeProfileId: typeof body.activeProfileId === "string" ? body.activeProfileId : void 0,
+					nonSecretFields: body.nonSecretFields && typeof body.nonSecretFields === "object" && !Array.isArray(body.nonSecretFields) ? body.nonSecretFields : void 0,
+					secretFields: body.secretFields && typeof body.secretFields === "object" && !Array.isArray(body.secretFields) ? body.secretFields : void 0,
+					accountLabel: typeof body.accountLabel === "string" ? body.accountLabel : void 0,
+					consentAccepted: typeof body.consentAccepted === "boolean" ? body.consentAccepted : void 0
+				}));
+				return;
+			}
+			if (action === "/verify") {
+				sendJson$1(response, 200, {
+					diagnostic: await service.verifyConnection(connectorId),
+					snapshot: await service.snapshot()
+				});
+				return;
+			}
+			if (action === "/disconnect") {
+				sendJson$1(response, 200, await service.disconnect(connectorId));
+				return;
+			}
+			response.writeHead(404).end();
+		} catch (error) {
+			sendJson$1(response, 400, { error: error instanceof Error ? error.message : String(error) });
+		}
+	};
+	return webServer.register({
+		kind: "prefix",
+		path: CONNECTOR_API_PREFIX,
+		handler
+	});
+}
+//#endregion
+//#region src/connectors/work-office-preset.ts
+const WORK_OFFICE_PLUGINS = [
+	{
+		id: "persona",
+		name: "@deepseek-ai/dsh-persona",
+		config: { prefix: "You are an office productivity assistant in DeepSeek Harness Desktop Work Mode. Discover connected office services on demand, protect sensitive enterprise data, and ask for confirmation before sending messages, sharing externally, or deleting records." }
+	},
+	{
+		id: "agent-instructions",
+		name: "@deepseek-ai/dsh-agent-instructions",
+		config: { maxBytes: 65536 }
+	},
+	{
+		id: "tool-office",
+		name: "@deepseek-ai/dsh-tool-office"
+	},
+	{
+		id: "skill-office",
+		name: "@deepseek-ai/dsh-skill-office"
+	},
+	{
+		id: "tool-bash",
+		name: "@deepseek-ai/dsh-tool-bash",
+		config: { timeoutMs: 3e5 }
+	},
+	{
+		id: "tool-str-replace-editor",
+		name: "@deepseek-ai/dsh-tool-str-replace-editor",
+		config: { maxOutputChars: 16e3 }
+	},
+	{
+		id: "tool-fs",
+		name: "@deepseek-ai/dsh-tool-fs"
+	},
+	{
+		id: "tool-fs-search",
+		name: "@deepseek-ai/dsh-tool-fs-search",
+		config: { sampleOverCapGlobResults: false }
+	},
+	{
+		id: "skill-filesystem",
+		name: "@deepseek-ai/dsh-skill-filesystem"
+	},
+	{
+		id: "tool-skill",
+		name: "@deepseek-ai/dsh-tool-skill"
+	},
+	{
+		id: "tool-todo",
+		name: "@deepseek-ai/dsh-tool-todo",
+		config: { allowParallelInProgress: true }
+	},
+	{
+		id: "tool-ask-user",
+		name: "@deepseek-ai/dsh-tool-ask-user"
+	},
+	{
+		id: "tool-web",
+		name: "@deepseek-ai/dsh-tool-web",
+		config: {
+			fetch: false,
+			searchTimeoutMs: 6e4
+		}
+	},
+	{
+		id: "compaction",
+		name: "cordis:group",
+		group: true,
+		isolate: {
+			compaction: true,
+			toolResultPruner: true
+		},
+		config: [
+			{
+				id: "compaction-basic",
+				name: "@deepseek-ai/dsh-compaction-basic"
+			},
+			{
+				id: "command-compact",
+				name: "@deepseek-ai/dsh-command-compact"
+			},
+			{
+				id: "tool-result-pruner",
+				name: "@deepseek-ai/dsh-compaction-tool-result-pruner",
+				config: {
+					thresholdChars: 8192,
+					headChars: 4096,
+					tailChars: 1024
+				}
+			}
+		]
+	}
+];
+function registerWorkOfficePreset(ctx) {
+	let closed = false;
+	let pending;
+	let release;
+	const start = () => {
+		if (closed || pending) return;
+		const registry = ctx.get?.("agentPresets");
+		if (!registry?.register) return;
+		pending = registry.register({
+			id: WORK_OFFICE_PRESET_ID,
+			name: "工作模式",
+			description: "面向日常办公、文档协作与会议整理，按需调用已连接的办公生态服务。",
+			order: 5,
+			plugins: WORK_OFFICE_PLUGINS
+		}).then((dispose) => {
+			if (closed) return dispose();
+			release = dispose;
+		}).catch((error) => {
+			ctx.logger?.warn?.(`dsh-desktop-compat: work-office preset declaration failed: ${error instanceof Error ? error.message : String(error)}`);
+		});
+	};
+	ctx.inject(["agentPresets"], start);
+	ctx.effect(() => {
+		start();
+		return async () => {
+			closed = true;
+			await pending;
+			await release?.();
+		};
+	}, "dsh-desktop-compat: work-office preset");
+}
+//#endregion
+//#region src/acp/acp-client.ts
+var AcpClientError = class extends Error {
+	code;
+	constructor(code, message) {
+		super(message);
+		this.code = code;
+		this.name = "AcpClientError";
+	}
+};
+async function assertWorkspaceContained(workspaceCwd, targetPath) {
+	if (typeof targetPath !== "string" || targetPath.trim().length === 0 || targetPath.includes("\0")) throw new AcpClientError("INVALID_PATH", "target path must be a non-empty string");
+	const rootReal = await realpath(resolve(workspaceCwd));
+	const candidate = isAbsolute(targetPath) ? resolve(targetPath) : resolve(rootReal, targetPath);
+	let resolvedTarget;
+	try {
+		resolvedTarget = await realpath(candidate);
+	} catch (error) {
+		if (error?.code !== "ENOENT") throw error;
+		resolvedTarget = joinSafe(await realpath(dirname(candidate)), candidate.slice(dirname(candidate).length).replace(/^[/\\]+/u, ""));
+	}
+	const rel = relative(rootReal, resolvedTarget);
+	if (rel.startsWith("..") || isAbsolute(rel) || rel.split(sep).includes("..")) throw new AcpClientError("WORKSPACE_ESCAPE", `path "${targetPath}" escapes session workspace`);
+	return resolvedTarget;
+}
+function joinSafe(parent, leaf) {
+	return leaf ? resolve(parent, leaf) : parent;
+}
+function isPlainObject(value) {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+function parseLineSlice(content, line, limit) {
+	if (line === void 0 && limit === void 0) return content;
+	const lines = content.split(/\r?\n/u);
+	const start = Math.max(0, (line ?? 1) - 1);
+	const end = limit !== void 0 && limit > 0 ? start + limit : lines.length;
+	return lines.slice(start, end).join("\n");
+}
+var AcpClient = class {
+	options;
+	child;
+	nextId = 0;
+	pending = /* @__PURE__ */ new Map();
+	sessionListeners = /* @__PURE__ */ new Map();
+	stderrTail = "";
+	closed = false;
+	closePromise;
+	negotiated;
+	constructor(options) {
+		this.options = options;
+	}
+	get capabilities() {
+		return this.negotiated;
+	}
+	ensureStarted() {
+		if (this.closed) throw new AcpClientError("CLIENT_CLOSED", "ACP client has closed");
+		if (this.child) return this.child;
+		const child = (this.options.launch ?? spawn)(this.options.command, this.options.args, {
+			cwd: this.options.cwd,
+			env: this.options.env ? {
+				...process.env,
+				...this.options.env
+			} : process.env,
+			shell: false,
+			windowsHide: true,
+			stdio: [
+				"pipe",
+				"pipe",
+				"pipe"
+			]
+		});
+		this.child = child;
+		child.stderr.setEncoding("utf8");
+		child.stderr.on("data", (chunk) => {
+			this.stderrTail = (this.stderrTail + chunk).slice(-16384);
+		});
+		child.stdin.on("error", () => {});
+		const lines = createInterface({
+			input: child.stdout,
+			crlfDelay: Infinity
+		});
+		lines.on("line", (line) => {
+			if (!line.trim()) return;
+			let msg;
+			try {
+				const parsed = JSON.parse(line);
+				if (!isPlainObject(parsed)) return;
+				msg = parsed;
+			} catch {
+				return;
+			}
+			this.handleMessage(msg);
+		});
+		this.closePromise = new Promise((resolvePromise) => {
+			const rejectAll = (reason) => {
+				for (const [id, entry] of this.pending) {
+					clearTimeout(entry.timer);
+					this.pending.delete(id);
+					entry.reject(reason);
+				}
+			};
+			child.once("error", (error) => {
+				lines.close();
+				rejectAll(new AcpClientError("SPAWN_FAILED", error.message));
+				resolvePromise();
+			});
+			child.once("close", (code) => {
+				lines.close();
+				this.closed = true;
+				const suffix = this.stderrTail.trim() ? `: ${this.stderrTail.trim()}` : "";
+				rejectAll(new AcpClientError("PROCESS_EXITED", `ACP server exited with code ${code ?? "null"}${suffix}`));
+				resolvePromise();
+			});
+		});
+		return child;
+	}
+	sendRaw(payload) {
+		const child = this.ensureStarted();
+		if (!child.stdin.writable) throw new AcpClientError("STDIN_CLOSED", "ACP stdin stream is closed");
+		child.stdin.write(`${JSON.stringify(payload)}\n`);
+	}
+	request(method, params, timeoutMs) {
+		this.ensureStarted();
+		const id = ++this.nextId;
+		const budget = timeoutMs ?? this.options.timeoutMs ?? 6e4;
+		return new Promise((resolvePromise, rejectPromise) => {
+			const timer = setTimeout(() => {
+				this.pending.delete(id);
+				rejectPromise(new AcpClientError("REQUEST_TIMEOUT", `ACP request "${method}" timed out`));
+			}, budget);
+			this.pending.set(id, {
+				resolve: resolvePromise,
+				reject: rejectPromise,
+				timer
+			});
+			try {
+				this.sendRaw({
+					jsonrpc: "2.0",
+					id,
+					method,
+					params
+				});
+			} catch (error) {
+				clearTimeout(timer);
+				this.pending.delete(id);
+				rejectPromise(error instanceof Error ? error : new Error(String(error)));
+			}
+		});
+	}
+	notify(method, params) {
+		this.sendRaw({
+			jsonrpc: "2.0",
+			method,
+			params
+		});
+	}
+	handleMessage(msg) {
+		if (typeof msg.method === "string" && msg.id !== void 0) {
+			this.handleAgentRequest(msg.id, msg.method, isPlainObject(msg.params) ? msg.params : {});
+			return;
+		}
+		if (msg.method === "session/update" && isPlainObject(msg.params)) {
+			const sid = typeof msg.params.sessionId === "string" ? msg.params.sessionId : "";
+			const listener = this.sessionListeners.get(sid);
+			if (listener && isPlainObject(msg.params.update)) {
+				const events = this.normalizeUpdate(msg.params.update);
+				for (const event of events) listener(event);
+			}
+			return;
+		}
+		if (typeof msg.id === "number" && this.pending.has(msg.id)) {
+			const entry = this.pending.get(msg.id);
+			clearTimeout(entry.timer);
+			this.pending.delete(msg.id);
+			if (isPlainObject(msg.error)) {
+				const errMsg = typeof msg.error.message === "string" ? msg.error.message : "ACP request failed";
+				const errCode = Number(msg.error.code ?? -32e3);
+				entry.reject(new AcpClientError(errCode === -32e3 && /auth/iu.test(errMsg) ? "AUTH_REQUIRED" : "RPC_ERROR", errMsg));
+			} else entry.resolve(msg.result);
+		}
+	}
+	normalizeUpdate(update) {
+		const kind = typeof update.sessionUpdate === "string" ? update.sessionUpdate : "";
+		const content = isPlainObject(update.content) ? update.content : void 0;
+		if (kind === "agent_message_chunk" && content?.type === "text" && typeof content.text === "string") return [{
+			type: "message_delta",
+			text: content.text
+		}];
+		if (kind === "agent_thought_chunk" && content?.type === "text" && typeof content.text === "string") return [{
+			type: "thought_delta",
+			text: content.text
+		}];
+		if (kind === "plan" && Array.isArray(update.entries)) return [{
+			type: "plan_update",
+			entries: update.entries.filter(isPlainObject).map((entry) => ({
+				content: String(entry.content ?? ""),
+				...typeof entry.status === "string" ? { status: entry.status } : {},
+				...typeof entry.priority === "string" ? { priority: entry.priority } : {}
+			}))
+		}];
+		if (kind === "tool_call") return [{
+			type: "tool_call",
+			toolCallId: String(update.toolCallId ?? ""),
+			...typeof update.title === "string" ? { title: update.title } : {},
+			...typeof update.kind === "string" ? { kind: update.kind } : {},
+			...typeof update.status === "string" ? { status: update.status } : {},
+			...update.rawInput !== void 0 ? { rawInput: update.rawInput } : {}
+		}];
+		if (kind === "tool_call_update") {
+			const diffItem = Array.isArray(update.content) ? update.content.find((item) => isPlainObject(item) && item.type === "diff" && typeof item.path === "string") : void 0;
+			return [{
+				type: "tool_call_update",
+				toolCallId: String(update.toolCallId ?? ""),
+				...typeof update.status === "string" ? { status: update.status } : {},
+				...update.content !== void 0 ? { content: update.content } : {},
+				...isPlainObject(diffItem) ? { diff: {
+					path: String(diffItem.path),
+					...typeof diffItem.oldText === "string" ? { oldText: diffItem.oldText } : {},
+					...typeof diffItem.newText === "string" ? { newText: diffItem.newText } : {}
+				} } : {}
+			}];
+		}
+		return [];
+	}
+	async handleAgentRequest(id, method, params) {
+		const reply = (payload) => {
+			try {
+				this.sendRaw({
+					jsonrpc: "2.0",
+					id,
+					...payload
+				});
+			} catch {}
+		};
+		if (method === "session/request_permission") {
+			const handler = this.options.handlers?.onPermissionRequest;
+			if (!handler) {
+				reply({ result: { outcome: { outcome: "cancelled" } } });
+				return;
+			}
+			try {
+				reply({ result: await handler({
+					requestId: id,
+					sessionId: String(params.sessionId ?? ""),
+					toolCall: isPlainObject(params.toolCall) ? {
+						title: typeof params.toolCall.title === "string" ? params.toolCall.title : void 0,
+						kind: typeof params.toolCall.kind === "string" ? params.toolCall.kind : void 0,
+						rawInput: params.toolCall.rawInput
+					} : void 0,
+					options: Array.isArray(params.options) ? params.options.filter(isPlainObject).map((opt) => ({
+						optionId: String(opt.optionId ?? ""),
+						name: typeof opt.name === "string" ? opt.name : void 0,
+						kind: typeof opt.kind === "string" ? opt.kind : void 0
+					})) : []
+				}) });
+			} catch {
+				reply({ result: { outcome: { outcome: "cancelled" } } });
+			}
+			return;
+		}
+		if (method === "fs/read_text_file") {
+			try {
+				reply({ result: { content: parseLineSlice(await readFile(await assertWorkspaceContained(this.options.cwd, String(params.path ?? "")), "utf8"), typeof params.line === "number" ? params.line : void 0, typeof params.limit === "number" ? params.limit : void 0) } });
+			} catch (error) {
+				reply({ error: {
+					code: error instanceof AcpClientError && error.code === "WORKSPACE_ESCAPE" ? -32602 : -32e3,
+					message: error instanceof Error ? error.message : "failed to read file"
+				} });
+			}
+			return;
+		}
+		if (method === "fs/write_text_file") {
+			try {
+				const safePath = await assertWorkspaceContained(this.options.cwd, String(params.path ?? ""));
+				const content = typeof params.content === "string" ? params.content : "";
+				if (!(this.options.handlers?.onFsWriteApprove ? await this.options.handlers.onFsWriteApprove(safePath, content) : false)) {
+					reply({ error: {
+						code: -32001,
+						message: "file write rejected by client policy"
+					} });
+					return;
+				}
+				await writeFile(safePath, content, "utf8");
+				reply({ result: {} });
+			} catch (error) {
+				reply({ error: {
+					code: -32e3,
+					message: error instanceof Error ? error.message : "failed to write file"
+				} });
+			}
+			return;
+		}
+		reply({ error: {
+			code: -32601,
+			message: `Unsupported client method: ${method}`
+		} });
+	}
+	async initialize(clientInfo = {
+		name: "deepseek-harness-desktop",
+		version: "5.4.0"
+	}, clientCapabilities = {
+		fs: {
+			readTextFile: true,
+			writeTextFile: true
+		},
+		terminal: false
+	}) {
+		const result = await this.request("initialize", {
+			protocolVersion: 1,
+			clientCapabilities,
+			clientInfo
+		}, 3e4);
+		const protocolVersion = Number(result.protocolVersion ?? 0);
+		if (protocolVersion !== 1) throw new AcpClientError("UNSUPPORTED_PROTOCOL", `unsupported ACP protocolVersion: ${String(result.protocolVersion)}`);
+		const caps = isPlainObject(result.agentCapabilities) ? result.agentCapabilities : {};
+		const mcpCaps = isPlainObject(caps.mcpCapabilities) ? caps.mcpCapabilities : {};
+		const authMethods = Array.isArray(result.authMethods) ? result.authMethods.filter(isPlainObject).map((m) => ({
+			id: String(m.id ?? ""),
+			name: typeof m.name === "string" ? m.name : void 0
+		})) : [];
+		const agentInfo = isPlainObject(result.agentInfo) ? {
+			name: typeof result.agentInfo.name === "string" ? result.agentInfo.name : void 0,
+			version: typeof result.agentInfo.version === "string" ? result.agentInfo.version : void 0
+		} : void 0;
+		this.negotiated = {
+			protocolVersion,
+			agentInfo,
+			loadSession: Boolean(caps.loadSession),
+			mcpHttp: Boolean(mcpCaps.http),
+			mcpSse: Boolean(mcpCaps.sse),
+			authMethods,
+			raw: caps
+		};
+		return this.negotiated;
+	}
+	async authenticate(methodId) {
+		await this.request("authenticate", { methodId }, 6e4);
+	}
+	parseSessionPayload(result) {
+		const acpSessionId = typeof result.sessionId === "string" ? result.sessionId : "";
+		if (!acpSessionId) throw new AcpClientError("INVALID_SESSION", "ACP agent did not return a sessionId");
+		const modelsObj = isPlainObject(result.models) ? result.models : void 0;
+		const availableModels = Array.isArray(modelsObj?.availableModels) ? modelsObj.availableModels.filter(isPlainObject).map((m) => ({
+			id: String(m.modelId ?? m.id ?? ""),
+			name: typeof m.name === "string" ? m.name : void 0
+		})) : [];
+		const configOptions = Array.isArray(result.configOptions) ? result.configOptions.filter(isPlainObject).map((opt) => ({
+			id: String(opt.id ?? ""),
+			name: typeof opt.name === "string" ? opt.name : void 0,
+			currentValue: typeof opt.currentValue === "string" ? opt.currentValue : void 0,
+			options: Array.isArray(opt.options) ? opt.options.filter(isPlainObject).map((o) => ({
+				value: String(o.value ?? ""),
+				name: typeof o.name === "string" ? o.name : void 0
+			})) : void 0
+		})) : [];
+		return {
+			acpSessionId,
+			currentModelId: typeof modelsObj?.currentModelId === "string" ? modelsObj.currentModelId : void 0,
+			availableModels,
+			configOptions
+		};
+	}
+	async newSession({ cwd, mcpServers = [] }) {
+		const res = await this.request("session/new", {
+			cwd,
+			mcpServers
+		}, 3e4);
+		return this.parseSessionPayload(res);
+	}
+	async loadSession({ sessionId, cwd, mcpServers = [] }) {
+		if (!this.negotiated?.loadSession) throw new AcpClientError("CAPABILITY_UNSUPPORTED", "ACP agent does not declare loadSession capability");
+		const res = await this.request("session/load", {
+			sessionId,
+			cwd,
+			mcpServers
+		}, 3e4);
+		return this.parseSessionPayload({
+			sessionId,
+			...res
+		});
+	}
+	async setModel(sessionId, modelId) {
+		await this.request("session/set_model", {
+			sessionId,
+			modelId
+		}, 15e3);
+	}
+	async setConfigOption(sessionId, configId, value) {
+		await this.request("session/set_config_option", {
+			sessionId,
+			configId,
+			value
+		}, 15e3);
+	}
+	async prompt({ sessionId, text, signal, onEvent, timeoutMs }) {
+		signal?.throwIfAborted();
+		if (onEvent) this.sessionListeners.set(sessionId, onEvent);
+		const onAbort = () => {
+			try {
+				this.notify("session/cancel", { sessionId });
+			} catch {}
+		};
+		signal?.addEventListener("abort", onAbort, { once: true });
+		try {
+			const res = await this.request("session/prompt", {
+				sessionId,
+				prompt: [{
+					type: "text",
+					text
+				}]
+			}, timeoutMs ?? this.options.timeoutMs ?? 18e4);
+			const stopReason = typeof res.stopReason === "string" ? res.stopReason : "end_turn";
+			onEvent?.({
+				type: "turn_finished",
+				stopReason
+			});
+			return { stopReason };
+		} finally {
+			signal?.removeEventListener("abort", onAbort);
+			this.sessionListeners.delete(sessionId);
+		}
+	}
+	cancel(sessionId) {
+		try {
+			this.notify("session/cancel", { sessionId });
+		} catch {}
+	}
+	async close() {
+		this.closed = true;
+		const child = this.child;
+		if (!child) return;
+		try {
+			child.stdin.end();
+		} catch {}
+		if (child.exitCode === null && child.signalCode === null) {
+			child.kill("SIGTERM");
+			const killTimer = setTimeout(() => {
+				if (child.exitCode === null && child.signalCode === null) try {
+					child.kill("SIGKILL");
+				} catch {}
+			}, 500);
+			killTimer.unref();
+			await this.closePromise;
+			clearTimeout(killTimer);
+		}
+	}
+};
+//#endregion
+//#region src/acp/acp-agent-manager.ts
+const SAFE_AGENT_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/u;
+var AcpComplianceError = class extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "AcpComplianceError";
+	}
+};
+const ANTIGRAVITY_ACP_AGENT = {
+	id: "antigravity",
+	name: "Google Antigravity",
+	command: process.platform === "win32" ? "agy.exe" : "agy",
+	args: ["acp"],
+	authMode: "oauth-personal",
+	custom: false
+};
+function assertAcpUsageAllowed(agent, invocationSource) {
+	if ((agent.id === ANTIGRAVITY_ACP_AGENT.id || /(?:^|[\\/])agy(?:\.exe)?$/iu.test(agent.command) || agent.authMode === "oauth-personal" || agent.authMode === "oauth-business") && invocationSource !== "human-interactive") throw new AcpComplianceError(`ACP agent "${agent.id}" under ${agent.authMode} is restricted to human-interactive sessions only (Google Antigravity Terms Section 6); blocked invocation source "${invocationSource}".`);
+}
+function resolveAcpHome(explicitHome) {
+	if (explicitHome && explicitHome.trim().length > 0) return explicitHome;
+	const envHome = process.env.DSH_HOME;
+	if (envHome && envHome.trim().length > 0) return envHome.trim();
+	return join(homedir(), ".dsh");
+}
+async function atomicWriteJson(filePath, payload) {
+	await mkdir(dirname(filePath), { recursive: true });
+	const temp = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+	await writeFile(temp, `${JSON.stringify(payload, null, 2)}\n`, {
+		encoding: "utf8",
+		mode: 384,
+		flag: "wx"
+	});
+	try {
+		await rename(temp, filePath);
+	} catch (error) {
+		await rm(temp, { force: true });
+		throw error;
+	}
+}
+var AcpAgentManager = class {
+	ctx;
+	acpDir;
+	agentsPath;
+	sessionsPath;
+	launch;
+	customAgents = /* @__PURE__ */ new Map();
+	persistedSessions = /* @__PURE__ */ new Map();
+	activeSessions = /* @__PURE__ */ new Map();
+	loaded = false;
+	constructor(ctx, deps = {}) {
+		this.ctx = ctx;
+		this.acpDir = join(resolveAcpHome(deps.dshHome), "acp");
+		this.agentsPath = join(this.acpDir, "agents.json");
+		this.sessionsPath = join(this.acpDir, "sessions.json");
+		this.launch = deps.launch;
+	}
+	async ensureLoaded() {
+		if (this.loaded) return;
+		const rawAgents = await readFile(this.agentsPath, "utf8").catch(() => void 0);
+		if (rawAgents) try {
+			const parsed = JSON.parse(rawAgents);
+			if (parsed.version === 1 && Array.isArray(parsed.agents)) {
+				for (const agent of parsed.agents) if (agent && SAFE_AGENT_ID.test(agent.id) && agent.id !== ANTIGRAVITY_ACP_AGENT.id) this.customAgents.set(agent.id, {
+					...agent,
+					custom: true
+				});
+			}
+		} catch {}
+		const rawSessions = await readFile(this.sessionsPath, "utf8").catch(() => void 0);
+		if (rawSessions) try {
+			const parsed = JSON.parse(rawSessions);
+			if (parsed.version === 1 && parsed.sessions) for (const [key, val] of Object.entries(parsed.sessions)) this.persistedSessions.set(key, val);
+		} catch {}
+		this.loaded = true;
+	}
+	async saveCustomAgents() {
+		await atomicWriteJson(this.agentsPath, {
+			version: 1,
+			agents: [...this.customAgents.values()]
+		});
+	}
+	async saveSessions() {
+		await atomicWriteJson(this.sessionsPath, {
+			version: 1,
+			sessions: Object.fromEntries(this.persistedSessions.entries())
+		});
+	}
+	async listAgents() {
+		await this.ensureLoaded();
+		return [ANTIGRAVITY_ACP_AGENT, ...this.customAgents.values()];
+	}
+	async getAgent(agentId) {
+		await this.ensureLoaded();
+		if (agentId === ANTIGRAVITY_ACP_AGENT.id) return ANTIGRAVITY_ACP_AGENT;
+		const custom = this.customAgents.get(agentId);
+		if (!custom) throw new AcpClientError("UNKNOWN_AGENT", `unknown ACP agent: ${agentId}`);
+		return custom;
+	}
+	async upsertCustomAgent(agent) {
+		await this.ensureLoaded();
+		if (!SAFE_AGENT_ID.test(agent.id) || agent.id === ANTIGRAVITY_ACP_AGENT.id) throw new AcpClientError("INVALID_AGENT_ID", "invalid or reserved ACP agent id");
+		if (!agent.command?.trim()) throw new AcpClientError("INVALID_AGENT_COMMAND", "ACP agent command is required");
+		const normalized = {
+			id: agent.id,
+			name: agent.name?.trim() || agent.id,
+			command: agent.command.trim(),
+			args: Array.isArray(agent.args) ? agent.args.map(String) : [],
+			authMode: agent.authMode ?? "custom",
+			custom: true,
+			...agent.timeoutMs ? { timeoutMs: agent.timeoutMs } : {}
+		};
+		this.customAgents.set(normalized.id, normalized);
+		await this.saveCustomAgents();
+		return normalized;
+	}
+	async removeCustomAgent(agentId) {
+		await this.ensureLoaded();
+		if (!this.customAgents.delete(agentId)) return false;
+		await this.saveCustomAgents();
+		return true;
+	}
+	listActiveSessions() {
+		return [...this.activeSessions.values()].map((rec) => rec.info);
+	}
+	async probeAgent(agentId, opts = {}) {
+		const base = await this.getAgent(agentId);
+		const client = new AcpClient({
+			command: opts.commandOverride?.trim() || base.command,
+			args: base.args,
+			cwd: opts.cwd || this.acpDir,
+			env: base.env,
+			timeoutMs: 15e3,
+			launch: this.launch
+		});
+		try {
+			await mkdir(opts.cwd || this.acpDir, { recursive: true });
+			const capabilities = await client.initialize();
+			return {
+				agentId: base.id,
+				state: "ready",
+				capabilities
+			};
+		} catch (error) {
+			const msg = error instanceof Error ? error.message : String(error);
+			const state = error instanceof AcpClientError && error.code === "SPAWN_FAILED" ? "not-installed" : error instanceof AcpClientError && error.code === "AUTH_REQUIRED" ? "not-authenticated" : "error";
+			return {
+				agentId: base.id,
+				state,
+				error: msg
+			};
+		} finally {
+			await client.close();
+		}
+	}
+	async bridgePermission(req, customHandler) {
+		if (customHandler) return customHandler(req);
+		const approval = this.ctx.get?.("approval");
+		if (!approval?.request) return { outcome: { outcome: "cancelled" } };
+		const allowOpt = req.options.find((opt) => opt.kind === "allow_once") ?? req.options.find((opt) => opt.kind === "allow_always");
+		if (!allowOpt) return { outcome: { outcome: "cancelled" } };
+		try {
+			const outcome = await approval.request({
+				toolName: req.toolCall?.kind ?? "acp_tool",
+				title: req.toolCall?.title ?? "External ACP Agent action requires confirmation"
+			});
+			const value = typeof outcome === "string" ? outcome : outcome?.outcome;
+			if (value === "allowed-once" || value === "allowed-always" || value === "allow") return { outcome: {
+				outcome: "selected",
+				optionId: allowOpt.optionId
+			} };
+			return { outcome: { outcome: "cancelled" } };
+		} catch {
+			return { outcome: { outcome: "cancelled" } };
+		}
+	}
+	async startSession({ agentId, cwd, dshSessionId, resume = false, invocationSource, mcpServers = [], commandOverride, authModeOverride, onPermissionRequest, onFsWriteApprove }) {
+		await this.ensureLoaded();
+		const agent = {
+			...await this.getAgent(agentId),
+			...commandOverride?.trim() ? { command: commandOverride.trim() } : {},
+			...authModeOverride ? { authMode: authModeOverride } : {}
+		};
+		assertAcpUsageAllowed(agent, invocationSource);
+		const sessionId = dshSessionId || randomUUID();
+		if (this.activeSessions.has(sessionId)) await this.closeSession(sessionId);
+		const client = new AcpClient({
+			command: agent.command,
+			args: agent.args,
+			cwd,
+			env: agent.env,
+			timeoutMs: agent.timeoutMs,
+			launch: this.launch,
+			handlers: {
+				onPermissionRequest: (req) => this.bridgePermission(req, onPermissionRequest),
+				onFsWriteApprove: onFsWriteApprove ?? (async () => false)
+			}
+		});
+		try {
+			const caps = await client.initialize();
+			const saved = resume ? this.persistedSessions.get(sessionId) : void 0;
+			const payload = saved?.agentId === agent.id && saved.cwd === cwd && caps.loadSession ? await client.loadSession({
+				sessionId: saved.acpSessionId,
+				cwd,
+				mcpServers
+			}) : await client.newSession({
+				cwd,
+				mcpServers
+			});
+			const info = {
+				sessionId,
+				acpSessionId: payload.acpSessionId,
+				agentId: agent.id,
+				cwd,
+				currentModelId: payload.currentModelId,
+				availableModels: payload.availableModels,
+				configOptions: payload.configOptions
+			};
+			const previous = this.persistedSessions.get(sessionId);
+			this.persistedSessions.set(sessionId, {
+				acpSessionId: payload.acpSessionId,
+				agentId: agent.id,
+				cwd,
+				updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+			});
+			try {
+				await this.saveSessions();
+			} catch (error) {
+				if (previous) this.persistedSessions.set(sessionId, previous);
+				else this.persistedSessions.delete(sessionId);
+				throw error;
+			}
+			this.activeSessions.set(sessionId, {
+				client,
+				agent,
+				info
+			});
+			return info;
+		} catch (error) {
+			await client.close();
+			throw error;
+		}
+	}
+	async setModel(sessionId, modelId) {
+		const rec = this.activeSessions.get(sessionId);
+		if (!rec) throw new AcpClientError("SESSION_NOT_FOUND", `no active ACP session: ${sessionId}`);
+		await rec.client.setModel(rec.info.acpSessionId, modelId);
+		rec.info = {
+			...rec.info,
+			currentModelId: modelId
+		};
+	}
+	async setConfigOption(sessionId, configId, value) {
+		const rec = this.activeSessions.get(sessionId);
+		if (!rec) throw new AcpClientError("SESSION_NOT_FOUND", `no active ACP session: ${sessionId}`);
+		await rec.client.setConfigOption(rec.info.acpSessionId, configId, value);
+	}
+	async sendPrompt({ sessionId, text, invocationSource, signal, onEvent }) {
+		const rec = this.activeSessions.get(sessionId);
+		if (!rec) throw new AcpClientError("SESSION_NOT_FOUND", `no active ACP session: ${sessionId}`);
+		assertAcpUsageAllowed(rec.agent, invocationSource);
+		return rec.client.prompt({
+			sessionId: rec.info.acpSessionId,
+			text,
+			signal,
+			onEvent
+		});
+	}
+	cancelSession(sessionId) {
+		const rec = this.activeSessions.get(sessionId);
+		if (!rec) return false;
+		rec.client.cancel(rec.info.acpSessionId);
+		return true;
+	}
+	async closeSession(sessionId) {
+		const rec = this.activeSessions.get(sessionId);
+		if (!rec) return false;
+		this.activeSessions.delete(sessionId);
+		await rec.client.close();
+		return true;
+	}
+	async dispose() {
+		const closing = [...this.activeSessions.keys()].map((id) => this.closeSession(id));
+		await Promise.allSettled(closing);
+	}
+};
+//#endregion
+//#region src/acp/types.ts
+const ACP_API_PREFIX = "/api/dsh-acp";
+//#endregion
+//#region src/acp/acp-routes.ts
+const MAX_BODY_BYTES = 128 * 1024;
+const LOOPBACK_HOSTS = /* @__PURE__ */ new Set([
+	"127.0.0.1",
+	"::1",
+	"::ffff:127.0.0.1"
+]);
+function sendJson(response, statusCode, body) {
+	response.writeHead(statusCode, {
+		"content-type": "application/json; charset=utf-8",
+		"cache-control": "no-store"
+	});
+	response.end(JSON.stringify(body));
+}
+async function readJsonBody(request) {
+	const chunks = [];
+	let total = 0;
+	for await (const chunk of request) {
+		const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+		total += buf.length;
+		if (total > MAX_BODY_BYTES) throw new Error("request body too large");
+		chunks.push(buf);
+	}
+	const text = Buffer.concat(chunks, total).toString("utf8").trim();
+	if (!text) return {};
+	const parsed = JSON.parse(text);
+	if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("request body must be a JSON object");
+	return parsed;
+}
+function isAuthorizedRequest(request, peer) {
+	const address = request.socket?.remoteAddress;
+	if (address !== void 0 && !LOOPBACK_HOSTS.has(address)) return false;
+	if (peer?.principal?.kind !== "owner") return false;
+	if (request.headers["x-dsh-acp"] !== "1") return false;
+	if (request.headers["sec-fetch-site"] === "cross-site") return false;
+	return true;
+}
+function registerAcpRoutes(ctx, manager) {
+	const webServer = ctx.get?.("webServer");
+	if (!webServer?.register) return () => {};
+	const handler = async (request, response, peer) => {
+		if (!isAuthorizedRequest(request, peer)) {
+			response.writeHead(403).end();
+			return;
+		}
+		const action = new URL(request.url ?? "/", "http://localhost").pathname.slice(12);
+		try {
+			if (action === "/agents" && request.method === "GET") {
+				sendJson(response, 200, {
+					agents: await manager.listAgents(),
+					activeSessions: manager.listActiveSessions()
+				});
+				return;
+			}
+			if (action === "/agents/custom" && request.method === "POST") {
+				const body = await readJsonBody(request);
+				sendJson(response, 200, { agent: await manager.upsertCustomAgent({
+					id: String(body.id ?? ""),
+					name: String(body.name ?? ""),
+					command: String(body.command ?? ""),
+					args: Array.isArray(body.args) ? body.args.map(String) : [],
+					authMode: typeof body.authMode === "string" ? body.authMode : "custom"
+				}) });
+				return;
+			}
+			if (action === "/agents/custom" && request.method === "DELETE") {
+				const body = await readJsonBody(request);
+				sendJson(response, 200, { removed: await manager.removeCustomAgent(String(body.id ?? "")) });
+				return;
+			}
+			if (request.method !== "POST") {
+				response.writeHead(405).end();
+				return;
+			}
+			const body = await readJsonBody(request);
+			if (action === "/probe") {
+				const agentId = typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : "antigravity";
+				sendJson(response, 200, await manager.probeAgent(agentId, {
+					cwd: typeof body.cwd === "string" ? body.cwd : void 0,
+					commandOverride: typeof body.commandOverride === "string" ? body.commandOverride : void 0
+				}));
+				return;
+			}
+			if (action === "/session/cancel") {
+				sendJson(response, 200, { cancelled: manager.cancelSession(String(body.sessionId ?? "")) });
+				return;
+			}
+			if (action === "/session/close") {
+				sendJson(response, 200, { closed: await manager.closeSession(String(body.sessionId ?? "")) });
+				return;
+			}
+			response.writeHead(404).end();
+		} catch (error) {
+			sendJson(response, 400, { error: error instanceof Error ? error.message : String(error) });
+		}
+	};
+	return webServer.register({
+		kind: "prefix",
+		path: ACP_API_PREFIX,
+		handler
+	});
+}
 const PATCH_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -1867,11 +5212,23 @@ const inject = [
 /** Install Desktop-only compatibility behavior through public DSH hooks. */
 function apply(ctx) {
 	new DesktopSkinStateService(ctx);
+	const connectorRegistry = new ConnectorRegistryService(ctx);
+	connectorRegistry.init().catch((error) => {
+		ctx.logger?.warn?.(`dsh-desktop-compat: connector registry init failed: ${error instanceof Error ? error.message : String(error)}`);
+	});
+	ctx.effect(() => () => connectorRegistry.dispose(), "dsh-desktop-compat: connector registry cleanup");
+	ctx.effect(() => registerConnectorRoutes(ctx, connectorRegistry), "dsh-desktop-compat: connector HTTP routes");
+	registerWorkOfficePreset(ctx);
+	const acpManager = new AcpAgentManager(ctx);
+	ctx.effect(() => () => {
+		acpManager.dispose();
+	}, "dsh-desktop-compat: ACP agent cleanup");
+	ctx.effect(() => registerAcpRoutes(ctx, acpManager), "dsh-desktop-compat: ACP HTTP routes");
 	installToolCallArgumentNormalization(ctx);
 	installTranscriptBalanceGuard(ctx);
 	installSessionCheckpointRecovery(ctx);
 	installSessionTitleCheckpoint(ctx);
-	installControlToolApproval(ctx);
+	installControlToolApproval(ctx, { lookupConnectorRisk: (name) => connectorRegistry.matchToolRisk(name) });
 	installAgentWslTool(ctx);
 	ctx.effect(() => registerDesktopWorkspaceFileOpenRoute(ctx), "dsh-desktop-compat: workspace native-open authority");
 	ctx.effect(() => registerDesktopConversationImportRoute(ctx), "dsh-desktop-compat: conversation import authority");
@@ -1905,4 +5262,4 @@ function apply(ctx) {
 	});
 }
 //#endregion
-export { DESKTOP_COMPAT_PATCHES, DESKTOP_CONVERSATION_IMPORT_PATH, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, apply, balanceTranscriptMessages, controlToolApprovalDecision, createDesktopConversationImportRoute, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, extractToolCallsFromAssistantMessage, importConversationIntoHost, inject, installAgentWslTool, installControlToolApproval, installToolCallArgumentNormalization, installTranscriptBalanceGuard, name, normalizeCancellationDecision, normalizeRedundantSandboxEscalation, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerDesktopConversationImportRoute, registerDesktopWorkspaceFileOpenRoute, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };
+export { ACP_API_PREFIX, ANTIGRAVITY_ACP_AGENT, AcpAgentManager, AcpClient, AcpClientError, AcpComplianceError, CONNECTOR_API_PREFIX, ConnectorRegistryService, ConnectorSecretVault, DESKTOP_COMPAT_PATCHES, DESKTOP_CONVERSATION_IMPORT_PATH, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, WORK_OFFICE_PRESET_ID, apply, assertAcpUsageAllowed, assertWorkspaceContained, balanceTranscriptMessages, classifyConnectorFailure, connectorToolApprovalDecision, controlToolApprovalDecision, createDesktopConversationImportRoute, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, extractToolCallsFromAssistantMessage, importConversationIntoHost, inject, installAgentWslTool, installControlToolApproval, installToolCallArgumentNormalization, installTranscriptBalanceGuard, loadBuiltinCatalog, name, normalizeCancellationDecision, normalizeRedundantSandboxEscalation, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerAcpRoutes, registerConnectorRoutes, registerDesktopConversationImportRoute, registerDesktopWorkspaceFileOpenRoute, registerWorkOfficePreset, resolveConnectorsHome, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };

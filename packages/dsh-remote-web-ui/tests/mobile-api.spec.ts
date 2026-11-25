@@ -218,4 +218,26 @@ describe('mobile api envelope', () => {
     req.destroy()
     await new Promise<void>(resolve => server.close(() => resolve()))
   })
+
+  it('blocks selecting restricted providers such as antigravity-cli from remote mobile sessions', async () => {
+    const server = await serve(makeMobileApiRoutes({ service, apiProxy, userScope, mobileEnterToSend }))
+    try {
+      const { status, body } = await call(server.port, 'session.selectModel', {
+        sessionId: 's-test',
+        provider: 'antigravity-cli',
+        model: 'gemini-pro',
+      })
+      expect(status).toBe(200)
+      expect(JSON.parse(body)).toMatchObject({
+        type: 'server-response',
+        rpcId: 'probe-1',
+        result: {
+          ok: false,
+          error: { code: 'forbidden', message: 'provider is not permitted on remote mobile sessions' },
+        },
+      })
+    } finally {
+      await server.close()
+    }
+  })
 })

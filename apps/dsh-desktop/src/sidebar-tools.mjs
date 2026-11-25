@@ -7,7 +7,9 @@ export const SIDEBAR_TOOLS_CSS = `
   grid-column: 2;
   grid-row: auto;
 }
-[data-dsh-tool-host][data-dsh-tools-collapsed="true"] > [data-dsh-collapsible-tool] {
+[data-dsh-tool-host][data-dsh-tools-collapsed="true"] > [data-dsh-collapsible-tool]:not(nav),
+[data-dsh-tool-host][data-dsh-tools-collapsed="true"] > nav[data-dsh-collapsible-tool]:not(:has([data-dsh-primary-panel="true"])),
+[data-dsh-tool-host][data-dsh-tools-collapsed="true"] > nav[data-dsh-collapsible-tool]:has([data-dsh-primary-panel="true"]) button:not(:has([data-dsh-primary-panel="true"])) {
   display: none !important;
 }
 [data-dsh-tool-host] > nav[data-dsh-collapsible-tool] {

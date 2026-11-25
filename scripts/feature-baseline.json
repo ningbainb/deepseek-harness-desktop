@@ -534,6 +534,7 @@
         "sidebar-layout-anchors-follow-panels-and-clean-up-only-owned-attributes",
         "optional-tools-collapse-without-moving-native-react-nodes",
         "persistent-accessible-tools-toggle-keeps-workspaces-and-session-actions-visible",
+        "office-mode-switch-and-connector-management-keep-native-conversation",
         "skin-rail-footer-grows-to-retain-every-action-and-account-menu",
         "startup-package-resolution-prefers-physical-unpacked-sdk-tree",
         "startup-host-identity-checks-remain-complete-and-bounded-parallel",
@@ -784,6 +785,7 @@
         "packaged-windows-background-console-regression",
         "quit-invalidates-pending-runtime-presentation",
         "private-runtime-graceful-shutdown-with-force-fallback",
+        "windows-runtime-cleanup-deadline-precedes-receipt-and-force-deadlines",
         "windows-shutdown-receipt-can-complete-after-three-seconds-within-the-existing-force-deadline",
         "runtime-stays-alive-until-shutdown-acknowledgement-pipe-closes",
         "bounded-shutdown-waits-for-inflight-http-responses",
@@ -1160,6 +1162,7 @@
       "features": [
         "real-local-provider-progressive-chinese-and-code-output",
         "streamed-reply-dom-does-not-remeasure-skills-composer-or-caption",
+        "work-mode-switcher-ignores-stream-mutations-and-remounts-with-sidebar",
         "usage-card-reuses-live-footer-without-global-stream-time-sidebar-rescans",
         "collapsed-tools-preserve-workspaces-sessions-dock-and-keyboard-access",
         "rc3-grid-owned-tool-rows-use-content-column-with-normal-click-targets",
@@ -1282,6 +1285,16 @@
       ]
     },
     {
+      "id": "release-guide",
+      "name": "当前版本新功能引导与帮助菜单入口",
+      "uiSelector": "#dsh-desktop-release-guide",
+      "features": [
+        "bilingual-current-version-cards",
+        "shown-once-per-version",
+        "reopen-from-help-menu"
+      ]
+    },
+    {
       "id": "star-prompt",
       "name": "3.5.0 升级后每个本机用户显示一次 Star 提示",
       "uiSelector": "#dsh-desktop-star-prompt",
@@ -1317,6 +1330,7 @@
       "features": [
         "workspace-and-session-create",
         "model-select",
+        "local-acp-permission-bridge-and-interactive-antigravity-isolation",
         "real-composer-submit",
         "pwsh-tool-round-trip",
         "assistant-completion",

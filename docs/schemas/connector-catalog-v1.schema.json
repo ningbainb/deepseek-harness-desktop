@@ -1,0 +1,339 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ningbainb/deepseek-harness-desktop/blob/main/docs/schemas/connector-catalog-v1.schema.json",
+  "title": "DeepSeek Harness Desktop Connector Catalog v1",
+  "$comment": "Declarative connector catalog schema v1 for work-mode office ecosystems. Strictly excludes inline executable shell scripts, secrets, and local filesystem paths.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "catalogVersion",
+    "updatedAt",
+    "connectors"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "catalogVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "connectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/ConnectorCatalogEntry" }
+    }
+  },
+  "$defs": {
+    "LocalizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zh", "en"],
+      "properties": {
+        "zh": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "en": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "LocalizedSteps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["zh", "en"],
+      "properties": {
+        "zh": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 500 } },
+        "en": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1, "maxLength": 500 } }
+      }
+    },
+    "SemVer": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "Platform": {
+      "type": "string",
+      "enum": ["win32", "darwin", "linux"]
+    },
+    "HttpsUrl": {
+      "type": "string",
+      "pattern": "^https://[^\\s]+$"
+    },
+    "InstallSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "package"],
+          "properties": {
+            "kind": { "const": "npm" },
+            "package": { "type": "string", "pattern": "^(?:@[a-z0-9-~][a-z0-9-._~]*/)?[a-z0-9-~][a-z0-9-._~]*$" },
+            "versionRange": { "type": "string", "minLength": 1, "maxLength": 64 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "repo", "assetTemplates"],
+          "properties": {
+            "kind": { "const": "github-release" },
+            "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+            "assetTemplates": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "win32-x64": { "type": "string", "minLength": 1 },
+                "win32-arm64": { "type": "string", "minLength": 1 },
+                "darwin-arm64": { "type": "string", "minLength": 1 },
+                "darwin-x64": { "type": "string", "minLength": 1 },
+                "linux-x64": { "type": "string", "minLength": 1 },
+                "linux-arm64": { "type": "string", "minLength": 1 }
+              }
+            },
+            "checksumAsset": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "package"],
+          "properties": {
+            "kind": { "const": "pypi-uvx" },
+            "package": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+            "versionRange": { "type": "string", "minLength": 1, "maxLength": 64 }
+          }
+        }
+      ]
+    },
+    "DriverSpec": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "binary", "installSource"],
+          "properties": {
+            "kind": { "const": "cli" },
+            "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
+            "binary": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+            "installSource": { "$ref": "#/$defs/InstallSource" },
+            "versionArgs": { "type": "array", "items": { "type": "string" }, "default": ["--version"] },
+            "skillsSource": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": {
+                "kind": { "type": "string", "enum": ["bundled-in-package", "release-asset", "repo-path"] },
+                "assetName": { "type": "string", "minLength": 1 },
+                "repo": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$" },
+                "path": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "url", "remoteTransport"],
+          "properties": {
+            "kind": { "const": "mcp-remote" },
+            "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
+            "url": { "$ref": "#/$defs/HttpsUrl" },
+            "remoteTransport": { "type": "string", "enum": ["streamable-http", "sse-legacy"] },
+            "toolLoading": { "type": "string", "enum": ["on-demand", "eager"], "default": "on-demand" },
+            "allowedTools": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "headersTemplate": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "oauth": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "issuer": { "$ref": "#/$defs/HttpsUrl" },
+                "scopes": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "command", "args"],
+          "properties": {
+            "kind": { "const": "mcp-stdio" },
+            "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
+            "command": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+            "args": { "type": "array", "items": { "type": "string" } },
+            "installSource": { "$ref": "#/$defs/InstallSource" },
+            "envTemplate": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "toolLoading": { "type": "string", "enum": ["on-demand", "eager"], "default": "on-demand" },
+            "allowedTools": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "id", "skillName", "source"],
+          "properties": {
+            "kind": { "const": "skill" },
+            "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
+            "skillName": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+            "source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "ref"],
+              "properties": {
+                "kind": { "type": "string", "enum": ["github-repo", "npm", "builtin"] },
+                "ref": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CredentialField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "fieldType", "required", "secret"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[a-zA-Z0-9_.-]{1,64}$" },
+        "label": { "$ref": "#/$defs/LocalizedText" },
+        "fieldType": { "type": "string", "enum": ["text", "password", "url"] },
+        "required": { "type": "boolean" },
+        "secret": { "type": "boolean" },
+        "placeholder": { "$ref": "#/$defs/LocalizedText" },
+        "help": { "$ref": "#/$defs/LocalizedText" }
+      }
+    },
+    "ConnectorCatalogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "summary",
+        "category",
+        "icon",
+        "color",
+        "maintainer",
+        "platforms",
+        "minDesktopVersion",
+        "officialUrls",
+        "drivers",
+        "auth",
+        "healthCheck",
+        "riskRules",
+        "examples",
+        "troubleshooting"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" },
+        "name": { "$ref": "#/$defs/LocalizedText" },
+        "summary": { "$ref": "#/$defs/LocalizedText" },
+        "category": {
+          "type": "string",
+          "enum": ["office-suite", "meeting-docs", "knowledge-notes", "storage-mail", "dev-collab", "other"]
+        },
+        "icon": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "maintainer": { "type": "string", "enum": ["official", "community"] },
+        "platforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/Platform" }
+        },
+        "minDesktopVersion": { "$ref": "#/$defs/SemVer" },
+        "officialUrls": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["docs"],
+          "properties": {
+            "repo": { "$ref": "#/$defs/HttpsUrl" },
+            "docs": { "$ref": "#/$defs/HttpsUrl" },
+            "openPlatform": { "$ref": "#/$defs/HttpsUrl" }
+          }
+        },
+        "drivers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/DriverSpec" }
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "guideSteps"],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["cli-native", "oauth2", "personal-token", "api-key", "custom-fields"]
+            },
+            "quickAuthUrl": { "$ref": "#/$defs/HttpsUrl" },
+            "manualUrl": { "$ref": "#/$defs/HttpsUrl" },
+            "guideSteps": { "$ref": "#/$defs/LocalizedSteps" },
+            "requiresEnterpriseAdmin": { "type": "boolean" },
+            "paidTierNote": { "$ref": "#/$defs/LocalizedText" },
+            "cliLoginCommand": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "fields": { "type": "array", "items": { "$ref": "#/$defs/CredentialField" } }
+          }
+        },
+        "healthCheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["cli-command", "mcp-probe", "skill-present"] },
+            "args": { "type": "array", "items": { "type": "string" } },
+            "timeoutMs": { "type": "integer", "minimum": 500, "maximum": 60000 }
+          }
+        },
+        "riskRules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["actionPattern", "level"],
+            "properties": {
+              "actionPattern": { "type": "string", "minLength": 1, "maxLength": 160 },
+              "level": { "type": "string", "enum": ["L0", "L1", "L2", "L3"] },
+              "label": { "$ref": "#/$defs/LocalizedText" }
+            }
+          }
+        },
+        "examples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "prompt"],
+            "properties": {
+              "title": { "$ref": "#/$defs/LocalizedText" },
+              "prompt": { "$ref": "#/$defs/LocalizedText" }
+            }
+          }
+        },
+        "troubleshooting": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["code", "matchPattern", "cause", "fix"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^[A-Z0-9_]{2,48}$" },
+              "matchPattern": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "cause": { "$ref": "#/$defs/LocalizedText" },
+              "fix": { "$ref": "#/$defs/LocalizedText" }
+            }
+          }
+        },
+        "deprecated": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reason"],
+          "properties": {
+            "reason": { "$ref": "#/$defs/LocalizedText" },
+            "replacementId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,47}$" }
+          }
+        }
+      }
+    }
+  }
+}

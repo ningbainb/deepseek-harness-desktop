@@ -190,3 +190,7 @@ test('rc3 grid sidebar gives tools a content-column row without covering the nat
     assert.equal(window.getComputedStyle(panels).display, 'none')
   } finally { dom.window.dshSidebarToolsController?.dispose(); dom.window.close() }
 })
+
+test('collapsed sidebar keeps primary panel button visible when present', () => {
+  assert.match(SIDEBAR_TOOLS_CSS, /\[data-dsh-primary-panel="true"\]/u)
+})

@@ -193,4 +193,25 @@ describe('Desktop Task Board Host scheduler runner', () => {
     expect(result.error).toMatch(/Worktree adapter/u)
     expect(calls.create).toHaveLength(0)
   })
+
+  it('rejects automation-restricted providers in both eligibility and run', async () => {
+    const restricted = createDesktopTaskBoardHostScheduleRunner({
+      agents: {
+        create: async () => { throw new Error('should not spawn') },
+        resume: async () => { throw new Error('should not resume') },
+      } as never,
+      defaultModel: { currentSelection: () => ({ provider: 'antigravity-cli', model: 'gemini-pro' }) } as never,
+      sessions: { flush: async () => true } as never,
+      sessionPersistence: { list: async () => [] } as never,
+      sessionQuery: { readSession: async () => ({ session: { id: 'x' }, inheritedEventCount: 0, events: [] }) } as never,
+      workspaceRegistry: { get: () => ({ path: 'C:\\workspace', status: async () => 'ok' }) } as never,
+    })
+    expect(await restricted.canOwnTask({ task: input.task, project: input.project })).toBe(false)
+    const result = await restricted.run(input)
+    expect(result).toMatchObject({
+      kind: 'settled',
+      outcome: 'failed',
+      error: 'provider "antigravity-cli" is not permitted for unattended background scheduling',
+    })
+  })
 })

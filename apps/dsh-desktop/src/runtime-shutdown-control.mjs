@@ -4,6 +4,9 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 export const RUNTIME_SHUTDOWN_CONTROL_ENV = 'DSH_DESKTOP_SHUTDOWN_CONTROL'
+export const WINDOWS_RUNTIME_CLEANUP_TIMEOUT_MS = 7_000
+export const RUNTIME_SHUTDOWN_ACK_TIMEOUT_MS = WINDOWS_RUNTIME_CLEANUP_TIMEOUT_MS + 500
+export const WINDOWS_RUNTIME_FORCE_TIMEOUT_MS = RUNTIME_SHUTDOWN_ACK_TIMEOUT_MS + 500
 
 export function createRuntimeShutdownControl(platform = process.platform) {
   const name = `dsh-stop-${randomBytes(16).toString('hex')}`

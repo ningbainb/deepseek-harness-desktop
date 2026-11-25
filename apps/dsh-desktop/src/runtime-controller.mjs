@@ -10,7 +10,10 @@ import {
 } from '@linxin666/dsh-desktop-compat/workspace-file-open-policy'
 import { emitBestEffort } from './best-effort-events.mjs'
 import { RUNTIME_HTTP_READY_LINE } from './runtime-readiness.mjs'
-import { createRuntimeShutdownControl, requestRuntimeShutdown, RUNTIME_SHUTDOWN_CONTROL_ENV } from './runtime-shutdown-control.mjs'
+import {
+  createRuntimeShutdownControl, requestRuntimeShutdown, RUNTIME_SHUTDOWN_CONTROL_ENV,
+  RUNTIME_SHUTDOWN_ACK_TIMEOUT_MS, WINDOWS_RUNTIME_FORCE_TIMEOUT_MS,
+} from './runtime-shutdown-control.mjs'
 import {
   STARTUP_OUTCOMES,
   STARTUP_PHASES,
@@ -441,7 +444,7 @@ export class DshRuntimeController extends EventEmitter {
     spawnProcess = spawn,
     logStore,
     startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
-    shutdownTimeoutMs = 5_000,
+    shutdownTimeoutMs,
     autoRestart = false,
     probeReady = probeHttpReady,
     schedule = setTimeout,
@@ -472,7 +475,7 @@ export class DshRuntimeController extends EventEmitter {
     this.spawnProcess = spawnProcess
     this.logStore = logStore ?? { append: async () => {} }
     this.startupTimeoutMs = startupTimeoutMs
-    this.shutdownTimeoutMs = shutdownTimeoutMs
+    this.shutdownTimeoutMs = shutdownTimeoutMs ?? (platform === 'win32' ? WINDOWS_RUNTIME_FORCE_TIMEOUT_MS : 5_000)
     this.autoRestart = autoRestart
     this.probeReady = probeReady
     this.schedule = schedule
@@ -1172,7 +1175,7 @@ export class DshRuntimeController extends EventEmitter {
       const control = shutdownControls.get(child)
       shutdownControls.delete(child)
       // Leave the normal cleanup time for the receipt and keep a margin before the force deadline.
-      const clean = control && await requestRuntimeShutdown(control, Math.min(7500, this.shutdownTimeoutMs))
+      const clean = control && await requestRuntimeShutdown(control, Math.min(RUNTIME_SHUTDOWN_ACK_TIMEOUT_MS, this.shutdownTimeoutMs))
       if (control) this.#appendDiagnostic(clean
         ? '[process] Runtime graceful shutdown acknowledged'
         : '[process] Runtime graceful shutdown unavailable; retaining process-tree fallback', redactionToken)

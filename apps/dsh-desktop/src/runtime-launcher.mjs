@@ -29,7 +29,9 @@ import {
 } from './runtime-pipe.mjs'
 import { createDesktopPipeSessionCookie, installLegacyConnectionAdmission, mergeDesktopPipeCookies, openDesktopPipeWebSocket } from './runtime-cookie.mjs'
 import { desktopLocalPath } from './desktop-remote-path.mjs'
-import { consumeRuntimeShutdownControl, listenRuntimeShutdownControl } from './runtime-shutdown-control.mjs'
+import {
+  consumeRuntimeShutdownControl, listenRuntimeShutdownControl, WINDOWS_RUNTIME_CLEANUP_TIMEOUT_MS,
+} from './runtime-shutdown-control.mjs'
 import { createRuntimeEventStreamDrain } from './runtime-stream-drain.mjs'
 import { createRuntimeStartupTiming } from './runtime-startup-timing.mjs'
 import { createDesktopFrontendFetch } from './runtime-frontend-assets.mjs'
@@ -304,7 +306,11 @@ async function run() {
     shuttingDown = true
     const shutdownStarted = performance.now()
     const markShutdown = phase => process.stdout.write(`[runtime-shutdown] ${phase}=${Math.round(performance.now() - shutdownStarted)}ms\n`)
-    forceTimer = setTimeout(() => process.exit(code), 5_000)
+    const cleanupTimeout = process.platform === 'win32' ? WINDOWS_RUNTIME_CLEANUP_TIMEOUT_MS : 5_000
+    forceTimer = setTimeout(() => {
+      markShutdown('cleanup-timeout')
+      process.exit(code)
+    }, cleanupTimeout)
     forceTimer.unref()
     try {
       const drained = pipeIdentity === undefined ? await eventStreams.drain(ctx?.get('webServer')?.port) : 0

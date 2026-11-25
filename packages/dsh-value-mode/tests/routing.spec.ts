@@ -215,4 +215,48 @@ describe('ValueMode Request Routing', () => {
     expect(result.model).toBe('default-model')
     expect(valueModeState.getSessionMetrics('standard-session').executorCalls).toBe(0)
   })
+
+  it('never inherits or routes to restricted providers like antigravity-cli', async () => {
+    ctx.agentDefaultModel = {
+      currentSelection: () => ({ provider: 'antigravity-cli', model: 'gemini-pro' }),
+    } as never
+    ctx.llm = {
+      listProviders: vi.fn().mockReturnValue([
+        { id: 'deepseek', displayName: 'DeepSeek' },
+        { id: 'antigravity-cli', displayName: 'Antigravity CLI (Gemini)' },
+      ]),
+    } as never
+
+    apply(ctx, {
+      enabled: true,
+      executor: { provider: 'deepseek', model: 'deepseek-chat' },
+    })
+
+    const initialConfig: LlmCallConfig = {
+      provider: 'default-prov',
+      model: 'default-model',
+    }
+    const result = await ctx.bail('agent/request', {
+      agent: { id: 'restricted-expert', session: { header: { agentPreset: 'value-mode' } } },
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+    } as never, async () => initialConfig)
+    expect(result.provider).toBe('default-prov')
+    expect(result.model).toBe('default-model')
+
+    apply(ctx, {
+      enabled: true,
+      executor: { provider: 'antigravity-cli', model: 'gemini-flash' },
+      expert: { provider: 'deepseek', model: 'deepseek-reasoner' },
+    })
+    const subResult = await ctx.bail('agent/request', {
+      agent: { id: 'restricted-subagent', session: { header: { agentPreset: 'value-mode', origin: 'subagent' } } },
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+    } as never, async () => initialConfig)
+    expect(subResult.provider).toBe('default-prov')
+    expect(subResult.model).toBe('default-model')
+  })
 })

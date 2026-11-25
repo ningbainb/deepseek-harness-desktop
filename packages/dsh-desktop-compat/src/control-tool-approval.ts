@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { PreToolDecision, ToolExecution } from '@deepseek-ai/dsh-tools'
 import { currentAgentWslPermission, type AgentWslPermission } from './agent-wsl-permission.ts'
+import type { ConnectorRiskMatch } from './connectors/types.ts'
 
 const BROWSER_PREFIXES = [
   'mcp__playwright-mcp__',
@@ -63,11 +64,43 @@ export function controlToolApprovalDecision(name: string, wslPermission: AgentWs
   return undefined
 }
 
-/** Require one-shot approval for mutating Browser Use and Computer Use actions. */
-export function installControlToolApproval(ctx: Context): void {
+/** Classify office connector MCP calls into L0-L3 approval gates. */
+export function connectorToolApprovalDecision(
+  name: string,
+  lookupRisk?: (toolName: string) => ConnectorRiskMatch | undefined,
+): PreToolDecision | undefined {
+  if (!lookupRisk) return undefined
+  const risk = lookupRisk(name)
+  if (!risk || risk.level === 'L0') return undefined
+  const detail = risk.label?.zh ? `（${risk.label.zh}）` : ''
+  if (risk.level === 'L3') {
+    return {
+      kind: 'ask',
+      reason: `高风险外部操作${detail}：涉及发送消息、邮件、外部分享或付费操作，必须经人工确认后执行。`,
+    }
+  }
+  if (risk.level === 'L2') {
+    return {
+      kind: 'ask',
+      reason: `受控办公变更操作${detail}：涉及删除、批量写入或修改日程会议，请确认操作对象。`,
+    }
+  }
+  return {
+    kind: 'ask',
+    reason: `办公写操作${detail}：将创建或更新目标内容，需要本次确认。`,
+  }
+}
+
+/** Require one-shot approval for mutating Browser Use, Computer Use, WSL, and office connector actions. */
+export function installControlToolApproval(
+  ctx: Context,
+  options: { lookupConnectorRisk?: (toolName: string) => ConnectorRiskMatch | undefined } = {},
+): void {
   ctx.on('tools/pre-execute', async (exec: ToolExecution, next) => {
-    const decision = controlToolApprovalDecision(exec.name,
-      exec.name === 'desktop_wsl' ? currentAgentWslPermission() : 'ask')
+    const decision = controlToolApprovalDecision(
+      exec.name,
+      exec.name === 'desktop_wsl' ? currentAgentWslPermission() : 'ask',
+    ) ?? connectorToolApprovalDecision(exec.name, options.lookupConnectorRisk)
     return decision ?? next()
   })
 }

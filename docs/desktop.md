@@ -45,7 +45,7 @@ The actual public Windows Setup, macOS ZIP and Linux DEB payloads were independe
 | SSH operations | Three-second Linux telemetry for CPU, memory, disk, load, processes, and failed services, plus confirmed process and systemd actions |
 | Window | Single instance, persisted visible main geometry, native menu, download destination prompt; movable/resizable settings panel with minimum and persisted bounds; explicit quit/minimize-to-tray/ask close behavior |
 | Community | Help-menu QQ group QR and one-click join, direct GitHub issue feedback |
-| Updates | Stable is the default update channel; Beta is an explicit prerelease channel. GitHub Releases remain first and default, downloads remain backgrounded, and installation still needs user confirmation; neither channel automatically downgrades |
+| Updates | Stable is the default update channel and Beta is opt-in. Downloads use GitHub Releases and can prioritize a configured CDN based on system time zone and locale. Installation requires confirmation, and neither channel automatically downgrades |
 | Smart Control | Browser Use and Computer Use default off; Playwright and Cua Driver providers are platform-probed, observations are separated from mutating actions, and repeated native failures recover through a preserved-config safe mode |
 | Upgrade and diagnostics | 3.5/4.0 Profiles migrate through a versioned backup, fingerprint, staged health check, commit, and rollback transaction. Diagnostics are user-initiated, redacted JSON/ZIP exports only |
 | Update handoff | Token-bound shutdown receipt v2, verified runtime/extension quiescence, constrained legacy cleanup fallback |
@@ -57,6 +57,10 @@ The actual public Windows Setup, macOS ZIP and Linux DEB payloads were independe
 | Context handoff import | Read-only discovery for Claude Code and Codex projects/sessions, streaming tolerant JSONL parser, centralized secret redaction, token-bounded Handoff prompt generator, atomic ledger, and legitimate DSH session bridge |
 | Visual system | Solid native/injected title-bar alignment, system-style Extension Dock, bounded particle-whale startup surface, page-aware full-interface particle theme |
 | Security | Sandbox, context isolation, no Node integration, per-window preload APIs, sender registry, loopback navigation allowlist, denied permissions |
+
+See [Work Mode and office connectors](work-mode-and-connectors.md) for the conversation sidebar and connector setup, and the [ACP and Antigravity guide](acp-and-antigravity.md) for local ACP sessions and credential boundaries.
+
+Desktop 5.5.0 ships with GitHub as its download source. To enable a first-party download mirror, set `DSH_DESKTOP_UPDATE_MIRRORS` to its HTTPS base URL before launching Desktop. Automatic routing can prefer a reachable configured mirror in mainland China, and prefers GitHub elsewhere. A base URL ending in `/releases/` serves objects at `/releases/<tag>/<asset>` and can point to a Cloudflare R2-backed domain. The existing installer verification applies to both GitHub and mirror downloads.
 
 ## Windows startup and recovery
 
@@ -185,7 +189,7 @@ Linux 5.1.0 provides unsigned AppImage and DEB Preview assets. Its native packag
 
 No separate Node.js or pnpm installation is required for release users. Desktop creates the stable `<userData>/runtime-bin/pnpm.cmd` shim and places that directory first only in the child PATH for the primary Runtime, persistent plugin installer, and built-in terminal. The terminal and installer use `~/.dsh/profiles/desktop` as cwd and never depend on a temporary recovery Profile.
 
-The installed app defaults to the Stable channel, checks its GitHub Release feed after startup and every six hours, then downloads a discovered release in the background. Beta is selected explicitly and may accept prereleases; Stable rejects prereleases. Switching channels never authorizes an automatic downgrade. Open `Help > Check for Updates` to check immediately. The update surface offers **Download from GitHub**, **Join user group**, and **Update later**. GitHub Releases is the only built-in/default transport. If GitHub is slow, [QQ Group 2 (`1129522514`)](https://qm.qq.com/q/9hrcdaEYPC) provides a synchronized installer ([group QR code](../website/assets/qq-group-1129522514.jpg)); the app does not enable or advertise third-party mirrors as a faster route. Administrators may explicitly opt in trusted HTTPS fallbacks through `DSH_DESKTOP_UPDATE_MIRRORS`, but those sources remain secondary to GitHub.
+The installed app defaults to the Stable channel, checks its GitHub Release feed after startup and every six hours, then downloads a discovered release in the background. Beta is selected explicitly and may accept prereleases. Stable rejects prereleases. Switching channels never authorizes an automatic downgrade. Open `Help > Check for Updates` to check immediately. The update surface offers automatic and manual download routing alongside **Download from GitHub**, **Join user group**, and **Update later**. GitHub Releases is the built-in download source. Administrators can opt in to a trusted HTTPS mirror as described above. If GitHub is slow, [QQ Group 2 (`1129522514`)](https://qm.qq.com/q/9hrcdaEYPC) provides a synchronized installer. [Group QR code](../website/assets/qq-group-1129522514.jpg)
 
 Installation still requires an explicit **Restart and install** action. Desktop stops and reaps the DSH child process before handing control to the installer. Automatic check failures remain in the desktop log; manual check failures are shown to the user.
 

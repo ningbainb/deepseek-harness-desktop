@@ -484,8 +484,8 @@ const NATIVE_PLUGINS = [
     author: 'ningbainb',
     category: 'ai',
     categoryLabel: 'AI 核心',
-    description: '通过本机已登录的官方 Antigravity CLI 调用 Gemini 模型，支持动态目录与推理档位。',
-    features: ['动态模型目录', '流式输出', '推理档位'],
+    description: '基于官方 ACP v1 协议与合规认证模式接入本机 Antigravity CLI，支持交互式会话、能力探测与推理档位控制。',
+    features: ['官方 ACP v1', '条款合规隔离', '能力探测'],
     icon: 'terminal',
   },
   {
@@ -598,6 +598,7 @@ const NATIVE_PLUGINS = [
     id: 'remote-web-ui',
     name: '远程移动配对控制',
     packageName: '@linxin666/dsh-remote-web-ui',
+    author: 'ningbainb',
     category: 'tools',
     categoryLabel: '工具协同',
     description: '局域网加密配对与手机端快捷控制台，手机扫码即可随时查看进度与发出指令。',
