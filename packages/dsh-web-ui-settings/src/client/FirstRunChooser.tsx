@@ -144,7 +144,8 @@ export function FirstRunChooser({
 }
 
 function isElementVisible(element: Element | null, win: Window): element is HTMLElement {
-  if (!(element instanceof win.HTMLElement)) return false
+  const HtmlElementCtor = (win as Window & typeof globalThis).HTMLElement ?? HTMLElement
+  if (!element || !(element instanceof HtmlElementCtor)) return false
   if (element.closest('[hidden], [aria-hidden="true"]')) return false
   const style = win.getComputedStyle(element)
   if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false
