@@ -83,10 +83,16 @@ jobs:
         with:
           name: desktop-candidate-${{ needs.metadata.outputs.version }}-windows-x64
           if-no-files-found: error
+          # Runtime dependencies include dotfiles such as pi-ai's provider manifest.
+          include-hidden-files: true
           retention-days: 1
           path: |
             apps/dsh-desktop/dist/**
             !apps/dsh-desktop/dist/office-runtime-verification/**
+            !apps/dsh-desktop/dist/**/.env
+            !apps/dsh-desktop/dist/**/.env.*
+            !apps/dsh-desktop/dist/**/.npmrc
+            !apps/dsh-desktop/dist/**/.git/**
 
       - name: Preserve failed Windows candidate diagnostics
         if: failure()

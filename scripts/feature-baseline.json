@@ -1412,6 +1412,7 @@
         "final-quit-keeps-inert-handlers-for-late-renderer-acks-and-cancellation",
         "rc2-typed-stream-events-ready-and-bidirectional-uplink",
         "packaged-runtime-sdk-module-identity-preserved",
+        "windows-candidate-upload-preserves-hidden-runtime-manifests",
         "packed-and-unpacked-asar-integrity-gated-before-windows-installer-compression",
         "windows-offline-electron-dedup-restores-byte-exact-runtime-before-transaction-commit",
         "windows-compact-runtime-restore-logs-subprocess-output-and-retries-interruption-once",

@@ -15,7 +15,7 @@
 
 3. **三端正式发版（`.github/workflows/desktop-three-platform-release.yml`）**
    - `macos`（arm64）与 `linux`（x64）各在原生 Runner 上完成 `pnpm verify`、打包、产物/Runtime 校验、启动冒烟并缓存 Playwright 浏览器。
-   - `windows-build` 只打包并校验一次产物（`pnpm verify` -> `pack:win` -> `pack:verify` -> `verify-office-runtime` -> `pack:smoke` -> 签名/清单校验），上传中间候选制品。
+   - `windows-build` 只打包并校验一次产物（`pnpm verify` -> `pack:win` -> `pack:verify` -> `verify-office-runtime` -> `pack:smoke` -> 签名/清单校验），上传带有 Runtime 隐藏清单的完整候选包。
    - 并行扇出 5 台 Windows Runner：
      - `windows-setup-upgrade`：在一次性云端 Runner 下载上一稳定版（`5.3.5`）并完成全新安装、覆盖升级与卸载保留验收。
      - `windows-e2e`（`shard: [1, 2, 3, 4]`）：复用同一构建产物并行跑完全量 47 组打包版回归，每片保留独立 QA 与截图证据。

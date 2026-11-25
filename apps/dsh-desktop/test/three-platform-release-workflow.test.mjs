@@ -145,6 +145,8 @@ test('workflow metadata uses the functional classifier and Windows regression fa
   const metadata = workflow.jobs.metadata.steps.find(step => step.id === 'meta')
   assert.equal(metadata.run.trim(), 'node scripts/desktop-release-metadata.mjs')
   assert.equal(workflow.jobs['windows-build'].steps.some(step => step.run?.startsWith('pnpm desktop:regression:e2e')), false)
+  const candidate = workflow.jobs['windows-build'].steps.find(step => step.name === 'Upload built Windows candidate for parallel verification')
+  assert.equal(candidate.with['include-hidden-files'], true, 'unpacked Runtime dependencies include dotfiles')
   assert.deepEqual(workflow.jobs['windows-e2e'].strategy.matrix.shard, [1, 2, 3, 4])
   const regression = workflow.jobs['windows-e2e'].steps.find(step => step.name === 'Run packaged Windows regression')
   assert.match(regression?.run ?? '', /test:regression:e2e:full\s+--shard=\$\{\{ matrix\.shard \}\}\/4\s+--retry-flaky=1\s+--collect-failures/u)
