@@ -307,6 +307,7 @@ function Inbox({ t, openSession, sessionTitle }: EntryProps) {
 
     place()
     const observer = new MutationObserver(() => {
+      if (button.isConnected) return
       const nav = findSidebarPanelsNav()
       if (nav && button.parentElement !== nav) nav.append(button)
     })

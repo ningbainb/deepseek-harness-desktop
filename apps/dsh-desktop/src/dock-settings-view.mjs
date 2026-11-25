@@ -120,7 +120,7 @@ export function createDockSettingsView({ WebContentsView, window, mainWindow, ge
   const layout = () => {
     if (!view || window.isDestroyed() || window.isMinimized?.()) return
     const [width, height] = window.getContentSize()
-    const sidebar = width <= 800 ? 180 : 224
+    const sidebar = width <= 800 ? 180 : 220
     const bounds = { x: sidebar, y: WINDOW_CHROME_HEIGHT, width: Math.max(1, width - sidebar), height: Math.max(1, height - WINDOW_CHROME_HEIGHT) }
     if (lastBounds && Object.keys(bounds).every(key => bounds[key] === lastBounds[key])) return
     lastBounds = bounds

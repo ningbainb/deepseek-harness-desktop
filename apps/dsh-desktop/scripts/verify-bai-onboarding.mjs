@@ -69,7 +69,7 @@ try {
   await dismissRuntimeOnboarding(page)
   const entry = page.locator('button[data-dsh-relay-model-entry]').first()
   await entry.waitFor({ state: 'visible', timeout: 30_000 })
-  await entry.filter({ hasText: /聚合中转（登录解锁模型）|Relay Hub \(sign in to unlock\)|bai（登录后获取模型）|bai \(models after sign-in\)/u }).waitFor({ state: 'visible', timeout: 60_000 })
+  await entry.filter({ hasText: /聚合中转（登录解锁模型）|Relay \(sign in to unlock\)|bai（登录后获取模型）|bai \(models after sign-in\)/u }).waitFor({ state: 'visible', timeout: 60_000 })
   assert.equal(await page.locator('[data-composer-card] [data-dsh-relay-connect]').count(), 0, 'chat has no independent bai promotion button')
   await entry.click()
   await page.getByRole('menuitem', { name: /^(模型|Model)/u }).waitFor({ state: 'visible', timeout: 30_000 })

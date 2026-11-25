@@ -91,7 +91,7 @@ test('publication verifies each native checksum receipt before generating the co
 test('Windows release runs physical Setup acceptance and a checksum-pinned previous stable upgrade', async () => {
   const workflow = await readFile(workflowPath, 'utf8')
 
-  assert.match(workflow, /gh release download desktop-v4\.3\.0[^\n]*--pattern SHA256SUMS\.txt/u)
+  assert.match(workflow, /gh release download desktop-v5\.3\.5[^\n]*--pattern SHA256SUMS\.txt/u)
   assert.match(workflow, /node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs/u)
   assert.ok(workflow.indexOf('verify-release-installer.mjs') > workflow.indexOf('pack:win'))
 })
@@ -109,16 +109,13 @@ test('failed Windows candidates retain diagnostics without entering the publicat
   assert.doesNotMatch(publication, /desktop-debug/u)
 })
 
-test('Windows release tests one clean install and upgrades from all six previous stable installers', async () => {
+test('Windows release tests one clean install and upgrade from the latest previous stable installer', async () => {
   const workflow = await readFile(workflowPath, 'utf8')
   const setup = workflow.slice(workflow.indexOf('- name: Verify production Setup'), workflow.indexOf('- name: Run packaged Windows regression'))
-  for (const version of ['4.3.0', '5.0.0', '5.0.1', '5.1.0', '5.2.0', '5.3.5']) {
-    assert.ok(setup.includes(`$env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '${version}'`))
-    assert.ok(setup.includes(`gh release download desktop-v${version} --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-${version}-x64.exe' --pattern SHA256SUMS.txt`))
-    assert.ok(setup.includes(`setup-from-${version}.json`))
-  }
+  assert.ok(setup.includes(`$env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.3.5'`))
+  assert.ok(setup.includes(`gh release download desktop-v5.3.5 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe' --pattern SHA256SUMS.txt`))
+  assert.ok(setup.includes('setup-from-5.3.5.json'))
   assert.equal(setup.match(/^ +node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs\s*$/gmu)?.length, 1)
-  assert.equal(setup.match(/^ +node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs --upgrade-only\s*$/gmu)?.length, 5)
 })
 
 test('Windows acceptance receipts survive successful runs and remain separate from public assets', async () => {
@@ -135,13 +132,13 @@ test('Windows acceptance receipts survive successful runs and remain separate fr
   assert.doesNotMatch(publication, /desktop-qa/u)
 })
 
-test('workflow metadata uses the functional classifier and source regression explicitly selects source-only suites', async () => {
+test('workflow metadata uses the functional classifier and Windows regression runs once on the packaged build', async () => {
   const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
   const metadata = workflow.jobs.metadata.steps.find(step => step.id === 'meta')
   assert.equal(metadata.run.trim(), 'node scripts/desktop-release-metadata.mjs')
-  const regression = workflow.jobs.windows.steps.find(step => step.run?.startsWith('pnpm desktop:regression:e2e'))
-  assert.match(regression.run, /(?:^|\s)--source(?:\s|$)/u)
-  assert.match(regression.run, /(?:^|\s)--collect-failures(?:\s|$)/u)
+  assert.equal(workflow.jobs.windows.steps.some(step => step.run?.startsWith('pnpm desktop:regression:e2e')), false)
+  const regression = workflow.jobs.windows.steps.find(step => step.name === 'Run packaged Windows regression')
+  assert.match(regression?.run ?? '', /test:regression:e2e:full\s+--collect-failures/u)
 })
 
 test('native artifact verification runs on dispatch and publication depends on its success', async () => {

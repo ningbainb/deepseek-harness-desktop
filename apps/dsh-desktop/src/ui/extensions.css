@@ -40,7 +40,7 @@ body {
 
 .settings-shell {
   display: grid;
-  grid-template-columns: 224px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   width: 100%;
   height: 100%;
   height: calc(100vh - var(--dsh-desktop-window-chrome-height, 0px) - 1px);

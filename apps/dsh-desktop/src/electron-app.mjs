@@ -1276,10 +1276,12 @@ export async function startElectronApp(metadata) {
   const starPromptStore = new StarPromptStore({ path: starPromptStatePath })
   const releaseGuideStore = new ReleaseGuideStore({ path: join(userData, 'release-guide-state.json') })
   let starPromptPreSeededForCurrentRelease = false
+  let starPromptHadPriorRelease = false
   try {
     const parsedStarState = JSON.parse(await readFile(starPromptStatePath, 'utf8'))
-    starPromptPreSeededForCurrentRelease = Array.isArray(parsedStarState?.shownVersions)
-      && parsedStarState.shownVersions.includes(STAR_PROMPT_VERSION)
+    const shownVersions = Array.isArray(parsedStarState?.shownVersions) ? parsedStarState.shownVersions : []
+    starPromptPreSeededForCurrentRelease = shownVersions.includes(STAR_PROMPT_VERSION)
+    starPromptHadPriorRelease = shownVersions.length > 0 && !starPromptPreSeededForCurrentRelease
   } catch (error) {
     if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) {
       await logStore.append(`[star-prompt] failed to inspect pre-seeded state: ${error instanceof Error ? error.message : String(error)}`)
@@ -2209,7 +2211,9 @@ export async function startElectronApp(metadata) {
         const claimed = await starPromptStore.claim(STAR_PROMPT_VERSION)
         if (claimed) {
           starPromptClaimedThisSession = true
-          await releaseGuideStore.markPending(RELEASE_GUIDE_VERSION).catch(() => {})
+          if (starPromptHadPriorRelease) {
+            await releaseGuideStore.markPending(RELEASE_GUIDE_VERSION).catch(() => {})
+          }
         }
         return claimed
       } catch (error) {
@@ -2221,7 +2225,7 @@ export async function startElectronApp(metadata) {
       try {
         if (starPromptClaimedThisSession) return false
         return await releaseGuideStore.claim(RELEASE_GUIDE_VERSION, {
-          suppressIfUnmarked: starPromptPreSeededForCurrentRelease,
+          suppressIfUnmarked: starPromptPreSeededForCurrentRelease || !starPromptHadPriorRelease,
         })
       } catch (error) {
         await logStore.append(`[release-guide] failed to persist display state: ${error instanceof Error ? error.message : String(error)}`)

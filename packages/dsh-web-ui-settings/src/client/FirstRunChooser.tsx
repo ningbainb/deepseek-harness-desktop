@@ -241,7 +241,7 @@ export function installFirstRunChooser(
     ].join(', ')
     const hasBlockingDialog = [...doc.querySelectorAll(blockingSelector)].some(el => !container.contains(el) && isElementVisible(el, win))
     const hasSettingsOrConversation = Boolean(
-      doc.querySelector('[data-shortcut-modal="settings"], [data-message-id], [data-turn-id]')
+      doc.querySelector('[data-shortcut-modal="settings"], [data-chat-flow-kind], [data-message-id], [data-turn-id]')
       || composerHasText(doc),
     )
 

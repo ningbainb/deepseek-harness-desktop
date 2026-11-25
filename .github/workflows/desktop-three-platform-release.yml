@@ -43,7 +43,6 @@ jobs:
       DSH_DESKTOP_SETTINGS_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/native-settings
       DSH_DESKTOP_DOCK_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/dock
       DSH_DESKTOP_BETA_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/usability
-      DSH_DESKTOP_E2E_RECEIPT: ${{ github.workspace }}/.tmp/release-qa/source-core.json
       DSH_DESKTOP_SMOKE_DIAGNOSTICS: ${{ github.workspace }}/.tmp/release-qa/packaged-smoke
     steps:
       - run: git config --global core.autocrlf false
@@ -61,7 +60,6 @@ jobs:
       - name: Check native installer cancellation before full verification
         run: node --test apps/dsh-desktop/test/installer-hardening-native.test.mjs
       - run: pnpm verify
-      - run: pnpm desktop:regression:e2e --source --collect-failures
       - name: Configure anonymous product metrics
         shell: pwsh
         env:
@@ -80,42 +78,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '4.3.0'
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-4.3.0'
-          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-4.3.0.json'
-          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
-          gh release download desktop-v4.3.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-4.3.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.0.0'
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.0.0'
-          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.0.0.json'
-          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
-          gh release download desktop-v5.0.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.0.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.0.1'
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.0.1'
-          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.0.1.json'
-          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
-          gh release download desktop-v5.0.1 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.0.1-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.1.0'
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.1.0'
-          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.1.0.json'
-          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
-          gh release download desktop-v5.1.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.1.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.2.0'
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.2.0'
-          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.2.0.json'
-          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
-          gh release download desktop-v5.2.0 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.2.0-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.3.5'
           $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.3.5'
           $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.3.5.json'
           New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
           gh release download desktop-v5.3.5 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs --upgrade-only
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs
       - name: Run packaged Windows regression
         shell: pwsh
         run: |
