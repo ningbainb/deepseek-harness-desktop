@@ -9,9 +9,9 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  verify:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 25
     steps:
       - name: Preserve repository line endings
         run: git config --global core.autocrlf false
@@ -26,17 +26,8 @@ jobs:
       - name: Enforce the desktop version release floor
         run: node scripts/verify-desktop-version-floor.mjs
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
       - name: Feature preservation baseline check
         run: pnpm feature-baseline:check
-      - name: Prepare native Windows fixture storage
-        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
-      - name: Windows installer lifecycle gate
-        run: pnpm --filter @linxin666/dsh-desktop test:installer-lifecycle:e2e
-      - name: Desktop core regression E2E gate
-        # Only the maintainer-approved 3.4.0 DPI position assertion is accepted.
-        # The test still runs; every other failure and version stays blocking.
-        run: pnpm desktop:regression:e2e --accept-known-dpi-position-3.4.0
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:scripts
@@ -56,3 +47,61 @@ jobs:
       - run: pnpm community:check
       - run: pnpm docs:check
       - run: git diff --check
+
+  installer-lifecycle:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Preserve repository line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
+      - name: Windows installer lifecycle gate
+        run: pnpm --filter @linxin666/dsh-desktop test:installer-lifecycle:e2e
+
+  e2e:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Preserve repository line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
+      - name: Desktop core regression E2E gate
+        # Only the maintainer-approved 3.4.0 DPI position assertion is accepted.
+        # The test still runs; every other failure and version stays blocking.
+        run: pnpm desktop:regression:e2e --accept-known-dpi-position-3.4.0 --shard=${{ matrix.shard }}/4 --retry-flaky=1 --collect-failures

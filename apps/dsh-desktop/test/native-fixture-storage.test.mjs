@@ -3,6 +3,7 @@ import test from 'node:test'
 import { access, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import YAML from 'yaml'
 import { assertNativeFixtureStorage, nativeFixtureStoragePolicy, prepareNativeFixtureStorage } from '../scripts/native-fixture-storage.mjs'
 import * as nativeStorage from '../scripts/native-fixture-storage.mjs'
 
@@ -16,11 +17,16 @@ const temporaryDirectory = 'D:\\a\\_temp\\dsh-native-fixtures'
 const nativeWindows = { skip: process.platform === 'win32' ? false : 'Requires native Windows filesystem paths; Windows must run this case', timeout: 30_000 }
 
 test('Desktop CI prepares the dedicated hosted fixture root before native lifecycle and GUI gates', async () => {
-  const workflow = await readFile(new URL('../../../.github/workflows/desktop-ci.yml', import.meta.url), 'utf8')
-  const prepare = workflow.indexOf('run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
-  assert.ok(prepare >= 0, 'Hosted native gates require their storage preparation step')
-  for (const command of ['test:installer-lifecycle:e2e', 'run: pnpm desktop:regression:e2e']) {
-    assert.ok(workflow.indexOf(command) > prepare, `${command} must use the prepared fixture environment`)
+  const workflow = YAML.parse(await readFile(new URL('../../../.github/workflows/desktop-ci.yml', import.meta.url), 'utf8'))
+  assert.ok(workflow.jobs.verify, 'Fast verify job must gate heavyweight E2E and installer jobs')
+  for (const [jobName, command] of [['installer-lifecycle', 'test:installer-lifecycle:e2e'], ['e2e', 'pnpm desktop:regression:e2e']]) {
+    const job = workflow.jobs[jobName]
+    assert.ok(job, `${jobName} job must exist in desktop-ci.yml`)
+    assert.ok(Array.isArray(job.needs) ? job.needs.includes('verify') : job.needs === 'verify', `${jobName} must depend on fast verify job`)
+    const prepare = job.steps.findIndex(step => step.run?.trim() === 'node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
+    const target = job.steps.findIndex(step => step.run?.includes(command))
+    assert.ok(prepare >= 0, `${jobName} requires its storage preparation step`)
+    assert.ok(target > prepare, `${command} must use the prepared fixture environment`)
   }
 })
 

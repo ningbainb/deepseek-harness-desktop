@@ -30,3 +30,12 @@ pnpm desktop:pack
 - Keep source, documentation, commit messages, and user-visible strings free of emoji.
 
 Before submitting a change, run `pnpm desktop:test`, `pnpm --filter @linxin666/dsh-desktop pack:verify` after packaging, and `git diff --check`.
+
+## Verification and CI workflow
+
+This repository splits CI into a fast `verify` gate (typecheck, unit tests, audits, doc checks) followed by 4 parallel Playwright/Electron E2E shards on Windows runners:
+
+- Fast local verification: `pnpm verify`
+- Single E2E suite during feature work: `node apps/dsh-desktop/scripts/verify-<name>.mjs`
+- Weighted shard execution matching CI: `pnpm desktop:regression:e2e --shard=1/4`
+- Release and nightly workflow architecture: see [docs/ci-and-release-testing.md](docs/ci-and-release-testing.md)

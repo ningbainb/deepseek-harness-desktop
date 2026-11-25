@@ -31,18 +31,15 @@ jobs:
       - id: meta
         run: node scripts/desktop-release-metadata.mjs
 
-  windows:
+  windows-build:
     needs: metadata
     if: github.event_name != 'workflow_dispatch' || inputs.verified_run == ''
     runs-on: windows-latest
-    timeout-minutes: 180
+    timeout-minutes: 60
     env:
       REQUIRE_SIGNING: 'false'
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       DSH_DESKTOP_UPDATE_CHANNEL: stable
-      DSH_DESKTOP_SETTINGS_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/native-settings
-      DSH_DESKTOP_DOCK_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/dock
-      DSH_DESKTOP_BETA_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/usability
       DSH_DESKTOP_SMOKE_DIAGNOSTICS: ${{ github.workspace }}/.tmp/release-qa/packaged-smoke
     steps:
       - run: git config --global core.autocrlf false
@@ -53,6 +50,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
       - name: Prepare confined native Windows fixture storage
         shell: pwsh
@@ -71,72 +73,20 @@ jobs:
           }
           @{ endpoint = $endpoint.AbsoluteUri; officialBuild = $true } | ConvertTo-Json | Set-Content -Encoding utf8NoBOM apps/dsh-desktop/build/telemetry-config.json
       - run: pnpm --filter @linxin666/dsh-desktop pack:win
-      - name: Verify production Setup on the disposable Windows Runner
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.3.5'
-          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.3.5'
-          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.3.5.json'
-          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
-          gh release download desktop-v5.3.5 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
-          node apps/dsh-desktop/scripts/verify-release-installer.mjs
-      - name: Run packaged Windows regression
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $PSNativeCommandUseErrorActionPreference = $true
-          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
-          # The full suite checks the native layout variant of this fixture.
-          pnpm --filter @linxin666/dsh-desktop test:directory-picker:e2e
-          $env:DSH_DESKTOP_E2E_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/packaged-full.json'
-          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --collect-failures
       - run: pnpm --filter @linxin666/dsh-desktop pack:verify
       - run: node apps/dsh-desktop/scripts/verify-office-runtime.mjs --resources apps/dsh-desktop/dist/win-unpacked/resources --output apps/dsh-desktop/dist/office-runtime-verification
       - run: pnpm --filter @linxin666/dsh-desktop pack:smoke
       - run: pnpm --filter @linxin666/dsh-desktop release:signatures:verify
       - run: pnpm --filter @linxin666/dsh-desktop release:manifest:verify
-      - uses: actions/upload-artifact@v4
+      - name: Upload built Windows candidate for parallel verification
+        uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ needs.metadata.outputs.version }}-windows-x64
+          name: desktop-candidate-${{ needs.metadata.outputs.version }}-windows-x64
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
           path: |
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe
-            apps/dsh-desktop/dist/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap
-            apps/dsh-desktop/dist/latest.yml
-            apps/dsh-desktop/dist/SHA256SUMS.txt
-            apps/dsh-desktop/dist/release-manifest.json
-
-      - name: Preserve Windows acceptance evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64
-          if-no-files-found: warn
-          include-hidden-files: true
-          retention-days: 14
-          path: |
-            .tmp/release-qa/**
-            !.tmp/release-qa/packaged-smoke/**/electron.raw.log
-
-      - name: Preserve native source and companion evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-native-qa-${{ needs.metadata.outputs.version }}-windows-x64
-          if-no-files-found: warn
-          include-hidden-files: true
-          retention-days: 14
-          path: |
-            ${{ runner.temp }}/dsh-native-fixtures/dsh-release-plugins-results/**
-            ${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**
-            ${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**
-            ${{ runner.temp }}/dsh-native-fixtures/dsh-packaged-release-browser-results/**
-            ${{ runner.temp }}/dsh-native-fixtures/dsh-dafeiyu-clearance-results-*/**
+            apps/dsh-desktop/dist/**
+            !apps/dsh-desktop/dist/office-runtime-verification/**
 
       - name: Preserve failed Windows candidate diagnostics
         if: failure()
@@ -153,6 +103,160 @@ jobs:
             apps/dsh-desktop/dist/SHA256SUMS.txt
             apps/dsh-desktop/dist/release-manifest.json
             !.tmp/release-qa/packaged-smoke/**/electron.raw.log
+
+  windows-setup-upgrade:
+    needs: [metadata, windows-build]
+    if: github.event_name != 'workflow_dispatch' || inputs.verified_run == ''
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      DSH_DESKTOP_UPDATE_CHANNEL: stable
+      DSH_DESKTOP_SMOKE_DIAGNOSTICS: ${{ github.workspace }}/.tmp/release-qa/packaged-smoke
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare confined native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
+      - name: Download built Windows candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-candidate-${{ needs.metadata.outputs.version }}-windows-x64
+          path: apps/dsh-desktop/dist
+      - name: Verify production Setup on the disposable Windows Runner
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.3.5'
+          $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY = Join-Path $env:RUNNER_TEMP 'dsh-previous-release-5.3.5'
+          $env:DSH_DESKTOP_SETUP_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/setup-from-5.3.5.json'
+          New-Item -ItemType Directory -Path $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY -Force | Out-Null
+          gh release download desktop-v5.3.5 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe' --pattern SHA256SUMS.txt --dir $env:DSH_DESKTOP_PREVIOUS_RELEASE_DIRECTORY
+          node apps/dsh-desktop/scripts/verify-release-installer.mjs
+      - name: Preserve Windows setup acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64-setup
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .tmp/release-qa/**
+            !.tmp/release-qa/packaged-smoke/**/electron.raw.log
+
+  windows-e2e:
+    needs: [metadata, windows-build]
+    if: github.event_name != 'workflow_dispatch' || inputs.verified_run == ''
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      DSH_DESKTOP_UPDATE_CHANNEL: stable
+      DSH_DESKTOP_SETTINGS_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/native-settings
+      DSH_DESKTOP_DOCK_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/dock
+      DSH_DESKTOP_BETA_SCREENSHOTS: ${{ github.workspace }}/.tmp/release-qa/usability
+      DSH_DESKTOP_SMOKE_DIAGNOSTICS: ${{ github.workspace }}/.tmp/release-qa/packaged-smoke
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare confined native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
+      - name: Download built Windows candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: desktop-candidate-${{ needs.metadata.outputs.version }}-windows-x64
+          path: apps/dsh-desktop/dist
+      - name: Run packaged Windows regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:DSH_DESKTOP_E2E_EXECUTABLE = (Resolve-Path 'apps/dsh-desktop/dist/win-unpacked/DeepSeek Harness Desktop.exe').Path
+          if ('${{ matrix.shard }}' -eq '1') {
+            # The full suite checks the native layout variant of this fixture.
+            pnpm --filter @linxin666/dsh-desktop test:directory-picker:e2e
+          }
+          $env:DSH_DESKTOP_E2E_RECEIPT = Join-Path $env:GITHUB_WORKSPACE '.tmp/release-qa/packaged-full-shard-${{ matrix.shard }}.json'
+          pnpm --filter @linxin666/dsh-desktop test:regression:e2e:full --shard=${{ matrix.shard }}/4 --retry-flaky=1 --collect-failures
+      - name: Preserve Windows acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64-shard-${{ matrix.shard }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .tmp/release-qa/**
+            !.tmp/release-qa/packaged-smoke/**/electron.raw.log
+      - name: Preserve native source and companion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-native-qa-${{ needs.metadata.outputs.version }}-windows-x64-shard-${{ matrix.shard }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-release-plugins-results/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-sidebar-footer-results/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-pet-clearance-results-*/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-packaged-release-browser-results/**
+            ${{ runner.temp }}/dsh-native-fixtures/dsh-dafeiyu-clearance-results-*/**
+
+  windows:
+    needs: [metadata, windows-build, windows-setup-upgrade, windows-e2e]
+    if: github.event_name != 'workflow_dispatch' || inputs.verified_run == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-candidate-${{ needs.metadata.outputs.version }}-windows-x64
+          path: candidate-win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ needs.metadata.outputs.version }}-windows-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            candidate-win/DeepSeek-Harness-Desktop-Setup-*.exe
+            candidate-win/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap
+            candidate-win/latest.yml
+            candidate-win/SHA256SUMS.txt
+            candidate-win/release-manifest.json
 
   macos:
     needs: metadata
@@ -172,6 +276,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
       - run: pnpm verify
       - name: Configure anonymous product metrics
@@ -226,6 +335,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
       - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
       - run: pnpm verify
       - name: Configure anonymous product metrics

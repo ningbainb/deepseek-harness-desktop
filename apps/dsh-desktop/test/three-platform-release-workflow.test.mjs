@@ -11,15 +11,21 @@ const workflowPath = join(import.meta.dirname, '..', '..', '..', '.github', 'wor
 
 test('Windows CI prepares confined native storage in its own step before verification', async () => {
   const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
-  const steps = workflow.jobs.windows.steps
+  const steps = workflow.jobs['windows-build'].steps
   const prepare = steps.findIndex(step => step.run?.trim() === 'node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
   const verify = steps.findIndex(step => step.run?.trim() === 'pnpm verify')
   assert.ok(prepare >= 0 && prepare < verify, 'GITHUB_ENV must be prepared in a preceding step')
   assert.equal(steps[prepare].shell, 'pwsh')
+  for (const jobName of ['windows-setup-upgrade', 'windows-e2e']) {
+    const jobSteps = workflow.jobs[jobName].steps
+    const jobPrepare = jobSteps.findIndex(step => step.run?.trim() === 'node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
+    assert.ok(jobPrepare >= 0, `${jobName} must prepare confined native storage before running Windows binaries`)
+    assert.equal(jobSteps[jobPrepare].shell, 'pwsh')
+  }
 })
 
 test('native installer cancellation runs after confined storage and before complete verification', async () => {
-  const steps = YAML.parse(await readFile(workflowPath, 'utf8')).jobs.windows.steps
+  const steps = YAML.parse(await readFile(workflowPath, 'utf8')).jobs['windows-build'].steps
   const prepare = steps.findIndex(step => step.run?.trim() === 'node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs')
   const installer = steps.findIndex(step => step.run?.trim() === 'node --test apps/dsh-desktop/test/installer-hardening-native.test.mjs')
   const verify = steps.findIndex(step => step.run?.trim() === 'pnpm verify')
@@ -28,7 +34,7 @@ test('native installer cancellation runs after confined storage and before compl
 
 test('native QA uploads only result directories and preserves existing acceptance evidence', async () => {
   const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
-  const step = workflow.jobs.windows.steps.find(step => step.with?.name === 'desktop-native-qa-${{ needs.metadata.outputs.version }}-windows-x64')
+  const step = workflow.jobs['windows-e2e'].steps.find(step => step.with?.name === 'desktop-native-qa-${{ needs.metadata.outputs.version }}-windows-x64-shard-${{ matrix.shard }}')
   assert.ok(step, 'native source and companion evidence needs its own artifact')
   assert.equal(step.if, 'always()')
   assert.equal(step.with['include-hidden-files'], true)
@@ -39,7 +45,7 @@ test('native QA uploads only result directories and preserves existing acceptanc
     '${{ runner.temp }}/dsh-native-fixtures/dsh-packaged-release-browser-results/**',
     '${{ runner.temp }}/dsh-native-fixtures/dsh-dafeiyu-clearance-results-*/**',
   ])
-  assert.ok(workflow.jobs.windows.steps.some(step => step.with?.name === 'desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64'))
+  assert.ok(workflow.jobs['windows-e2e'].steps.some(step => step.with?.name === 'desktop-qa-${{ needs.metadata.outputs.version }}-windows-x64-shard-${{ matrix.shard }}'))
 })
 
 test('all Windows-only geometry fixtures use the shared storage boundary before writing output', async () => {
@@ -64,8 +70,8 @@ test('three-platform release delegates the stable updater channel to the Windows
 })
 
 test('packaged Windows regression stops when any native validation command fails', async () => {
-  const workflow = await readFile(workflowPath, 'utf8')
-  const regression = workflow.slice(workflow.indexOf('- name: Run packaged Windows regression'), workflow.indexOf('- run: pnpm --filter @linxin666/dsh-desktop pack:verify'))
+  const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
+  const regression = workflow.jobs['windows-e2e'].steps.find(step => step.name === 'Run packaged Windows regression')?.run ?? ''
 
   assert.match(regression, /\$ErrorActionPreference = 'Stop'/u)
   assert.match(regression, /\$PSNativeCommandUseErrorActionPreference = \$true/u)
@@ -89,16 +95,18 @@ test('publication verifies each native checksum receipt before generating the co
 })
 
 test('Windows release runs physical Setup acceptance and a checksum-pinned previous stable upgrade', async () => {
-  const workflow = await readFile(workflowPath, 'utf8')
-
-  assert.match(workflow, /gh release download desktop-v5\.3\.5[^\n]*--pattern SHA256SUMS\.txt/u)
-  assert.match(workflow, /node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs/u)
-  assert.ok(workflow.indexOf('verify-release-installer.mjs') > workflow.indexOf('pack:win'))
+  const parsed = YAML.parse(await readFile(workflowPath, 'utf8'))
+  const setupJob = parsed.jobs['windows-setup-upgrade']
+  assert.ok(setupJob.needs.includes('windows-build'), 'windows-setup-upgrade must run after windows-build')
+  assert.ok(parsed.jobs['windows-build'].steps.some(step => step.run?.includes('pack:win')))
+  const setupRun = setupJob.steps.find(step => step.name === 'Verify production Setup on the disposable Windows Runner')?.run ?? ''
+  assert.match(setupRun, /gh release download desktop-v5\.3\.5[^\n]*--pattern SHA256SUMS\.txt/u)
+  assert.match(setupRun, /node apps\/dsh-desktop\/scripts\/verify-release-installer\.mjs/u)
 })
 
 test('failed Windows candidates retain diagnostics without entering the publication artifact set', async () => {
   const workflow = await readFile(workflowPath, 'utf8')
-  const diagnostics = workflow.slice(workflow.indexOf('      - name: Preserve failed Windows candidate diagnostics'), workflow.indexOf('  macos:'))
+  const diagnostics = workflow.slice(workflow.indexOf('      - name: Preserve failed Windows candidate diagnostics'), workflow.indexOf('  windows-setup-upgrade:'))
   assert.match(diagnostics, /if: failure\(\)/u)
   assert.match(diagnostics, /include-hidden-files: true/u)
   assert.match(diagnostics, /name: desktop-debug-\$\{\{ needs\.metadata\.outputs\.version \}\}-windows-x64/u)
@@ -111,7 +119,7 @@ test('failed Windows candidates retain diagnostics without entering the publicat
 
 test('Windows release tests one clean install and upgrade from the latest previous stable installer', async () => {
   const workflow = await readFile(workflowPath, 'utf8')
-  const setup = workflow.slice(workflow.indexOf('- name: Verify production Setup'), workflow.indexOf('- name: Run packaged Windows regression'))
+  const setup = workflow.slice(workflow.indexOf('- name: Verify production Setup on the disposable Windows Runner'), workflow.indexOf('- name: Preserve Windows setup acceptance evidence'))
   assert.ok(setup.includes(`$env:DSH_DESKTOP_PREVIOUS_RELEASE_VERSION = '5.3.5'`))
   assert.ok(setup.includes(`gh release download desktop-v5.3.5 --repo ningbainb/deepseek-harness-desktop --pattern 'DeepSeek-Harness-Desktop-Setup-5.3.5-x64.exe' --pattern SHA256SUMS.txt`))
   assert.ok(setup.includes('setup-from-5.3.5.json'))
@@ -122,9 +130,9 @@ test('Windows acceptance receipts survive successful runs and remain separate fr
   const workflow = await readFile(workflowPath, 'utf8')
   const start = workflow.indexOf('      - name: Preserve Windows acceptance evidence')
   assert.ok(start > 0)
-  const evidence = workflow.slice(start, workflow.indexOf('      - name: Preserve failed Windows candidate diagnostics', start))
+  const evidence = workflow.slice(start, workflow.indexOf('      - name: Preserve native source and companion evidence', start))
   assert.match(evidence, /if: always\(\)/u)
-  assert.match(evidence, /name: desktop-qa-\$\{\{ needs\.metadata\.outputs\.version \}\}-windows-x64/u)
+  assert.match(evidence, /name: desktop-qa-\$\{\{ needs\.metadata\.outputs\.version \}\}-windows-x64-shard-\$\{\{ matrix\.shard \}\}/u)
   assert.match(evidence, /include-hidden-files: true/u)
   assert.match(evidence, /\.tmp\/release-qa\/\*\*/u)
   const publication = workflow.slice(workflow.lastIndexOf('  publish:'))
@@ -132,13 +140,15 @@ test('Windows acceptance receipts survive successful runs and remain separate fr
   assert.doesNotMatch(publication, /desktop-qa/u)
 })
 
-test('workflow metadata uses the functional classifier and Windows regression runs once on the packaged build', async () => {
+test('workflow metadata uses the functional classifier and Windows regression fans out across 4 packaged shards', async () => {
   const workflow = YAML.parse(await readFile(workflowPath, 'utf8'))
   const metadata = workflow.jobs.metadata.steps.find(step => step.id === 'meta')
   assert.equal(metadata.run.trim(), 'node scripts/desktop-release-metadata.mjs')
-  assert.equal(workflow.jobs.windows.steps.some(step => step.run?.startsWith('pnpm desktop:regression:e2e')), false)
-  const regression = workflow.jobs.windows.steps.find(step => step.name === 'Run packaged Windows regression')
-  assert.match(regression?.run ?? '', /test:regression:e2e:full\s+--collect-failures/u)
+  assert.equal(workflow.jobs['windows-build'].steps.some(step => step.run?.startsWith('pnpm desktop:regression:e2e')), false)
+  assert.deepEqual(workflow.jobs['windows-e2e'].strategy.matrix.shard, [1, 2, 3, 4])
+  const regression = workflow.jobs['windows-e2e'].steps.find(step => step.name === 'Run packaged Windows regression')
+  assert.match(regression?.run ?? '', /test:regression:e2e:full\s+--shard=\$\{\{ matrix\.shard \}\}\/4\s+--retry-flaky=1\s+--collect-failures/u)
+  assert.deepEqual(workflow.jobs.windows.needs, ['metadata', 'windows-build', 'windows-setup-upgrade', 'windows-e2e'])
 })
 
 test('native artifact verification runs on dispatch and publication depends on its success', async () => {

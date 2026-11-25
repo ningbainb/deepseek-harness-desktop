@@ -1,0 +1,67 @@
+name: Desktop Nightly Regression
+
+on:
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Preserve repository line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify
+
+  e2e:
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Preserve repository line endings
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - run: pnpm --filter @linxin666/dsh-desktop exec playwright install chromium
+      - name: Prepare native Windows fixture storage
+        shell: pwsh
+        run: node apps/dsh-desktop/scripts/prepare-native-fixture-storage.mjs
+      - name: Run full source Windows regression shard
+        env:
+          DSH_DESKTOP_E2E_RECEIPT: ${{ github.workspace }}/.tmp/release-qa/nightly-shard-${{ matrix.shard }}.json
+        run: pnpm desktop:regression:e2e --source --shard=${{ matrix.shard }}/4 --retry-flaky=1 --collect-failures
+      - name: Preserve nightly QA receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-nightly-qa-shard-${{ matrix.shard }}
+          if-no-files-found: warn
+          include-hidden-files: true
+          retention-days: 14
+          path: |
+            .tmp/release-qa/**

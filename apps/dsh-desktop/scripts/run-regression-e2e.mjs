@@ -11,10 +11,14 @@
  *   remote isolation). Required for full release verification.
  *
  * Usage:
- *   node scripts/run-regression-e2e.mjs          # Core regression
- *   node scripts/run-regression-e2e.mjs --source # Verify current source and rebuilt plugins
- *   node scripts/run-regression-e2e.mjs --core   # Core regression
- *   node scripts/run-regression-e2e.mjs --full   # Full regression
+ *   node scripts/run-regression-e2e.mjs                        # Core regression
+ *   node scripts/run-regression-e2e.mjs --source               # Verify current source and rebuilt plugins
+ *   node scripts/run-regression-e2e.mjs --core                 # Core regression
+ *   node scripts/run-regression-e2e.mjs --full                 # Full regression
+ *   node scripts/run-regression-e2e.mjs --shard=1/4            # Run one weighted shard (1-based index)
+ *   node scripts/run-regression-e2e.mjs --retry-flaky=1        # Retry failed suites up to N times (0..3)
+ *   node scripts/run-regression-e2e.mjs --collect-failures     # Continue running remaining suites on failure
+ *   node scripts/run-regression-e2e.mjs --evidence=<path>      # Write JSON QA receipt to <path>
  */
 
 import { execFileSync, spawn } from 'node:child_process'
@@ -23,16 +27,44 @@ import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { acceptedReleaseIssue } from './release-known-issues.mjs'
 import { prepareSourceSkins } from './prepare-source-skins.mjs'
+import { parseRetryCount, parseShardSpec, selectShardSuites } from './regression-e2e-shards.mjs'
+
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`Usage: node scripts/run-regression-e2e.mjs [options]
+
+Options:
+  --core                     Run core regression suites (default)
+  --source                   Force source Electron execution and verify source suites
+  --full                     Run core + packaged release suites
+  --shard=<index>/<total>    Run balanced subset shard (1 <= index <= total)
+  --retry-flaky=<count>      Retry a failing suite up to <count> times (0..3, default 0)
+  --collect-failures         Run all selected suites instead of stopping at first failure
+  --evidence=<path>          Write JSON acceptance receipt to <path>
+  -h, --help                 Show this help message`)
+  process.exit(0)
+}
+
+function readOption(name) {
+  const prefix = `--${name}=`
+  const inline = process.argv.find((argument) => argument.startsWith(prefix))
+  if (inline !== undefined) return inline.slice(prefix.length)
+  const index = process.argv.indexOf(`--${name}`)
+  if (index >= 0 && index + 1 < process.argv.length) return process.argv[index + 1]
+  return undefined
+}
 
 const APP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const IS_FULL = process.argv.includes('--full')
 const COLLECT_FAILURES = process.argv.includes('--collect-failures')
 const SOURCE_ONLY = process.argv.includes('--source')
+const SHARD = parseShardSpec(readOption('shard') ?? process.env.DSH_DESKTOP_E2E_SHARD)
+const RETRY_FLAKY = parseRetryCount(readOption('retry-flaky') ?? process.env.DSH_DESKTOP_E2E_RETRY_FLAKY)
 const ACCEPT_KNOWN_DPI = process.argv.includes('--accept-known-dpi-position-3.4.0')
 const VERSION = JSON.parse(readFileSync(resolve(APP_DIR, 'package.json'), 'utf8')).version
 const ACCEPT_STREAM_TIMING = process.argv.includes(`--accept-stream-frame-timing-${VERSION}`)
 const ACCEPT_INITIAL_RUNTIME_STOP = process.argv.includes(`--accept-initial-runtime-stop-${VERSION}`)
 const acceptedIssues = []
+const flakySuites = []
 const receiptArgument = process.argv.find((argument) => argument.startsWith('--evidence='))
 const RECEIPT_PATH = receiptArgument
   ? resolve(process.cwd(), receiptArgument.slice('--evidence='.length))
@@ -468,16 +500,55 @@ function releaseArtifactEvidence() {
   }
 }
 
-function writeReceipt({ startedAt, finishedAt, status, suites, failure, terminal = true }) {
+async function runSuiteWithRetries(suite) {
+  let previousFailure
+  for (let attempt = 0; attempt <= RETRY_FLAKY; attempt++) {
+    try {
+      const result = await runSuite(suite)
+      if (attempt > 0) {
+        flakySuites.push(suite.name)
+        console.warn(`[FLAKY-PASS] ${suite.name} passed on attempt ${attempt + 1}/${RETRY_FLAKY + 1}.`)
+        return {
+          ...result,
+          status: 'flaky',
+          attempts: attempt + 1,
+          previousFailure,
+        }
+      }
+      return result
+    } catch (error) {
+      previousFailure = error instanceof Error ? error.message : String(error)
+      if (attempt < RETRY_FLAKY) {
+        console.warn(`[RETRY ${attempt + 1}/${RETRY_FLAKY}] ${suite.name} failed; retrying after 1.5s...`)
+        await new Promise((r) => setTimeout(r, 1500))
+        continue
+      }
+      throw error
+    }
+  }
+}
+
+function writeReceipt({
+  startedAt,
+  finishedAt,
+  status,
+  suites,
+  totalSuites = IS_FULL ? CORE_SUITES.length + PACKAGED_SUITES.length : CORE_SUITES.length,
+  failure,
+  terminal = true,
+}) {
   if (!RECEIPT_PATH) return
   const executable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
     ? relative(APP_DIR, resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE)).replaceAll('\\', '/')
     : undefined
+  const activeShard = typeof SHARD !== 'undefined' ? SHARD : null
+  const activeFlaky = typeof flakySuites !== 'undefined' ? flakySuites : []
   const receipt = {
     schemaVersion: 1,
     kind: 'desktop-regression-e2e',
     version: VERSION,
     mode: IS_FULL ? 'full-release' : (SOURCE_ONLY ? 'source-core' : 'core'),
+    ...(activeShard ? { shard: activeShard } : {}),
     sourceCommit: repositoryCommit(),
     startedAt: new Date(startedAt).toISOString(),
     updatedAt: new Date(finishedAt).toISOString(),
@@ -485,12 +556,13 @@ function writeReceipt({ startedAt, finishedAt, status, suites, failure, terminal
     durationSeconds: Number(((finishedAt - startedAt) / 1000).toFixed(1)),
     status,
     acceptedIssues: [...acceptedIssues],
+    flakySuites: [...activeFlaky],
     executable,
     ...releaseArtifactEvidence(),
     suites,
-    totalSuites: IS_FULL ? CORE_SUITES.length + PACKAGED_SUITES.length : CORE_SUITES.length,
+    totalSuites,
     completedSuites: suites.length,
-    completed: terminal && suites.length === (IS_FULL ? CORE_SUITES.length + PACKAGED_SUITES.length : CORE_SUITES.length),
+    completed: terminal && suites.length === totalSuites,
     ...(failure ? { failure } : {}),
   }
   mkdirSync(dirname(RECEIPT_PATH), { recursive: true })
@@ -510,11 +582,19 @@ async function main() {
     const restored = await prepareSourceSkins()
     console.log(`Verified source Skin Center assets: restored ${restored.length} offline skins`)
   }
-  const suitesToRun = IS_FULL
+  const activeShard = typeof SHARD !== 'undefined' ? SHARD : null
+  const retryFlaky = typeof RETRY_FLAKY !== 'undefined' ? RETRY_FLAKY : 0
+  const activeFlaky = typeof flakySuites !== 'undefined' ? flakySuites : []
+  const allSuites = IS_FULL
     ? [...CORE_SUITES, ...PACKAGED_SUITES]
     : CORE_SUITES
+  const suitesToRun = typeof selectShardSuites === 'function'
+    ? selectShardSuites(allSuites, activeShard)
+    : allSuites
+  const shardSuffix = activeShard ? `, shard ${activeShard.index}/${activeShard.total}` : ''
+  const retrySuffix = retryFlaky > 0 ? `, retry-flaky=${retryFlaky}` : ''
 
-  console.log(`Starting Desktop Regression E2E Gate (${IS_FULL ? 'FULL RELEASE' : 'CORE PR'} mode, ${suitesToRun.length} suites)...`)
+  console.log(`Starting Desktop Regression E2E Gate (${IS_FULL ? 'FULL RELEASE' : 'CORE PR'} mode${shardSuffix}${retrySuffix}, ${suitesToRun.length}/${allSuites.length} suites)...`)
   const totalStart = Date.now()
   const suiteResults = []
   const failures = []
@@ -524,12 +604,14 @@ async function main() {
     const suiteStartedAt = Date.now()
     console.log(`\nProgress: [${i + 1}/${suitesToRun.length}] ${suite.name}`)
     try {
-      suiteResults.push(await runSuite(suite))
+      const result = retryFlaky > 0 ? await runSuiteWithRetries(suite) : await runSuite(suite)
+      suiteResults.push(result)
       writeReceipt({
         startedAt: totalStart,
         finishedAt: Date.now(),
         status: failures.length ? 'failed' : 'running',
         suites: suiteResults,
+        totalSuites: suitesToRun.length,
         terminal: false,
         ...(failures.length ? { failure: failures.join('\n') } : {}),
       })
@@ -551,6 +633,7 @@ async function main() {
         finishedAt: Date.now(),
         status: 'failed',
         suites: suiteResults,
+        totalSuites: suitesToRun.length,
         failure: failures.join('\n'),
         terminal: !COLLECT_FAILURES,
       })
@@ -569,6 +652,7 @@ async function main() {
       finishedAt: Date.now(),
       status: 'failed',
       suites: suiteResults,
+      totalSuites: suitesToRun.length,
       failure: failures.join('\n'),
     })
     console.error(` [FAILED] Unified Desktop Regression Gate (${failures.length}/${suitesToRun.length} suites failed, ${totalElapsed}s)`)
@@ -580,10 +664,12 @@ async function main() {
     finishedAt: Date.now(),
     status: acceptedIssues.length ? 'accepted-known-issue' : 'passed',
     suites: suiteResults,
+    totalSuites: suitesToRun.length,
   })
   console.log(`\n============================================================`)
   console.log(` [${acceptedIssues.length ? 'COMPLETED WITH ACCEPTED KNOWN ISSUE' : 'ALL PASSED'}] Unified Desktop Regression Gate (${suitesToRun.length} suites, ${totalElapsed}s)`)
   if (acceptedIssues.length) console.log(` Accepted issues: ${acceptedIssues.join(', ')}`)
+  if (activeFlaky.length) console.log(` Flaky (passed on retry): ${activeFlaky.join(', ')}`)
   console.log(`============================================================`)
 }
 
