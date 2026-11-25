@@ -184,6 +184,7 @@ export function installRelayModelEntrances(doc: Document, translate: Translate):
   const show = (autoConnect: boolean, forceAuth = false) => {
     if (disposed || showing) return
     showing = true
+    doc.body.append(container)
     root.render(<RelayAccessDialog t={translate} onClose={close} autoConnect={autoConnect} forceAuth={forceAuth} />)
   }
   const onClick = (event: MouseEvent) => {
@@ -192,6 +193,9 @@ export function installRelayModelEntrances(doc: Document, translate: Translate):
     if (explicit && !explicit.disabled) {
       event.preventDefault()
       event.stopImmediatePropagation()
+      if (explicit.closest('[role="menu"]')) {
+        doc.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+      }
       show(true)
       return
     }

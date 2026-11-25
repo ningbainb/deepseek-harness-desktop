@@ -31,7 +31,7 @@
 .defaultModel dt { color: var(--dsw-alias-label-secondary); }
 .defaultModel dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
 
-.accessBackdrop { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 42%); }
+.accessBackdrop { position: fixed; inset: 0; z-index: 2147483640; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 42%); }
 .accessDialog {
   width: min(500px, 100%);
   max-height: calc(100vh - 40px);

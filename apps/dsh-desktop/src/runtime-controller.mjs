@@ -1172,7 +1172,7 @@ export class DshRuntimeController extends EventEmitter {
       const control = shutdownControls.get(child)
       shutdownControls.delete(child)
       // Leave the normal cleanup time for the receipt and keep a margin before the force deadline.
-      const clean = control && await requestRuntimeShutdown(control, Math.min(4500, this.shutdownTimeoutMs))
+      const clean = control && await requestRuntimeShutdown(control, Math.min(7500, this.shutdownTimeoutMs))
       if (control) this.#appendDiagnostic(clean
         ? '[process] Runtime graceful shutdown acknowledged'
         : '[process] Runtime graceful shutdown unavailable; retaining process-tree fallback', redactionToken)

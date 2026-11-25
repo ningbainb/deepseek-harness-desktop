@@ -794,7 +794,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-native-plugin-pages.mjs | 32 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-native-settings-interactions.mjs | 47 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs | 317 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs | 427 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs | 428 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 121 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 156 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 170 | DSH_HOME |

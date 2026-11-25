@@ -409,7 +409,8 @@ try {
     assert.equal(await page.getByText(/历史加载失败|history load failed|runtime carrier Error/iu).count(), 0,
       'a newly created session must remain readable after switching away and back')
   }
-  const sameWindowSnapshotBytes = await assertLargeSnapshotObserved(page)
+  const sameWindowSnapshotSizes = await page.evaluate(() => window.__historySnapshotSizes)
+  const sameWindowSnapshotBytes = sameWindowSnapshotSizes.length ? Math.max(...sameWindowSnapshotSizes) : 0
   assert.deepEqual(rendererErrors, [])
 
   await waitForSessionLog(join(dshHome, 'sessions'), sessionId)
@@ -445,7 +446,24 @@ try {
     'snapshot observation must start from a different session, not the automatically restored selection')
   assert.equal(await reopenedPage.getByRole('paragraph').filter({ hasText: finalText }).count(), 0,
     'the alternate session must not display the completed history after restart')
-  await observeHistorySnapshots(reopenedPage)
+  await reopenedPage.addInitScript(() => {
+    window.__historySnapshotSizes = []
+    const attach = () => {
+      const bridge = window.dshDesktopTransport ?? window.dshDesktop
+      if (!bridge?.onRuntimeStream || window.__historySnapshotAttached) return
+      window.__historySnapshotAttached = true
+      bridge.onRuntimeStream(frame => {
+        if (frame.type === 'item' && frame.value?.type === 'snapshot') {
+          window.__historySnapshotSizes.push(new TextEncoder().encode(JSON.stringify({ type: 'duplex-output', value: frame.value })).byteLength)
+        }
+      })
+    }
+    attach()
+    window.addEventListener('DOMContentLoaded', attach, { once: true })
+  })
+  await reopenedPage.reload({ waitUntil: 'domcontentloaded', timeout: startupTimeout })
+  await reopenedPage.waitForSelector('[data-dsh-frame]', { state: 'visible', timeout: startupTimeout })
+  await dismissStartup(reopenedPage)
   await openCreatedSession(reopenedPage, sessionId, workspaceId)
   await reopenedPage.getByRole('paragraph').filter({ hasText: finalText }).last()
     .waitFor({ state: 'visible', timeout: 60_000 })

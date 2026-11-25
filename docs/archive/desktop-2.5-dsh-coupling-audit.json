@@ -6538,7 +6538,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs",
-      "line": 427,
+      "line": 428,
       "operation": "DSH_HOME"
     },
     {
