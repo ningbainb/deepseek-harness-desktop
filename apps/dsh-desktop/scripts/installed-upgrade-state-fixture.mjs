@@ -234,6 +234,16 @@ export async function createInstalledUpgradeFixture() {
         await useChineseFixtureLocale(app)
         page = await app.firstWindow({ timeout: 600_000 })
         page.on('pageerror', error => pageErrors.push(error.message))
+        await page.addLocatorHandler(page.locator('#dsh-desktop-release-guide[data-open="true"]'), async overlay => {
+          const close = overlay.getByRole('button', { name: /^(?:开始使用|Get started|关闭|Close|×)$/u }).first()
+          if (await close.isVisible().catch(() => false)) await close.click({ force: true })
+          await overlay.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {})
+        })
+        await page.addLocatorHandler(page.locator('#dsh-desktop-star-prompt[data-open="true"]'), async overlay => {
+          const close = overlay.getByRole('button', { name: /^(?:先继续使用|Continue for now|关闭|Close|×)$/u }).first()
+          if (await close.isVisible().catch(() => false)) await close.click({ force: true })
+          await overlay.waitFor({ state: 'hidden', timeout: 10_000 }).catch(() => {})
+        })
         await page.waitForURL(/^(?:dsh-runtime:\/\/app\/|http:\/\/127\.0\.0\.1:\d+\/)/u, { timeout: 600_000 })
         await page.locator('[data-dsh-frame]').waitFor({ state: 'visible', timeout: 600_000 })
         await dismissRuntimeOnboarding(page)
