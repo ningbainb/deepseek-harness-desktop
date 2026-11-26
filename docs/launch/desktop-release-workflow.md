@@ -39,6 +39,14 @@ The publish job verifies all five installation assets and each platform's checks
 
 Formal 5.1.0 gates passed source core 28/28, full packaged regression 44/44 without waivers, Windows Desktop tests 1943/1943 with zero skips; macOS/Linux each passed 1906 with 37 existing platform skips and zero failures out of 1943; scripts passed 213/213 on each platform. All packages are unsigned; macOS is unnotarized Preview on arm64/macOS 13+, and Linux remains Preview. Actual public Setup/ZIP/DEB payloads were inspected for the formal telemetry endpoint and `officialBuild: true`. Configuration presence is not production-event submission or storage acceptance; neither was exercised.
 
+## Stable download mirror
+
+Publish each authorized stable tag to `https://download.1521003.xyz/releases/<tag>/<asset>` from the public GitHub Release after native acceptance. Mirror the installers, updater metadata and payloads (including blockmaps), `SHA256SUMS.txt`, and `release-manifest.json`. Download the mirrored files over public HTTPS and compare their byte sizes and SHA-256 with the GitHub release. Check HTTP Range, installer and updater fallback to GitHub, and an unproxied mainland China sample before listing the tag on the website. Update the verified tags in [website download routing](../../website/release-stats.mjs) when those checks pass.
+
+Starting with the next stable Desktop release, preconfigure `https://download.1521003.xyz/releases/` and verify the actual packaged updater. In mainland China, `auto` may try a healthy mirror first when it is faster or GitHub is unavailable. Keep GitHub first elsewhere and as the fallback for `429`, unavailability, or a failed transfer. A website link alone does not configure the installed Desktop client.
+
+Keep the R2 bucket private behind Workers Free. Both public hostnames share the global ceiling of 50,000 accepted download requests per UTC day. Count HEAD and Range requests against the ceiling, issue at most one R2 read per accepted request, and stop before accessing R2 once the ceiling is reached. Check account-wide free storage and request headroom before adding each release. Keep the GitHub Release link available on the website.
+
 ## Handoff template
 
 ```text
@@ -46,6 +54,7 @@ Scope: Desktop <version>, proposed <stable|beta>; no external publication action
 Version evidence: root and Desktop package versions.
 Checks: exact commands and pass/fail results, including packaged direct-start matrix.
 Artifacts: local paths or none; actual signature status.
+Download mirror: follow the Stable download mirror checklist and record the mirror URL, public SHA-256 and Range results, mainland direct sample, and GitHub fallback. Record whether the packaged updater ships the mirror by default.
 Open risks: dirty files, failed gates, or none.
 Required next authority: explicit maintainer decision for any external action.
 ```

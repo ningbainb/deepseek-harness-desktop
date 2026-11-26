@@ -1,4 +1,4 @@
-import { resolvePlatformDownloads, sumInstallerDownloads } from './release-stats.mjs'
+import { resolveMirroredDownload, resolvePlatformDownloads, sumInstallerDownloads } from './release-stats.mjs?v=5.5.0'
 
 const releaseApi = 'https://api.github.com/repos/ningbainb/deepseek-harness-desktop/releases/latest'
 const releasesApi = 'https://api.github.com/repos/ningbainb/deepseek-harness-desktop/releases?per_page=100'
@@ -78,10 +78,11 @@ async function hydrateLatestRelease() {
     if (!installer) throw new Error('release installer is missing')
 
     const version = String(release.tag_name || '').replace(/^desktop-v/, 'v')
+    const windowsDownload = resolveMirroredDownload(installer.browser_download_url)
     document.documentElement.dataset.releaseVersion = version.replace(/^v/u, '')
-    setLinks('.download-link', installer.browser_download_url)
+    setLinks('.download-link', windowsDownload)
     for (const [platform, download] of Object.entries(resolvePlatformDownloads(release))) {
-      setLinks(`[data-platform="${platform}"]`, download)
+      setLinks(`[data-platform="${platform}"]`, resolveMirroredDownload(download))
       if (platform === 'linux-x64') {
         const label = download?.endsWith('.deb') ? '下载 DEB' : download?.endsWith('.AppImage') ? '下载 AppImage' : '查看发行页'
         setText('[data-platform="linux-x64"] .code-action', label)
@@ -89,13 +90,13 @@ async function hydrateLatestRelease() {
     }
     const terminalAction = document.querySelector('#terminal-action')
     if (terminalAction) {
-      terminalAction.dataset.downloadHref = installer.browser_download_url
+      terminalAction.dataset.downloadHref = windowsDownload
       if (document.querySelector('[data-terminal-tab="download"]')?.classList.contains('is-active')) {
-        terminalAction.href = installer.browser_download_url
+        terminalAction.href = windowsDownload
       }
     }
     setLinks('.release-page-link', release.html_url)
-    setLinks('.checksum-link', checksum?.browser_download_url)
+    setLinks('.checksum-link', resolveMirroredDownload(checksum?.browser_download_url))
     setText('.release-version', version)
     setText('.release-size', formatBytes(installer.size))
 

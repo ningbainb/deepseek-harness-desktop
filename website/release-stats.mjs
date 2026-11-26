@@ -1,4 +1,14 @@
 const installerPattern = /^DeepSeek-Harness-Desktop-Setup-[\w.-]+-x64\.exe$/
+const githubAssetBase = 'https://github.com/ningbainb/deepseek-harness-desktop/releases/download/'
+const mirrorAssetBase = 'https://download.1521003.xyz/releases/'
+const verifiedMirrorTags = new Set(['desktop-v5.5.0'])
+
+export function resolveMirroredDownload(download) {
+  if (typeof download !== 'string' || !download.startsWith(githubAssetBase)) return download
+  const [tag, asset, extra] = download.slice(githubAssetBase.length).split('/')
+  if (!verifiedMirrorTags.has(tag) || extra !== undefined || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(asset ?? '')) return download
+  return `${mirrorAssetBase}${tag}/${asset}`
+}
 
 export function resolvePlatformDownloads(release) {
   const version = /^desktop-v(\d+\.\d+\.\d+)$/u.exec(release?.tag_name ?? '')?.[1]

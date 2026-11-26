@@ -1,6 +1,7 @@
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import { resolveMirroredDownload } from '../website/release-stats.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const websiteRoot = path.join(root, 'website')
@@ -145,9 +146,14 @@ export async function collectWebsiteErrors(html, expectedVersion) {
     if (!/\balt=["'][^"']*["']/i.test(image[0])) errors.push(`image is missing alt text: ${image[0]}`)
   }
 
+  const officialInstaller = `https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v${expectedVersion}/DeepSeek-Harness-Desktop-Setup-${expectedVersion}-x64.exe`
+  const mirrorInstaller = resolveMirroredDownload(officialInstaller)
   for (const match of html.matchAll(/<a\b[^>]*\bdata-download-source=["'][^"']+["'][^>]*>/gi)) {
-    if (!/\bhref=["']https:\/\/github\.com\/ningbainb\/deepseek-harness-desktop\/releases\/(?:latest\/)?download\//i.test(match[0])) {
-      errors.push(`tracked installer link must remain a direct GitHub download: ${match[0]}`)
+    const [href] = collectAttributeValues(match[0], 'href')
+    const directGitHub = /^https:\/\/github\.com\/ningbainb\/deepseek-harness-desktop\/releases\/(?:latest\/)?download\//iu.test(href ?? '')
+    const verifiedMirror = mirrorInstaller !== officialInstaller && href === mirrorInstaller
+    if (!directGitHub && !verifiedMirror) {
+      errors.push(`tracked installer link must be a direct GitHub or verified first-party mirror download: ${match[0]}`)
     }
   }
 

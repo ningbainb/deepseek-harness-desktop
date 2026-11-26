@@ -1,0 +1,92 @@
+{
+  "platform": "Windows x64",
+  "desktopVersion": "5.5.0",
+  "runtimeVersion": "0.2.3-alpha.2",
+  "sourceCommit": "34f39ba61c13768eec443b21dcdda699fdbfee5c",
+  "installerSha256": "d8fcdbbd6cfcbb5dc942ddbfb7d5903b9928ad229cd36fe029f708476fc7242a",
+  "workflowRun": "https://github.com/ningbainb/deepseek-harness-desktop/actions/runs/45724869000",
+  "profile": "Isolated Windows release acceptance profile",
+  "processing": "Original capture pixels encoded as lossless WebP",
+  "screenshots": [
+    {
+      "file": "desktop-5.5.0-main.webp",
+      "view": "Conversation workspace",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-4",
+      "source": "usability/initial.png",
+      "width": 1024,
+      "height": 720,
+      "sourceSha256": "7d27d7414b9c244ed149fd0a8b9e4117ebf70b0e1f552f61c9682abb09549d60",
+      "sha256": "9688c24f61a19c911bb2f579475aae59d57c92b1d37dc35a4e9ed51d2ae6f464"
+    },
+    {
+      "file": "desktop-5.5.0-dock.webp",
+      "view": "Plugin discovery with the Community Workshop source",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-2",
+      "source": "dock/native-workshop.png",
+      "width": 1024,
+      "height": 720,
+      "sourceSha256": "aaf0a550e42a934dbb1bab59063bafadc791dad7f1b6c1e7621cb13881924a58",
+      "sha256": "f18b6a958333ffc08a2e5b5b43f56f005554225dad5abac1ad6578eae137f3ec"
+    },
+    {
+      "file": "desktop-5.5.0-memory.webp",
+      "view": "Personal Preferences and local memory",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-2",
+      "source": "dock/memory-management.png",
+      "width": 740,
+      "height": 648,
+      "sourceSha256": "528dd76e22b8ff4581fba0a795ddb8231b1016f218f3fb4d6f8f5649c6051955",
+      "sha256": "2df2a874cea50135ad0889afae97cf92e3e0e446105045e67b72ac8fb6fab768"
+    },
+    {
+      "file": "desktop-5.5.0-settings-light.webp",
+      "view": "Extension Dock in light mode",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-2",
+      "source": "dock/dock-light.png",
+      "width": 960,
+      "height": 680,
+      "sourceSha256": "055dce0082bb997fbd12b0406d3f1d0dbd90161021c2fac861195ba8b9cb846f",
+      "sha256": "876eedfe388bb476e6fa063bde0819ba9836f74a7055a89143619047bfc67acc"
+    },
+    {
+      "file": "desktop-5.5.0-settings-dark.webp",
+      "view": "Extension Dock in dark mode",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-2",
+      "source": "dock/dock-dark.png",
+      "width": 960,
+      "height": 680,
+      "sourceSha256": "8e699b4e555ca99153af4446d30e7035a10a49170deee51d0e31fa3afa7a4591",
+      "sha256": "2f211eee95335120751ce86ccea2ef8bf9185a8a77d511481024d8f6efaf3a52"
+    },
+    {
+      "file": "desktop-5.5.0-sidebar-cards.webp",
+      "view": "Sidebar card settings",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-3",
+      "source": "native-settings/sidebar-cards.png",
+      "width": 1024,
+      "height": 720,
+      "sourceSha256": "f0b89261ae11d0b8af38c28efee32e3ae8d50655a7e042def3c05b2cf2eeb570",
+      "sha256": "ad0e6bf7fc2c8899b9a33fbf10d0ee789ea05702fde9bd34fc7f9cf430d5661f"
+    },
+    {
+      "file": "desktop-5.5.0-control-center.webp",
+      "view": "Browser and computer controls under More Tools",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-2",
+      "source": "dock/control-center.png",
+      "width": 740,
+      "height": 648,
+      "sourceSha256": "bbb5616e0d646c0759e9b9d5c2792cd502f3479bece5457017776e2aefc7d5bf",
+      "sha256": "473556d000b6c904ed48751bdda7988c32f1151f7a541e1f6b406dffa7064633"
+    },
+    {
+      "file": "desktop-5.5.0-models.webp",
+      "view": "Model and sign-in settings",
+      "artifact": "desktop-qa-5.5.0-windows-x64-shard-2",
+      "source": "dock/models.png",
+      "width": 740,
+      "height": 648,
+      "sourceSha256": "b77dd0fafa86f4503716fb896180514566526b97abb8607b76ebbf2030eade12",
+      "sha256": "2f0b799fc716c6581ed194107078ce8cf51fdc7b68367f69ebb777902a758379"
+    }
+  ]
+}

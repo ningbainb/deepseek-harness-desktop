@@ -20,6 +20,7 @@
      - `windows-setup-upgrade`：在一次性云端 Runner 下载上一稳定版（`5.3.5`）并完成全新安装、覆盖升级与卸载保留验收。
      - `windows-e2e`（`shard: [1, 2, 3, 4]`）：复用同一构建产物并行跑完全量 47 组打包版回归，每片保留独立 QA 与截图证据。
    - `windows` 汇总门禁全绿后接入 `verify-artifacts` 与 `publish` 创建 GitHub Release。
+   - 稳定版发布后，按[镜像发布与交接清单](launch/desktop-release-workflow.md#stable-download-mirror)同步及验收官网下载和客户端更新线路。
 
 ## 本地定向验证
 

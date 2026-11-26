@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import test from 'node:test'
 
 import { collectDiscoveryErrors, collectPrivacyErrors, collectWebsiteErrors, collectWebsiteScriptErrors, resolveWebsiteVersion } from './validate-website.mjs'
-import { resolvePlatformDownloads, sumInstallerDownloads } from '../website/release-stats.mjs'
+import { resolveMirroredDownload, resolvePlatformDownloads, sumInstallerDownloads } from '../website/release-stats.mjs'
 
 const websitePath = resolve(import.meta.dirname, '..', 'website', 'index.html')
 const privacyPath = resolve(import.meta.dirname, '..', 'website', 'privacy.html')
@@ -58,6 +58,21 @@ test('public site does not upload installer-click telemetry', async () => {
 
 test('website fallback installer matches the desktop release version', async () => {
   assert.deepEqual(await collectWebsiteErrors(websiteHtml, expectedWebsiteVersion), [])
+})
+
+test('static download buttons provide each verified platform asset and a GitHub fallback', () => {
+  const github = 'https://github.com/ningbainb/deepseek-harness-desktop/releases/'
+  const tag = `desktop-v${expectedWebsiteVersion}`
+  const files = {
+    'windows-x64': `DeepSeek-Harness-Desktop-Setup-${expectedWebsiteVersion}-x64.exe`,
+    'macos-arm64': `DeepSeek-Harness-Desktop-${expectedWebsiteVersion}-arm64.dmg`,
+    'linux-x64': `DeepSeek-Harness-Desktop-${expectedWebsiteVersion}-amd64.deb`,
+  }
+  for (const [platform, asset] of Object.entries(files)) {
+    const url = resolveMirroredDownload(`${github}download/${tag}/${asset}`)
+    assert.ok(websiteHtml.includes(`data-platform="${platform}" href="${url}"`))
+  }
+  assert.ok(websiteHtml.includes(`class="btn btn-primary release-page-link" href="${github}tag/${tag}"`))
 })
 
 test('homepage hero uses one short introduction instead of a technical release report', () => {
@@ -138,13 +153,30 @@ test('website validation rejects missing GitHub Star guidance', async () => {
   assert.ok(errors.some(error => error.includes('GitHub Star count')))
 })
 
-test('tracked installer links remain direct GitHub downloads', async () => {
+test('tracked installer links reject third-party downloads and unverified mirror paths', async () => {
   const html = websiteHtml.replace(
-    'data-download-source="hero" href="https://github.com/',
-    'data-download-source="hero" href="https://telemetry.example/',
+    /(data-download-source="hero" href=")https:\/\/[^/]+/u,
+    '$1https://telemetry.example',
   )
   const errors = await collectWebsiteErrors(html, expectedWebsiteVersion)
-  assert.ok(errors.some(error => error.includes('must remain a direct GitHub download')))
+  assert.ok(errors.some(error => error.includes('direct GitHub or verified first-party mirror download')))
+  const unverified = websiteHtml.replace(
+    /(data-download-source="hero" href=")[^"]+/u,
+    `$1https://download.1521003.xyz/releases/desktop-v9.9.9/DeepSeek-Harness-Desktop-Setup-${expectedWebsiteVersion}-x64.exe`,
+  )
+  assert.ok((await collectWebsiteErrors(unverified, expectedWebsiteVersion)).some(error => error.includes('verified first-party mirror download')))
+})
+
+test('live release downloads keep verified assets on the mirror and other releases on GitHub', () => {
+  const github = 'https://github.com/ningbainb/deepseek-harness-desktop/releases/'
+  const mirror = 'https://download.1521003.xyz/releases/'
+  for (const asset of ['DeepSeek-Harness-Desktop-Setup-5.5.0-x64.exe', 'DeepSeek-Harness-Desktop-5.5.0-arm64.dmg', 'DeepSeek-Harness-Desktop-5.5.0-amd64.deb', 'SHA256SUMS.txt']) {
+    assert.equal(resolveMirroredDownload(`${github}download/desktop-v5.5.0/${asset}`), `${mirror}desktop-v5.5.0/${asset}`)
+  }
+  const next = `${github}download/desktop-v5.5.1/SHA256SUMS.txt`
+  const releasePage = `${github}tag/desktop-v5.5.0`
+  assert.equal(resolveMirroredDownload(next), next)
+  assert.equal(resolveMirroredDownload(releasePage), releasePage)
 })
 
 test('sumInstallerDownloads totals only Windows x64 installer assets', () => {

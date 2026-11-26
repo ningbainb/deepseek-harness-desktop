@@ -1,12 +1,12 @@
 # DeepSeek Harness Desktop
 
-> DeepSeek Harness Desktop is an open-source, community-maintained AI workspace for conversations, projects, plugins and local memory. Desktop 5.3.6 includes the official DSH 0.2.2-rc.5 runtime and Web UI.
+> DeepSeek Harness Desktop is an open-source, community-maintained AI workspace for conversations, projects, plugins and local memory. Desktop 5.5.0 includes the official DSH 0.2.3-alpha.2 runtime and Web UI.
 
-## Desktop 5.3.6
+## Desktop 5.5.0
 
-- Release tag: desktop-v5.3.6
-- Published: 2026-11-21
-- Source commit: 8c5c7ffde7d02f829bf5451e4759945c932670b3
+- Release tag: desktop-v5.5.0
+- Published: 2026-11-26
+- Source commit: 34f39ba61c13768eec443b21dcdda699fdbfee5c
 - Platforms: Windows 10/11 x64, macOS 13+ on Apple Silicon (Preview), Linux x64 (Preview)
 - License: BSD-3-Clause
 
@@ -16,7 +16,8 @@
 - The conversation sidebar focuses on chats and projects. The Extension Dock groups tools, and Community Workshop appears in plugin discovery.
 - Windows Setup completes before Shared Browser downloads. The component is prepared on first use.
 - Personal Preferences manages local memory by global, project and session scope. Model suggestions are saved after confirmation.
-- The official DSH RC5 runtime powers the application. Conversation Context can be inspected in the side panel or with `/context`.
+- Work Mode brings office connectors such as Feishu, Tencent Docs, and DingTalk into native conversations.
+- ACP v1 connects local agents. Antigravity OAuth is limited to direct local interaction.
 
 ## Links
 
@@ -24,11 +25,11 @@
 - Repository: https://github.com/ningbainb/deepseek-harness-desktop
 - Chinese README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.md
 - English README: https://github.com/ningbainb/deepseek-harness-desktop/blob/main/README.en.md
-- Release notes: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.3.6
-- Windows x64: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.6/DeepSeek-Harness-Desktop-Setup-5.3.6-x64.exe
-- macOS arm64 DMG: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.6/DeepSeek-Harness-Desktop-5.3.6-arm64.dmg
-- Linux x64 DEB: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.6/DeepSeek-Harness-Desktop-5.3.6-amd64.deb
-- SHA-256 checksums: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.6/SHA256SUMS.txt
-- Manifest and signing status: https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.3.6/release-manifest.json
-- Windows screenshot provenance: https://1521003.xyz/assets/desktop-5.3.6-provenance.json
+- Release notes and GitHub fallback: https://github.com/ningbainb/deepseek-harness-desktop/releases/tag/desktop-v5.5.0
+- Windows x64: https://download.1521003.xyz/releases/desktop-v5.5.0/DeepSeek-Harness-Desktop-Setup-5.5.0-x64.exe
+- macOS arm64 DMG: https://download.1521003.xyz/releases/desktop-v5.5.0/DeepSeek-Harness-Desktop-5.5.0-arm64.dmg
+- Linux x64 DEB: https://download.1521003.xyz/releases/desktop-v5.5.0/DeepSeek-Harness-Desktop-5.5.0-amd64.deb
+- SHA-256 checksums: https://download.1521003.xyz/releases/desktop-v5.5.0/SHA256SUMS.txt
+- Manifest and signing status: https://download.1521003.xyz/releases/desktop-v5.5.0/release-manifest.json
+- Windows screenshot provenance: https://1521003.xyz/assets/desktop-5.5.0-provenance.json
 - Privacy: https://1521003.xyz/privacy.html
