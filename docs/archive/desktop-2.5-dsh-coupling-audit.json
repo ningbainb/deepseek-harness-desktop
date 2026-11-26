@@ -16894,19 +16894,19 @@
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx",
-      "line": 243,
+      "line": 254,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx",
-      "line": 248,
+      "line": 259,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx",
-      "line": 255,
+      "line": 266,
       "operation": "settings.section"
     },
     {

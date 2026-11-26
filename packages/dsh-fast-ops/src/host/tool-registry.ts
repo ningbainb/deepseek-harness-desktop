@@ -152,8 +152,8 @@ export class FastOpsController {
       }))
     }
 
-    const systemPrompt = getHostService<SystemPromptServiceLike>(this.ctx, 'systemPrompt')
-    if (systemPrompt?.section) {
+    const mountPrompt = (systemPrompt: SystemPromptServiceLike) => {
+      if (!systemPrompt.section) return
       const stopPrompt = systemPrompt.section({
         id: 'fast-ops-batching-guidance',
         order: 45,
@@ -168,6 +168,21 @@ export class FastOpsController {
         },
       })
       if (typeof stopPrompt === 'function') disposers.push(stopPrompt)
+    }
+
+    const existingPrompt = getHostService<SystemPromptServiceLike>(this.ctx, 'systemPrompt')
+    if (existingPrompt) {
+      mountPrompt(existingPrompt)
+    } else if (typeof (this.ctx as unknown as { inject?: unknown }).inject === 'function') {
+      try {
+        const stopInject = (this.ctx as unknown as {
+          inject: (deps: string[], cb: (scoped: { systemPrompt?: SystemPromptServiceLike }) => void) => (() => void) | { dispose?: () => void }
+        }).inject(['systemPrompt'], (scoped) => {
+          if (scoped?.systemPrompt) mountPrompt(scoped.systemPrompt)
+        })
+        if (typeof stopInject === 'function') disposers.push(stopInject)
+        else if (stopInject && typeof stopInject.dispose === 'function') disposers.push(() => stopInject.dispose?.())
+      } catch {}
     }
 
     const mountTools = (tools: ToolsServiceLike) => {

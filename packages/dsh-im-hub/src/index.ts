@@ -265,9 +265,7 @@ export function apply(ctx: Context, options: ApplyImHubOptions = {}): ImHubManag
   }
 
   ctx.effect(() => hub.install(ctx))
-  ctx.effect(() => {
-    const webServer = getHostService<WebServerLike>(ctx, 'webServer')
-    if (!webServer) return () => {}
+  const mountWebServer = (webServer: WebServerLike): (() => void) => {
     if (typeof webServer.register === 'function') {
       return webServer.register({ path: ROUTE_PREFIX, kind: 'prefix', handler: handleRequest }) ?? (() => {})
     }
@@ -288,7 +286,20 @@ export function apply(ctx: Context, options: ApplyImHubOptions = {}): ImHubManag
     return () => {
       for (const stop of stops) stop()
     }
-  })
+  }
+
+  const existingWebServer = getHostService<WebServerLike>(ctx, 'webServer')
+  if (existingWebServer) {
+    ctx.effect(() => mountWebServer(existingWebServer))
+  } else if (typeof (ctx as unknown as { inject?: unknown }).inject === 'function') {
+    (ctx as unknown as {
+      inject: (deps: string[], cb: (scoped: { webServer?: WebServerLike }) => (() => void) | void) => void
+    }).inject(['webServer'], (scoped) => {
+      const ws = scoped?.webServer ?? getHostService<WebServerLike>(ctx, 'webServer')
+      if (!ws) return
+      return mountWebServer(ws)
+    })
+  }
 
   return hub
 }

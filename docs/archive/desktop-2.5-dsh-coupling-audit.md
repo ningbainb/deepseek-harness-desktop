@@ -2518,9 +2518,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-tool-describe-image/src/client/index.ts | 99 | web-ui.plugin.item |
 | slot | packages/dsh-value-mode/src/client/index.ts | 239 | web-ui.plugin.item |
 | slot | packages/dsh-value-mode/src/client/index.ts | 262 | conversation.session.header.actions |
-| slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 243 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 248 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 255 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 254 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 259 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 266 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 11 | conversation.input.right |
 | slot | packages/dsh-web-ui-settings/src/client/index.ts | 219 | web-ui.plugin.item |
 | slot | packages/dsh-web-ui-settings/src/client/index.ts | 224 | settings.section |

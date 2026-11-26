@@ -411,6 +411,7 @@ test('five Dock groups retain every old destination and place settings navigatio
     ['qqbot', null, 'more-tools'], ['appearance', 'appearance', 'appearance'],
     ['particle-theme', 'particle-theme', 'appearance'], ['backup', null, 'desktop-settings'],
     ['recovery', null, 'desktop-settings'], ['agent-team', 'agent-team', 'more-tools'], ['shared-browser', 'shared-browser', 'more-tools'],
+    ['win-control', 'win-control', 'more-tools'], ['fast-ops', 'fast-ops', 'more-tools'], ['im-hub', 'im-hub', 'more-tools'],
   ]) {
     await vm.runInContext(`activateTab(document.getElementById('${id}-tab'))`, context)
     await tick()

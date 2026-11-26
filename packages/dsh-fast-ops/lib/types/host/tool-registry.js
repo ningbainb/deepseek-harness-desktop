@@ -133,8 +133,9 @@ export class FastOpsController {
                 this.reapply();
             }));
         }
-        const systemPrompt = getHostService(this.ctx, 'systemPrompt');
-        if (systemPrompt?.section) {
+        const mountPrompt = (systemPrompt) => {
+            if (!systemPrompt.section)
+                return;
             const stopPrompt = systemPrompt.section({
                 id: 'fast-ops-batching-guidance',
                 order: 45,
@@ -151,6 +152,23 @@ export class FastOpsController {
             });
             if (typeof stopPrompt === 'function')
                 disposers.push(stopPrompt);
+        };
+        const existingPrompt = getHostService(this.ctx, 'systemPrompt');
+        if (existingPrompt) {
+            mountPrompt(existingPrompt);
+        }
+        else if (typeof this.ctx.inject === 'function') {
+            try {
+                const stopInject = this.ctx.inject(['systemPrompt'], (scoped) => {
+                    if (scoped?.systemPrompt)
+                        mountPrompt(scoped.systemPrompt);
+                });
+                if (typeof stopInject === 'function')
+                    disposers.push(stopInject);
+                else if (stopInject && typeof stopInject.dispose === 'function')
+                    disposers.push(() => stopInject.dispose?.());
+            }
+            catch { }
         }
         const mountTools = (tools) => {
             if (!tools.register)

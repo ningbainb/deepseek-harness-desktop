@@ -1045,8 +1045,8 @@ var FastOpsController = class {
 				this.reapply();
 			}));
 		}
-		const systemPrompt = getHostService(this.ctx, "systemPrompt");
-		if (systemPrompt?.section) {
+		const mountPrompt = (systemPrompt) => {
+			if (!systemPrompt.section) return;
 			const stopPrompt = systemPrompt.section({
 				id: "fast-ops-batching-guidance",
 				order: 45,
@@ -1061,7 +1061,16 @@ var FastOpsController = class {
 				}
 			});
 			if (typeof stopPrompt === "function") disposers.push(stopPrompt);
-		}
+		};
+		const existingPrompt = getHostService(this.ctx, "systemPrompt");
+		if (existingPrompt) mountPrompt(existingPrompt);
+		else if (typeof this.ctx.inject === "function") try {
+			const stopInject = this.ctx.inject(["systemPrompt"], (scoped) => {
+				if (scoped?.systemPrompt) mountPrompt(scoped.systemPrompt);
+			});
+			if (typeof stopInject === "function") disposers.push(stopInject);
+			else if (stopInject && typeof stopInject.dispose === "function") disposers.push(() => stopInject.dispose?.());
+		} catch {}
 		const mountTools = (tools) => {
 			if (!tools.register) return;
 			const reg = (spec) => {
@@ -1465,9 +1474,7 @@ function apply(ctx) {
 		}
 	};
 	ctx.effect(() => controller.mount());
-	ctx.effect(() => {
-		const webServer = getHostService(ctx, "webServer");
-		if (!webServer) return () => {};
+	const mountWebServer = (webServer) => {
 		if (typeof webServer.register === "function") return webServer.register({
 			path: "/api/dsh-fast-ops",
 			kind: "prefix",
@@ -1482,6 +1489,13 @@ function apply(ctx) {
 		return () => {
 			for (const stop of stops) stop();
 		};
+	};
+	const existingWebServer = getHostService(ctx, "webServer");
+	if (existingWebServer) ctx.effect(() => mountWebServer(existingWebServer));
+	else if (typeof ctx.inject === "function") ctx.inject(["webServer"], (scoped) => {
+		const ws = scoped?.webServer ?? getHostService(ctx, "webServer");
+		if (!ws) return;
+		return mountWebServer(ws);
 	});
 }
 //#endregion

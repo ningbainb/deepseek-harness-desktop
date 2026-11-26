@@ -1411,9 +1411,7 @@ function apply(ctx) {
 		}
 	};
 	ctx.effect(() => gate.mount());
-	ctx.effect(() => {
-		const webServer = getService(ctx, "webServer");
-		if (!webServer) return () => {};
+	const mountWebServer = (webServer) => {
 		if (typeof webServer.register === "function") return webServer.register({
 			path: "/api/dsh-win-control",
 			kind: "prefix",
@@ -1432,6 +1430,13 @@ function apply(ctx) {
 		return () => {
 			for (const stop of stops) stop();
 		};
+	};
+	const existingWebServer = getService(ctx, "webServer");
+	if (existingWebServer) ctx.effect(() => mountWebServer(existingWebServer));
+	else if (typeof ctx.inject === "function") ctx.inject(["webServer"], (scoped) => {
+		const ws = scoped?.webServer ?? getService(ctx, "webServer");
+		if (!ws) return;
+		return mountWebServer(ws);
 	});
 }
 //#endregion

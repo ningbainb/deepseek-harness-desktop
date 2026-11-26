@@ -2470,9 +2470,7 @@ function apply(ctx, options = {}) {
 		}
 	};
 	ctx.effect(() => hub.install(ctx));
-	ctx.effect(() => {
-		const webServer = getHostService(ctx, "webServer");
-		if (!webServer) return () => {};
+	const mountWebServer = (webServer) => {
 		if (typeof webServer.register === "function") return webServer.register({
 			path: "/api/dsh-im-hub",
 			kind: "prefix",
@@ -2492,6 +2490,13 @@ function apply(ctx, options = {}) {
 		return () => {
 			for (const stop of stops) stop();
 		};
+	};
+	const existingWebServer = getHostService(ctx, "webServer");
+	if (existingWebServer) ctx.effect(() => mountWebServer(existingWebServer));
+	else if (typeof ctx.inject === "function") ctx.inject(["webServer"], (scoped) => {
+		const ws = scoped?.webServer ?? getHostService(ctx, "webServer");
+		if (!ws) return;
+		return mountWebServer(ws);
 	});
 	return hub;
 }

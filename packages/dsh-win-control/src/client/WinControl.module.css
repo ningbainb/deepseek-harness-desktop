@@ -5,9 +5,9 @@
   height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14));
-  background: var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.04));
-  color: var(--dsw-alias-label-secondary, #9ca3af);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.24));
+  background: var(--dsw-alias-bg-layer-2, rgba(128, 128, 128, 0.08));
+  color: var(--dsw-alias-label-secondary, inherit);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -15,14 +15,14 @@
 }
 
 .pill:hover:not(:disabled) {
-  border-color: var(--dsw-alias-label-dimmed, rgba(255, 255, 255, 0.28));
-  color: var(--dsw-alias-label-primary, #ffffff);
+  border-color: var(--dsw-alias-label-dimmed, rgba(128, 128, 128, 0.45));
+  color: var(--dsw-alias-label-primary, inherit);
 }
 
 .pill[data-active='true'] {
   background: rgba(16, 185, 129, 0.14);
   border-color: rgba(16, 185, 129, 0.45);
-  color: #34d399;
+  color: #10b981;
 }
 
 .pill:disabled {
@@ -41,7 +41,7 @@
   padding: 0 5px;
   border-radius: 999px;
   font-size: 11px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(128, 128, 128, 0.16);
 }
 
 .card {
@@ -51,10 +51,10 @@
   width: 100%;
   box-sizing: border-box;
   padding: 16px 20px;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));
   border-radius: 12px;
-  background: var(--dsw-alias-bg-layer-3, rgba(255, 255, 255, 0.04));
-  color: var(--dsw-alias-label-primary, #ffffff);
+  background: var(--dsw-alias-bg-layer-3, rgba(128, 128, 128, 0.05));
+  color: var(--dsw-alias-label-primary, inherit);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -75,7 +75,7 @@
 .description {
   margin: 4px 0 0;
   font-size: 12px;
-  color: var(--dsw-alias-label-tertiary, #81858c);
+  color: var(--dsw-alias-label-tertiary, #6b7280);
 }
 
 .statusPill {
@@ -86,15 +86,15 @@
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
-  background: rgba(156, 163, 175, 0.14);
-  border: 1px solid rgba(156, 163, 175, 0.25);
-  color: var(--dsw-alias-label-secondary, #9ca3af);
+  background: rgba(128, 128, 128, 0.14);
+  border: 1px solid rgba(128, 128, 128, 0.26);
+  color: var(--dsw-alias-label-secondary, inherit);
 }
 
 .statusPill[data-ready='true'] {
   background: rgba(16, 185, 129, 0.14);
   border-color: rgba(16, 185, 129, 0.35);
-  color: #34d399;
+  color: #10b981;
 }
 
 .toolbar {
@@ -111,9 +111,9 @@
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14));
-  background: var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.05));
-  color: var(--dsw-alias-label-primary, #ffffff);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.24));
+  background: var(--dsw-alias-bg-layer-2, rgba(128, 128, 128, 0.08));
+  color: var(--dsw-alias-label-primary, inherit);
 }
 
 .primaryBtn {
@@ -146,8 +146,8 @@
   height: 32px;
   padding: 0 8px;
   border-radius: 6px;
-  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14));
-  background: var(--dsw-alias-bg-layer-1, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.26));
+  background: var(--dsw-alias-bg-layer-1, rgba(128, 128, 128, 0.06));
   color: inherit;
   font-size: 12px;
 }
@@ -171,8 +171,8 @@
 .box {
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.08));
+  background: rgba(128, 128, 128, 0.08);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));
   font-size: 12px;
 }
 
@@ -194,10 +194,10 @@
 
 .notice {
   font-size: 12px;
-  color: #34d399;
+  color: #10b981;
 }
 
 .error {
   font-size: 12px;
-  color: #f87171;
+  color: #ef4444;
 }

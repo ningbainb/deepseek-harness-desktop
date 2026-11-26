@@ -129,7 +129,7 @@ it.each(['slot', 'factory'])('groups the official %s navigation while opening ol
 })
 
 it('declares a dedicated slot per built-in settings page and mirrors its original card', () => {
-  const ids = ['data-location', 'agent-inbox', 'llm-antigravity']
+  const ids = ['data-location', 'agent-inbox', 'llm-antigravity', 'win-control', 'fast-ops', 'im-hub']
   const cards = ids.map(id => ({ options: { id }, component: () => <h3>{id}</h3> }))
   const register = vi.fn((_options: Record<string, unknown>, _component: unknown) => () => {})
   const slots = {
