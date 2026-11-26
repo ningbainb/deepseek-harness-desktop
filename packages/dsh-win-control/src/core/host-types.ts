@@ -26,6 +26,7 @@ export interface AgentLike {
 export interface ScopedToolsLike {
   restrict?: (rule: { deny?: string[]; allow?: string[] }) => () => void
   schemas?: () => ReadonlyArray<ToolSchemaLike | [string, ToolSchemaLike?]>
+  view?: (scope?: unknown) => { restrictableNames?: ReadonlySet<string> }
 }
 
 export interface ToolExecutionLike {
@@ -33,10 +34,16 @@ export interface ToolExecutionLike {
   agent?: AgentLike
 }
 
+export interface ToolOutputSpec {
+  schema: Record<string, unknown>
+  render: (args: unknown, value: unknown) => ReadonlyArray<{ type: 'text'; text: string }>
+}
+
 export interface ToolRegistrationSpec {
   name: string
   description: string
   parameters: unknown
+  output: ToolOutputSpec
   returns?: unknown
   render?: (args: unknown, value: unknown) => ReadonlyArray<{ type: 'text'; text: string }>
   execute: (args: Record<string, unknown> | undefined, exec?: { agent?: AgentLike }) => unknown
@@ -44,6 +51,7 @@ export interface ToolRegistrationSpec {
 
 export interface ToolsServiceLike {
   schemas?: () => ReadonlyArray<ToolSchemaLike | [string, ToolSchemaLike?]>
+  view?: (scope?: unknown) => { restrictableNames?: ReadonlySet<string> }
   restrict?: (rule: { deny?: string[]; allow?: string[] }) => () => void
   guard?: (fn: (exec: ToolExecutionLike) => string | undefined) => (() => void) | void
   register?: (

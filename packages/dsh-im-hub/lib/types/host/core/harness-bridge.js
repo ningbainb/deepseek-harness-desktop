@@ -45,15 +45,23 @@ export class HarnessBridge {
             const collector = this.turnCollectors.get(sessionId);
             if (!collector)
                 return;
+            const data = (event.data && typeof event.data === 'object' ? event.data : event);
             if (event.type === 'assistant/message') {
-                const text = extractTextBlocks(event.content);
+                const messageObj = (data.message && typeof data.message === 'object' ? data.message : data);
+                const text = extractTextBlocks(messageObj.content);
                 if (text)
                     collector.chunks.push(text);
             }
             else if (event.type === 'turn/end') {
-                const reason = event.reason;
-                if (reason && typeof reason.message === 'string' && reason.code !== 'ABORTED') {
-                    collector.error = reason.message;
+                const reason = data.reason;
+                if (reason && reason.kind === 'error') {
+                    const detail = (reason.error ?? reason.failure);
+                    const msg = typeof detail?.message === 'string'
+                        ? detail.message
+                        : typeof reason.message === 'string'
+                            ? reason.message
+                            : 'turn failed';
+                    collector.error = msg;
                 }
             }
         });
@@ -161,15 +169,48 @@ export class HarnessBridge {
             this.inflightOpen.delete(conversationKey);
         }
     }
+    async resolveDefaultAgentOptions() {
+        if (!this.ctx)
+            return undefined;
+        const defaultModel = getHostService(this.ctx, 'agentDefaultModel');
+        const selection = defaultModel?.currentSelection?.();
+        if (selection?.provider && selection?.model) {
+            return {
+                provider: selection.provider,
+                model: selection.model,
+                ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+            };
+        }
+        const llm = getHostService(this.ctx, 'llm');
+        const providers = llm?.listProviders?.() ?? [];
+        for (const entry of providers) {
+            const providerId = typeof entry === 'string' ? entry : entry?.id;
+            if (!providerId)
+                continue;
+            try {
+                const models = (await llm?.listModels?.(providerId)) ?? [];
+                const firstModel = models[0];
+                if (firstModel?.id) {
+                    return { provider: providerId, model: firstModel.id };
+                }
+            }
+            catch {
+                // Ignore individual provider lookup errors and try next provider.
+            }
+        }
+        return undefined;
+    }
     async createBinding(conversationKey, workspacePath) {
         const agents = this.ctx ? getHostService(this.ctx, 'agents') : undefined;
         if (!agents?.create) {
             throw new Error('DSH agents service is unavailable');
         }
         const sessionId = `session-${randomUUID()}`;
+        const agentOptions = await this.resolveDefaultAgentOptions();
         const created = await agents.create({
             sessionId,
             meta: { cwd: workspacePath },
+            ...(agentOptions ? { agentOptions } : {}),
         });
         const binding = {
             conversationKey,
@@ -194,6 +235,7 @@ export class HarnessBridge {
         const promptText = `${senderPrefix}${message.text}`;
         try {
             binding.agent.followup({
+                id: randomUUID(),
                 role: 'user',
                 content: [{ type: 'text', text: promptText }],
                 source: { kind: 'user' },

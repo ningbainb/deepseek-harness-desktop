@@ -42,6 +42,7 @@ export declare class HarnessBridge {
     runTurn(message: InboundMessage, sendReply: (reply: OutboundReply) => Promise<void>): Promise<void>;
     disposeAll(): Promise<void>;
     private getOrCreateBinding;
+    private resolveDefaultAgentOptions;
     private createBinding;
     private executeAgentTurn;
 }

@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import {
   getHostService,
+  type AgentDefaultModelServiceLike,
   type AgentHandleLike,
   type AgentLike,
   type AgentsServiceLike,
+  type LlmServiceLike,
   type WorkspaceRegistryLike,
 } from '../../core/host-types.ts'
 import { splitMessageChunks } from './commands.ts'
@@ -85,13 +87,21 @@ export class HarnessBridge {
       if (!sessionId) return
       const collector = this.turnCollectors.get(sessionId)
       if (!collector) return
+      const data = (event.data && typeof event.data === 'object' ? event.data : event) as Record<string, unknown>
       if (event.type === 'assistant/message') {
-        const text = extractTextBlocks(event.content)
+        const messageObj = (data.message && typeof data.message === 'object' ? data.message : data) as Record<string, unknown>
+        const text = extractTextBlocks(messageObj.content)
         if (text) collector.chunks.push(text)
       } else if (event.type === 'turn/end') {
-        const reason = event.reason as Record<string, unknown> | undefined
-        if (reason && typeof reason.message === 'string' && reason.code !== 'ABORTED') {
-          collector.error = reason.message
+        const reason = data.reason as Record<string, unknown> | undefined
+        if (reason && reason.kind === 'error') {
+          const detail = (reason.error ?? reason.failure) as Record<string, unknown> | undefined
+          const msg = typeof detail?.message === 'string'
+            ? detail.message
+            : typeof reason.message === 'string'
+              ? reason.message
+              : 'turn failed'
+          collector.error = msg
         }
       }
     })
@@ -208,6 +218,39 @@ export class HarnessBridge {
     }
   }
 
+  private async resolveDefaultAgentOptions(): Promise<{
+    provider: string
+    model: string
+    reasoningEffort?: string
+  } | undefined> {
+    if (!this.ctx) return undefined
+    const defaultModel = getHostService<AgentDefaultModelServiceLike>(this.ctx, 'agentDefaultModel')
+    const selection = defaultModel?.currentSelection?.()
+    if (selection?.provider && selection?.model) {
+      return {
+        provider: selection.provider,
+        model: selection.model,
+        ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+      }
+    }
+    const llm = getHostService<LlmServiceLike>(this.ctx, 'llm')
+    const providers = llm?.listProviders?.() ?? []
+    for (const entry of providers) {
+      const providerId = typeof entry === 'string' ? entry : entry?.id
+      if (!providerId) continue
+      try {
+        const models = (await llm?.listModels?.(providerId)) ?? []
+        const firstModel = models[0]
+        if (firstModel?.id) {
+          return { provider: providerId, model: firstModel.id }
+        }
+      } catch {
+        // Ignore individual provider lookup errors and try next provider.
+      }
+    }
+    return undefined
+  }
+
   private async createBinding(
     conversationKey: string,
     workspacePath: string,
@@ -218,9 +261,11 @@ export class HarnessBridge {
     }
 
     const sessionId = `session-${randomUUID()}`
+    const agentOptions = await this.resolveDefaultAgentOptions()
     const created = await agents.create({
       sessionId,
       meta: { cwd: workspacePath },
+      ...(agentOptions ? { agentOptions } : {}),
     })
 
     const binding: ConversationBinding = {
@@ -252,6 +297,7 @@ export class HarnessBridge {
 
     try {
       binding.agent.followup({
+        id: randomUUID(),
         role: 'user',
         content: [{ type: 'text', text: promptText }],
         source: { kind: 'user' },

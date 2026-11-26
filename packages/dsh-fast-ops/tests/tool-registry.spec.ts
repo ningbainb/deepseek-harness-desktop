@@ -26,7 +26,7 @@ describe('dsh-fast-ops controller & routes', () => {
 
     ctx.systemPrompt = {
       section: (spec: any) => {
-        promptSections.push(spec.id)
+        promptSections.push(spec.name ?? spec.id)
         return () => {}
       },
     }
@@ -41,7 +41,7 @@ describe('dsh-fast-ops controller & routes', () => {
     const controller = new FastOpsController({ ctx, getSettings: () => settings })
     const stop = controller.mount()
 
-    expect(promptSections).toEqual(['fast-ops-batching-guidance'])
+    expect(promptSections).toEqual(['dsh:fast-ops'])
     for (const name of [...RESIDENT_TOOLS, ...SPECIALIZED_TOOLS]) {
       expect(registered.has(name)).toBe(true)
     }

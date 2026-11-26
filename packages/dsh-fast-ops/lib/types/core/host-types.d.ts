@@ -25,11 +25,22 @@ export interface ScopedToolsLike {
         allow?: string[];
     }) => () => void;
     schemas?: () => ReadonlyArray<ToolSchemaLike | [string, ToolSchemaLike?]>;
+    view?: (scope?: unknown) => {
+        restrictableNames?: ReadonlySet<string>;
+    };
+}
+export interface ToolOutputSpec {
+    schema: Record<string, unknown>;
+    render: (args: unknown, value: unknown) => Array<{
+        type: 'text';
+        text: string;
+    }>;
 }
 export interface ToolRegistrationSpec {
     name: string;
     description: string;
     parameters: unknown;
+    output: ToolOutputSpec;
     returns?: unknown;
     execute: (args: Record<string, unknown> | undefined, exec?: {
         agent?: AgentLike;
@@ -37,6 +48,9 @@ export interface ToolRegistrationSpec {
 }
 export interface ToolsServiceLike {
     schemas?: () => ReadonlyArray<ToolSchemaLike | [string, ToolSchemaLike?]>;
+    view?: (scope?: unknown) => {
+        restrictableNames?: ReadonlySet<string>;
+    };
     restrict?: (rule: {
         deny?: string[];
         allow?: string[];
@@ -45,9 +59,9 @@ export interface ToolsServiceLike {
 }
 export interface SystemPromptServiceLike {
     section?: (spec: {
-        id: string;
-        order?: number;
-        render: () => string | undefined | null;
+        name: string;
+        order: number;
+        text: (() => string) | string;
     }) => (() => void) | void;
 }
 export interface WorkspaceEntryLike {

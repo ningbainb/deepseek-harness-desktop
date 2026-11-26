@@ -26,11 +26,34 @@ export interface AgentsServiceLike {
   get?: (sessionId: string) => AgentLike | undefined
   resume?: (options: {
     resumeSessionId: string
+    agentOptions?: {
+      provider?: string
+      model?: string
+      reasoningEffort?: string
+    }
   }) => Promise<AgentHandleLike>
   create?: (options: {
     sessionId: string
     meta?: { cwd?: string }
+    agentOptions?: {
+      provider?: string
+      model?: string
+      reasoningEffort?: string
+    }
   }) => Promise<AgentHandleLike>
+}
+
+export interface AgentDefaultModelServiceLike {
+  currentSelection?: () => {
+    provider?: string
+    model?: string
+    reasoningEffort?: string
+  } | undefined
+}
+
+export interface LlmServiceLike {
+  listProviders?: () => ReadonlyArray<string | { id: string }>
+  listModels?: (provider: string) => Promise<ReadonlyArray<{ id: string }>> | ReadonlyArray<{ id: string }>
 }
 
 export interface ApprovalRequestLike {

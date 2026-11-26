@@ -1113,8 +1113,12 @@ var WinControlGate = class {
 		try {
 			const scoped = agent.ctx?.get?.("tools") ?? agent.ctx?.tools;
 			if (typeof scoped?.restrict !== "function") return;
-			const deny = this.denyListFor(agent);
+			let deny = this.denyListFor(agent);
 			if (!deny) return;
+			if (typeof scoped.view === "function") {
+				const known = scoped.view(agent)?.restrictableNames;
+				if (known) deny = deny.filter((name) => known.has(name));
+			}
 			const key = deny.slice().sort().join(",");
 			const prev = this.applied.get(agent);
 			if (prev && prev.key === key) return;
@@ -1212,6 +1216,16 @@ var WinControlGate = class {
 							}
 						}
 					},
+					output: {
+						schema: {
+							type: "object",
+							additionalProperties: true
+						},
+						render: (_args, value) => [{
+							type: "text",
+							text: typeof value === "string" ? value : JSON.stringify(value, null, 2)
+						}]
+					},
 					execute: (args, exec) => {
 						if (!this.isGrantedForAgent(exec?.agent)) return {
 							revealed: [],
@@ -1244,9 +1258,19 @@ var WinControlGate = class {
 						additionalProperties: false,
 						properties: {}
 					},
-					execute: async (_args, exec) => {
-						return (await this.buildDoctorReport(exec?.agent)).report;
-					}
+					output: {
+						schema: {
+							type: "object",
+							additionalProperties: true
+						},
+						render: (_args, value) => {
+							return [{
+								type: "text",
+								text: value && typeof value === "object" && "report" in value && typeof value.report === "string" ? value.report : JSON.stringify(value, null, 2)
+							}];
+						}
+					},
+					execute: async (_args, exec) => this.buildDoctorReport(exec?.agent)
 				});
 				if (typeof disposeDoctor === "function") disposers.push(disposeDoctor);
 			}

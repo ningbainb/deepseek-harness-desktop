@@ -1003,7 +1003,11 @@ var FastOpsController = class {
 		try {
 			const scoped = agent.ctx?.get?.("tools") ?? agent.ctx?.tools;
 			if (typeof scoped?.restrict !== "function") return;
-			const deny = this.denyListFor(agent);
+			let deny = this.denyListFor(agent);
+			if (typeof scoped.view === "function") {
+				const known = scoped.view(agent)?.restrictableNames;
+				if (known) deny = deny.filter((name) => known.has(name));
+			}
 			const key = deny.slice().sort().join(",");
 			const prev = this.applied.get(agent);
 			if (prev && prev.key === key) return;
@@ -1048,11 +1052,11 @@ var FastOpsController = class {
 		const mountPrompt = (systemPrompt) => {
 			if (!systemPrompt.section) return;
 			const stopPrompt = systemPrompt.section({
-				id: "fast-ops-batching-guidance",
+				name: "dsh:fast-ops",
 				order: 45,
-				render: () => {
+				text: () => {
 					const settings = this.getSettings();
-					if (!settings.enabled || !settings.batchingGuidance) return null;
+					if (!settings.enabled || !settings.batchingGuidance) return "";
 					return [
 						"## Fast Ops Token-Efficiency Tips",
 						"- Prefer `fast_read_files` to inspect multiple files/ranges in a single turn and obtain SHA-256 `revision` tokens.",
@@ -1074,7 +1078,19 @@ var FastOpsController = class {
 		const mountTools = (tools) => {
 			if (!tools.register) return;
 			const reg = (spec) => {
-				const stop = tools.register(spec);
+				const stop = tools.register({
+					...spec,
+					output: {
+						schema: {
+							type: "object",
+							additionalProperties: true
+						},
+						render: (_args, value) => [{
+							type: "text",
+							text: typeof value === "string" ? value : JSON.stringify(value, null, 2)
+						}]
+					}
+				});
 				if (typeof stop === "function") disposers.push(stop);
 			};
 			reg({

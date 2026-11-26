@@ -1891,12 +1891,16 @@ var HarnessBridge = class {
 			if (!sessionId) return;
 			const collector = this.turnCollectors.get(sessionId);
 			if (!collector) return;
+			const data = event.data && typeof event.data === "object" ? event.data : event;
 			if (event.type === "assistant/message") {
-				const text = extractTextBlocks(event.content);
+				const text = extractTextBlocks((data.message && typeof data.message === "object" ? data.message : data).content);
 				if (text) collector.chunks.push(text);
 			} else if (event.type === "turn/end") {
-				const reason = event.reason;
-				if (reason && typeof reason.message === "string" && reason.code !== "ABORTED") collector.error = reason.message;
+				const reason = data.reason;
+				if (reason && reason.kind === "error") {
+					const detail = reason.error ?? reason.failure;
+					collector.error = typeof detail?.message === "string" ? detail.message : typeof reason.message === "string" ? reason.message : "turn failed";
+				}
 			}
 		});
 		return () => {
@@ -1981,13 +1985,37 @@ var HarnessBridge = class {
 			this.inflightOpen.delete(conversationKey);
 		}
 	}
+	async resolveDefaultAgentOptions() {
+		if (!this.ctx) return void 0;
+		const selection = getHostService(this.ctx, "agentDefaultModel")?.currentSelection?.();
+		if (selection?.provider && selection?.model) return {
+			provider: selection.provider,
+			model: selection.model,
+			...selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}
+		};
+		const llm = getHostService(this.ctx, "llm");
+		const providers = llm?.listProviders?.() ?? [];
+		for (const entry of providers) {
+			const providerId = typeof entry === "string" ? entry : entry?.id;
+			if (!providerId) continue;
+			try {
+				const firstModel = (await llm?.listModels?.(providerId) ?? [])[0];
+				if (firstModel?.id) return {
+					provider: providerId,
+					model: firstModel.id
+				};
+			} catch {}
+		}
+	}
 	async createBinding(conversationKey, workspacePath) {
 		const agents = this.ctx ? getHostService(this.ctx, "agents") : void 0;
 		if (!agents?.create) throw new Error("DSH agents service is unavailable");
 		const sessionId = `session-${randomUUID()}`;
+		const agentOptions = await this.resolveDefaultAgentOptions();
 		const created = await agents.create({
 			sessionId,
-			meta: { cwd: workspacePath }
+			meta: { cwd: workspacePath },
+			...agentOptions ? { agentOptions } : {}
 		});
 		const binding = {
 			conversationKey,
@@ -2012,6 +2040,7 @@ var HarnessBridge = class {
 		const promptText = `${message.chatType === "group" ? `[${message.senderName ?? message.senderId} (${message.senderId})] ` : ""}${message.text}`;
 		try {
 			binding.agent.followup({
+				id: randomUUID(),
 				role: "user",
 				content: [{
 					type: "text",

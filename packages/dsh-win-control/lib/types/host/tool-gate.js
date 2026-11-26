@@ -202,9 +202,14 @@ export class WinControlGate {
             const scoped = agent.ctx?.get?.('tools') ?? agent.ctx?.tools;
             if (typeof scoped?.restrict !== 'function')
                 return;
-            const deny = this.denyListFor(agent);
+            let deny = this.denyListFor(agent);
             if (!deny)
                 return;
+            if (typeof scoped.view === 'function') {
+                const known = scoped.view(agent)?.restrictableNames;
+                if (known)
+                    deny = deny.filter(name => known.has(name));
+            }
             const key = deny.slice().sort().join(',');
             const prev = this.applied.get(agent);
             if (prev && prev.key === key)
@@ -295,6 +300,13 @@ export class WinControlGate {
                     disposers.push(disposeGuard);
             }
             if (typeof tools.register === 'function') {
+                const defaultOutput = {
+                    schema: { type: 'object', additionalProperties: true },
+                    render: (_args, value) => [{
+                            type: 'text',
+                            text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+                        }],
+                };
                 const disposeReveal = tools.register({
                     name: REVEAL_TOOL_NAME,
                     description: 'Reveal Windows desktop UI automation tools (mcp__windows__*) for the next step when lazy tool loading is enabled.',
@@ -306,6 +318,7 @@ export class WinControlGate {
                             query: { type: 'string', description: 'Optional keyword filter.' },
                         },
                     },
+                    output: defaultOutput,
                     execute: (args, exec) => {
                         if (!this.isGrantedForAgent(exec?.agent)) {
                             return { revealed: [], tools: [], note: '当前会话尚未开启桌面操控授权，无法展开工具。' };
@@ -338,14 +351,21 @@ export class WinControlGate {
                 });
                 if (typeof disposeReveal === 'function')
                     disposers.push(disposeReveal);
+                const doctorOutput = {
+                    schema: { type: 'object', additionalProperties: true },
+                    render: (_args, value) => {
+                        const report = value && typeof value === 'object' && 'report' in value && typeof value.report === 'string'
+                            ? value.report
+                            : JSON.stringify(value, null, 2);
+                        return [{ type: 'text', text: report }];
+                    },
+                };
                 const disposeDoctor = tools.register({
                     name: DOCTOR_TOOL_NAME,
                     description: 'Diagnose Windows-MCP installation, session grant status, UI Automation window visibility, and display DPI scaling.',
                     parameters: { type: 'object', additionalProperties: false, properties: {} },
-                    execute: async (_args, exec) => {
-                        const result = await this.buildDoctorReport(exec?.agent);
-                        return result.report;
-                    },
+                    output: doctorOutput,
+                    execute: async (_args, exec) => this.buildDoctorReport(exec?.agent),
                 });
                 if (typeof disposeDoctor === 'function')
                     disposers.push(disposeDoctor);

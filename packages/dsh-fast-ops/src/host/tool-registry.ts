@@ -108,7 +108,11 @@ export class FastOpsController {
     try {
       const scoped = agent.ctx?.get?.('tools') as ScopedToolsLike | undefined ?? agent.ctx?.tools
       if (typeof scoped?.restrict !== 'function') return
-      const deny = this.denyListFor(agent)
+      let deny = this.denyListFor(agent)
+      if (typeof scoped.view === 'function') {
+        const known = scoped.view(agent)?.restrictableNames
+        if (known) deny = deny.filter(name => known.has(name))
+      }
       const key = deny.slice().sort().join(',')
       const prev = this.applied.get(agent)
       if (prev && prev.key === key) return
@@ -155,11 +159,11 @@ export class FastOpsController {
     const mountPrompt = (systemPrompt: SystemPromptServiceLike) => {
       if (!systemPrompt.section) return
       const stopPrompt = systemPrompt.section({
-        id: 'fast-ops-batching-guidance',
+        name: 'dsh:fast-ops',
         order: 45,
-        render: () => {
+        text: () => {
           const settings = this.getSettings()
-          if (!settings.enabled || !settings.batchingGuidance) return null
+          if (!settings.enabled || !settings.batchingGuidance) return ''
           return [
             '## Fast Ops Token-Efficiency Tips',
             '- Prefer `fast_read_files` to inspect multiple files/ranges in a single turn and obtain SHA-256 `revision` tokens.',
@@ -194,7 +198,16 @@ export class FastOpsController {
         parameters: unknown
         execute: (args: Record<string, unknown> | undefined, exec?: { agent?: AgentLike }) => unknown
       }) => {
-        const stop = tools.register!(spec)
+        const stop = tools.register!({
+          ...spec,
+          output: {
+            schema: { type: 'object', additionalProperties: true },
+            render: (_args: unknown, value: unknown) => [{
+              type: 'text',
+              text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+            }],
+          },
+        })
         if (typeof stop === 'function') disposers.push(stop)
       }
 

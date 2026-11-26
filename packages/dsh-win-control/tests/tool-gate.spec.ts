@@ -107,9 +107,10 @@ describe('dsh-win-control gate', () => {
 
     // windows_mcp_doctor builds a diagnostic summary.
     const doctorTool = host.registered.get(DOCTOR_TOOL_NAME)!
-    const report = await doctorTool.execute({}, { agent: agentA })
-    expect(report).toContain('已挂载 MCP 桌面工具数: 2')
-    expect(report).toContain('当前会话桌面操控授权: 已开启')
+    const doctorResult = await doctorTool.execute({}, { agent: agentA }) as { report: string; bridgedCount: number }
+    expect(doctorResult.bridgedCount).toBe(2)
+    expect(doctorResult.report).toContain('已挂载 MCP 桌面工具数: 2')
+    expect(doctorResult.report).toContain('当前会话桌面操控授权: 已开启')
 
     stop()
   })
