@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "derived": true,
-  "supportStatus": "supported",
+  "supportStatus": "known-good",
   "authority": {
     "desktopManifest": "apps/dsh-desktop/package.json",
     "rootManifest": "package.json",
@@ -38,11 +38,11 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "c10f7e94e0c807db2b03d04dcdd524303e1e0d141a0c146208a4a1b9213909ed"
+    "sha256": "3a115bfcc554f4d3d97d274c25817542e32fe3a22d94c290429b4c8e1c3a0962"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
-    "supportStatus": "supported",
+    "supportStatus": "known-good",
     "upstreamVersion": "0.2.3-alpha.2",
     "capabilities": [
       {

@@ -1,0 +1,1 @@
+{"version":3,"file":"WinControlCard.d.ts","sourceRoot":"","sources":["../../../src/client/WinControlCard.tsx"],"names":[],"mappings":"AAuBA,OAAO,KAAK,EAAE,mBAAmB,EAAE,MAAM,cAAc,CAAA;AAGvD,MAAM,WAAW,mBAAmB;IAClC,CAAC,EAAE,CAAC,GAAG,EAAE,mBAAmB,KAAK,MAAM,CAAA;CACxC;AASD,wBAAgB,cAAc,CAAC,EAAE,CAAC,EAAE,EAAE,mBAAmB,+BAuSxD"}

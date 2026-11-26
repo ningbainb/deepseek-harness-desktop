@@ -45,6 +45,7 @@
     "@linxin666/dsh-ssh": "workspace:*",
     "@linxin666/dsh-tool-describe-image": "workspace:*",
     "@ningbainb/dsh-chat-artifacts": "workspace:*",
+    "@ningbainb/dsh-win-control": "workspace:*",
     "@linxin666/dsh-liangshen": "workspace:*",
     "@linxin666/dsh-client-ui-web-ui-settings": "workspace:*",
     "@ningbainb/dsh-user-scope": "workspace:*",

@@ -1293,6 +1293,39 @@
       }
     },
     {
+      "name": "@ningbainb/dsh-win-control",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-win-control"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-26T14:00:00.000Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-win-control"
+      },
+      "reason": "Ship the Community Desktop Windows UI Automation MCP control center.",
+      "desktopContracts": [
+        "Ephemeral per-session authorization pill",
+        "Lazy schema reveal and live UIA/DPI diagnostics",
+        "Mirror-probed isolated toolchain installer"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-win-control/tests/settings.spec.ts",
+          "packages/dsh-win-control/tests/mirrors.spec.ts",
+          "packages/dsh-win-control/tests/toolchain.spec.ts",
+          "packages/dsh-win-control/tests/desktop-probe.spec.ts",
+          "packages/dsh-win-control/tests/tool-gate.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Toggle the composer Win Control pill per session and inspect Settings diagnostics."
+        ],
+        "results": []
+      }
+    },
+    {
       "name": "@ningbainb/dsh-llm-antigravity",
       "selection": {
         "version": "0.1.0",

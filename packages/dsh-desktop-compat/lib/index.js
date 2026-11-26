@@ -1350,7 +1350,19 @@ const BROWSER_PREFIXES = [
 	"mcp__chrome-devtools-mcp__",
 	"stagehand_"
 ];
-const COMPUTER_PREFIXES = ["cua_driver_native__", "mcp__cua-driver-mcp__"];
+const COMPUTER_PREFIXES = [
+	"cua_driver_native__",
+	"mcp__cua-driver-mcp__",
+	"mcp__windows__"
+];
+const WINDOWS_MCP_OBSERVATION_NAMES = /* @__PURE__ */ new Set([
+	"screenshot",
+	"snapshot",
+	"displayinventory",
+	"controlstatus",
+	"wait",
+	"waitfor"
+]);
 const BROWSER_OBSERVATION_NAMES = /* @__PURE__ */ new Set([
 	"browser_console_messages",
 	"browser_network_requests",
@@ -1432,6 +1444,7 @@ function controlToolApprovalDecision(name, wslPermission = "ask", options = {}) 
 	}
 	const computerName = stripPrefix(name, COMPUTER_PREFIXES);
 	if (computerName !== void 0) {
+		if (name.startsWith("mcp__windows__") && WINDOWS_MCP_OBSERVATION_NAMES.has(computerName.toLowerCase())) return;
 		if (COMPUTER_OBSERVATION_PATTERN.test(computerName)) return void 0;
 		return options.fullAccessUnattended === true ? void 0 : {
 			kind: "ask",

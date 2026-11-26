@@ -26,6 +26,13 @@ describe('Desktop control tool approval policy', () => {
     expect(controlToolApprovalDecision('mcp__cua-driver-mcp__take_screenshot')).toBeUndefined()
     expect(controlToolApprovalDecision('cua_driver_native__click')?.kind).toBe('ask')
     expect(controlToolApprovalDecision('mcp__cua-driver-mcp__type_text')?.kind).toBe('ask')
+    expect(controlToolApprovalDecision('mcp__windows__Screenshot')).toBeUndefined()
+    expect(controlToolApprovalDecision('mcp__windows__Snapshot')).toBeUndefined()
+    expect(controlToolApprovalDecision('mcp__windows__DisplayInventory')).toBeUndefined()
+    expect(controlToolApprovalDecision('mcp__windows__Click')?.kind).toBe('ask')
+    expect(controlToolApprovalDecision('mcp__windows__Type')?.kind).toBe('ask')
+    expect(controlToolApprovalDecision('mcp__windows__Click', 'ask', { fullAccessUnattended: true })).toBeUndefined()
+    expect(controlToolApprovalDecision('mcp__windows__Type', 'ask', { fullAccessUnattended: true })).toBeUndefined()
   })
 
   it('does not affect unrelated tools', () => {

@@ -1,0 +1,26 @@
+- insert:
+    - id: win-control
+      name: '@ningbainb/dsh-win-control'
+    - id: windows-mcp-bridge
+      name: '@deepseek-ai/dsh-mcp-client'
+      disabled: true
+      config:
+        serverName: windows
+        transport: stdio
+        command: uvx
+        args:
+          - windows-mcp@0.8.8
+          - serve
+          - --exclude-tools
+          - App,PowerShell,FileSystem
+        toolCallTimeoutMs: 120000
+        failOnStartupError: false
+        reconnect:
+          enabled: true
+          initialDelayMs: 500
+          maxDelayMs: 30000
+          maxAttempts: 10
+        env:
+          ANONYMIZED_TELEMETRY: 'false'
+          WINDOWS_MCP_DISABLE_FLASH: '1'
+          WINDOWS_MCP_SCREENSHOT_SCALE: '0.75'

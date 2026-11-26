@@ -104,6 +104,7 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@linxin666/dsh-tool-describe-image',
   '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-user-scope',
+  '@ningbainb/dsh-win-control',
 ].toSorted())
 
 // Skin Center v1 exposed every shipped theme as a separate Cordis package.
@@ -227,6 +228,7 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@tencent-connect/dsh-qqbot',
   '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-user-scope',
+  '@ningbainb/dsh-win-control',
   'dsh-better-sidebar',
   'reasoning-slider',
 ].toSorted())
@@ -320,6 +322,7 @@ export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@ningbainb/dsh-personal-prompt',
   '@linxin666/dsh-ssh',
   '@ningbainb/dsh-user-scope',
+  '@ningbainb/dsh-win-control',
 ].toSorted())
 
 // Desktop 2.1 first claimed this package as a managed compatibility link, but
@@ -329,6 +332,7 @@ export const MANAGED_RUNTIME_PACKAGES = Object.freeze([
   ...BUILTIN_RUNTIME_PACKAGES,
   ...DESKTOP_SUPPORT_PACKAGES,
   ...DESKTOP_PLUGIN_COMPAT_PACKAGES,
+  '@deepseek-ai/dsh-mcp-client',
   DESKTOP_REPAIR_BUNDLE,
 ].toSorted())
 
@@ -522,6 +526,31 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
       name: '@linxin666/dsh-tool-describe-image'
     - id: chat-artifacts
       name: '@ningbainb/dsh-chat-artifacts'
+    - id: win-control
+      name: '@ningbainb/dsh-win-control'
+    - id: windows-mcp-bridge
+      name: '@deepseek-ai/dsh-mcp-client'
+      disabled: true
+      config:
+        serverName: windows
+        transport: stdio
+        command: uvx
+        args:
+          - windows-mcp@0.8.8
+          - serve
+          - --exclude-tools
+          - App,PowerShell,FileSystem
+        toolCallTimeoutMs: 120000
+        failOnStartupError: false
+        reconnect:
+          enabled: true
+          initialDelayMs: 500
+          maxDelayMs: 30000
+          maxAttempts: 10
+        env:
+          ANONYMIZED_TELEMETRY: 'false'
+          WINDOWS_MCP_DISABLE_FLASH: '1'
+          WINDOWS_MCP_SCREENSHOT_SCALE: '0.75'
     - id: particle-theme
       name: '@linxin666/dsh-particle-theme'
       config:

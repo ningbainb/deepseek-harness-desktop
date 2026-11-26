@@ -12,7 +12,17 @@ const BROWSER_PREFIXES = [
 const COMPUTER_PREFIXES = [
   'cua_driver_native__',
   'mcp__cua-driver-mcp__',
+  'mcp__windows__',
 ] as const
+
+const WINDOWS_MCP_OBSERVATION_NAMES = new Set([
+  'screenshot',
+  'snapshot',
+  'displayinventory',
+  'controlstatus',
+  'wait',
+  'waitfor',
+])
 
 const BROWSER_OBSERVATION_NAMES = new Set([
   'browser_console_messages',
@@ -108,6 +118,9 @@ export function controlToolApprovalDecision(
 
   const computerName = stripPrefix(name, COMPUTER_PREFIXES)
   if (computerName !== undefined) {
+    if (name.startsWith('mcp__windows__') && WINDOWS_MCP_OBSERVATION_NAMES.has(computerName.toLowerCase())) {
+      return undefined
+    }
     if (COMPUTER_OBSERVATION_PATTERN.test(computerName)) return undefined
     return options.fullAccessUnattended === true
       ? undefined

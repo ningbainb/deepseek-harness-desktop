@@ -504,6 +504,9 @@ importers:
       '@ningbainb/dsh-user-scope':
         specifier: workspace:*
         version: link:../../packages/dsh-user-scope
+      '@ningbainb/dsh-win-control':
+        specifier: workspace:*
+        version: link:../../packages/dsh-win-control
       '@tencent-connect/dsh-qqbot':
         specifier: 0.5.5
         version: 0.5.5(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-agent@0.2.3-alpha.2(b56017794072c507b6a81b0da603b03a))(@deepseek-ai/dsh-llm@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-session@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)(@deepseek-ai/dsh-error@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1))(@deepseek-ai/dsh-scope@0.2.3-alpha.2(@deepseek-ai/cordis@4.2.0-alpha.1)))(@deepseek-ai/dsh-user-approval@0.2.3-alpha.2(e533969a5ef4fe5a468035af6ded2059))(@deepseek-ai/schemastery@3.20.0-alpha.1)(@tencent-connect/qqbot-connector@1.2.0)
@@ -2342,6 +2345,9 @@ importers:
       '@ningbainb/dsh-user-scope':
         specifier: workspace:*
         version: link:../dsh-user-scope
+      '@ningbainb/dsh-win-control':
+        specifier: workspace:*
+        version: link:../dsh-win-control
     devDependencies:
       jsdom:
         specifier: 29.1.1
@@ -2458,6 +2464,39 @@ importers:
       vitest:
         specifier: ^4.1.1
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@26.1.0(supports-color@7.2.0))(yaml@2.9.1)
+
+  packages/dsh-win-control:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.2.0-alpha.1
+        version: 4.2.0-alpha.1(@deepseek-ai/cordis-plugin-include@1.2.0-alpha.1)(@deepseek-ai/cordis-plugin-loader@1.2.0-alpha.1)
+      '@ningbainb/dsh-user-scope':
+        specifier: workspace:*
+        version: link:../dsh-user-scope
+      '@types/node':
+        specifier: ^22.20.0
+        version: 22.20.3
+      '@types/react':
+        specifier: ~18.3.1
+        version: 18.3.31
+      jsdom:
+        specifier: 29.1.1
+        version: 29.1.1(@noble/hashes@2.3.0)
+      lightningcss:
+        specifier: ^1.32.0
+        version: 1.32.0
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      tsdown:
+        specifier: ^0.22.2
+        version: 0.22.2(typescript@6.0.3)(unrun@0.3.1)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.8
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.20.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@2.3.0))(yaml@2.9.1)
 
   packages/skins/blue-fantasy:
     devDependencies:

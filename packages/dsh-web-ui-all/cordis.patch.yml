@@ -104,6 +104,13 @@
     - id: chat-artifacts
       name: '@ningbainb/dsh-chat-artifacts'
 
+# from ../dsh-win-control
+- insert:
+    - id: win-control
+      name: '@ningbainb/dsh-win-control'
+    - id: windows-mcp-bridge
+      name: '@deepseek-ai/dsh-mcp-client'
+
 # from ../dsh-liangshen
 - insert:
     - id: liangshen
