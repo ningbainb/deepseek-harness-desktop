@@ -1,0 +1,29 @@
+export declare const zh: {
+    cardTitle: string;
+    cardDescription: string;
+    statusActive: string;
+    statusDisabled: string;
+    enableLabel: string;
+    lazyToolsLabel: string;
+    batchGuidanceLabel: string;
+    maxInlineLabel: string;
+    ttlLabel: string;
+    ttl15m: string;
+    ttl1h: string;
+    ttl6h: string;
+    statsBatchCalls: string;
+    statsFilesBatched: string;
+    statsSpills: string;
+    statsActivated: string;
+    statsCacheRefs: string;
+    reclaimAction: string;
+    saveAction: string;
+    saving: string;
+    savedNotice: string;
+    reclaimedNotice: string;
+    errorNotice: string;
+    refresh: string;
+};
+export declare const en: typeof zh;
+export type FastOpsLocaleKey = keyof typeof zh;
+//# sourceMappingURL=locales.d.ts.map

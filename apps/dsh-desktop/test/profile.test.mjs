@@ -92,6 +92,7 @@ test('published rc.2 Web aggregate cannot silently remove Desktop-only profile r
     'chat-artifacts',
     'win-control',
     'windows-mcp-bridge',
+    'fast-ops',
     'particle-theme',
     'ui-web-ui-compat',
   ]
@@ -108,7 +109,7 @@ test('published rc.2 Web aggregate cannot silently remove Desktop-only profile r
     'ui-community-plugins': 'web-ui-community-plugins',
     'ui-skin-center': 'web-ui-skin-center',
   }
-  assert.equal(legacyIds.size, 28)
+  assert.equal(legacyIds.size, 29)
   assert.equal(BUILTIN_BUNDLES.filter(name => name === legacy || name === alpha).length, 1,
     'the two aggregate patches reuse loader IDs and must not be mounted together')
   const active = BUILTIN_BUNDLES.includes(alpha) ? alpha : legacy
@@ -1431,6 +1432,7 @@ test('runtime resolver finds every bundled and desktop support package', async (
     '@ningbainb/dsh-agent-inbox',
     '@ningbainb/dsh-chat-artifacts',
     '@ningbainb/dsh-data-location',
+    '@ningbainb/dsh-fast-ops',
     '@ningbainb/dsh-llm-antigravity',
     '@ningbainb/dsh-memory',
     '@ningbainb/dsh-personal-prompt',
@@ -1487,7 +1489,7 @@ test('runtime resolver finds every bundled and desktop support package', async (
     assert.equal(manifest.version, version, `${name} must use its reviewed public release`)
   }
   for (const packageName of DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES) {
-    assert.match(resolved.get(packageName), /packages[\\/](?:dsh-agent-inbox|dsh-llm-antigravity|dsh-aionui-panel|dsh-chat-artifacts|dsh-data-location|dsh-git-graph|dsh-model-preferences|dsh-task-board|dsh-memory|dsh-personal-prompt|dsh-pet|dsh-ssh|dsh-tool-describe-image|dsh-user-scope|dsh-win-control|skins[\\/]skin-center)$/u)
+    assert.match(resolved.get(packageName), /packages[\\/](?:dsh-agent-inbox|dsh-llm-antigravity|dsh-aionui-panel|dsh-chat-artifacts|dsh-data-location|dsh-git-graph|dsh-model-preferences|dsh-task-board|dsh-memory|dsh-personal-prompt|dsh-pet|dsh-ssh|dsh-tool-describe-image|dsh-user-scope|dsh-win-control|dsh-fast-ops|skins[\\/]skin-center)$/u)
   }
   const aionRoot = resolved.get('@linxin666/dsh-client-ui-aionui-panel')
   assert.match(aionRoot, /packages[\\/]dsh-aionui-panel$/u)

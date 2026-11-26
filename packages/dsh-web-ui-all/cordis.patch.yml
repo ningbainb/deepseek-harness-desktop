@@ -111,6 +111,11 @@
     - id: windows-mcp-bridge
       name: '@deepseek-ai/dsh-mcp-client'
 
+# from ../dsh-fast-ops
+- insert:
+    - id: fast-ops
+      name: '@ningbainb/dsh-fast-ops'
+
 # from ../dsh-liangshen
 - insert:
     - id: liangshen

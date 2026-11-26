@@ -1326,6 +1326,37 @@
       }
     },
     {
+      "name": "@ningbainb/dsh-fast-ops",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-fast-ops"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-26T14:30:00.000Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-fast-ops"
+      },
+      "reason": "Ship the Community Desktop token-efficient batch file, search, and result-cache toolkit.",
+      "desktopContracts": [
+        "Workspace-confined batch file ops with SHA-256 CAS multi-edit",
+        "Progressive tool disclosure via fast_discover and bounded ref:// cache"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-fast-ops/tests/settings.spec.ts",
+          "packages/dsh-fast-ops/tests/result-cache.spec.ts",
+          "packages/dsh-fast-ops/tests/file-ops.spec.ts",
+          "packages/dsh-fast-ops/tests/tool-registry.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Configure Fast Ops settings card and reclaim cached references."
+        ],
+        "results": []
+      }
+    },
+    {
       "name": "@ningbainb/dsh-llm-antigravity",
       "selection": {
         "version": "0.1.0",

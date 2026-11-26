@@ -29,6 +29,7 @@ patchFrom:
   - ../dsh-tool-describe-image
   - ../dsh-chat-artifacts
   - ../dsh-win-control
+  - ../dsh-fast-ops
   - ../dsh-liangshen
   - ../dsh-skins
 externalRows:
@@ -51,6 +52,7 @@ deps:
   - ../dsh-tool-describe-image
   - ../dsh-chat-artifacts
   - ../dsh-win-control
+  - ../dsh-fast-ops
   - ../dsh-liangshen
   - ../dsh-web-ui-settings
   - ../dsh-user-scope
