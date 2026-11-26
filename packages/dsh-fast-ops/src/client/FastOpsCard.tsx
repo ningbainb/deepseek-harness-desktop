@@ -18,6 +18,9 @@ export interface FastOpsCardProps {
   t: (key: FastOpsLocaleKey) => string
 }
 
+const RESIDENT_TOOL_NAMES = ['fast_read_files', 'fast_search', 'fast_edit_batch', 'fast_discover'] as const
+const SPECIALIZED_TOOL_NAMES = ['fast_stat', 'fast_diff', 'fast_replace', 'fast_read_table', 'fast_result'] as const
+
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
@@ -79,103 +82,167 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
     return t('ttl6h')
   }
 
+  const counters = state?.counters ?? {
+    batchCalls: 0,
+    filesReadInBatches: 0,
+    cacheSpills: 0,
+    toolsActivated: 0,
+  }
+  const cache = state?.cache ?? { totalRefs: 0, totalBytes: 0, sessionCount: 0 }
+  const isDirty = state !== null && JSON.stringify(draft) !== JSON.stringify(state.settings)
+
   return (
-    <section className={css.card} data-fast-ops-settings>
-      <header className={css.header}>
-        <div>
-          <h3 className={css.title}>{t('cardTitle')}</h3>
+    <section className={css.card} data-fast-ops-settings data-fast-ops-loaded={state ? 'true' : 'false'}>
+      <header className={css.hero}>
+        <div className={css.heroText}>
+          <div className={css.titleRow}>
+            <h3 className={css.title}>{t('cardTitle')}</h3>
+            <span className={css.statusPill} data-active={draft.enabled ? 'true' : 'false'}>
+              <span className={css.statusDot} aria-hidden="true" />
+              <span>{draft.enabled ? t('statusActive') : t('statusDisabled')}</span>
+            </span>
+          </div>
           <p className={css.description}>{t('cardDescription')}</p>
         </div>
-        <span className={css.statusPill} data-active={draft.enabled ? 'true' : 'false'}>
-          {draft.enabled ? t('statusActive') : t('statusDisabled')}
-        </span>
+
+        <label className={css.heroControl}>
+          <span className={css.masterText}>{t('enableLabel')}</span>
+          <span className={css.switchControl}>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label={t('enableLabel')}
+              className={css.switchInput}
+              checked={draft.enabled}
+              onChange={e => setDraft(prev => ({ ...prev, enabled: e.target.checked }))}
+            />
+            <span className={css.switchTrack} aria-hidden="true" />
+          </span>
+        </label>
       </header>
 
-      {state && (
-        <div className={css.statsGrid}>
-          <div className={css.statBox}>
-            <div className={css.statValue}>{state.counters.batchCalls}</div>
-            <div className={css.statLabel}>{t('statsBatchCalls')}</div>
+      <div className={css.metricsStrip} data-fast-ops-stats>
+        <div className={css.metricCard}>
+          <div className={css.metricValue}>{counters.batchCalls}</div>
+          <div className={css.metricLabel}>{t('statsBatchCalls')}</div>
+        </div>
+        <div className={css.metricCard}>
+          <div className={css.metricValue}>{counters.filesReadInBatches}</div>
+          <div className={css.metricLabel}>{t('statsFilesBatched')}</div>
+        </div>
+        <div className={css.metricCard}>
+          <div className={css.metricValue}>{counters.toolsActivated}</div>
+          <div className={css.metricLabel}>{t('statsActivated')}</div>
+        </div>
+        <div className={css.metricCard}>
+          <div className={css.metricValue}>{`${cache.totalRefs} (${formatBytes(cache.totalBytes)})`}</div>
+          <div className={css.metricLabel}>{t('statsCacheRefs')}</div>
+          <div className={css.metricSub}>{`${counters.cacheSpills} ${t('statsSpillSuffix')}`}</div>
+        </div>
+      </div>
+
+      <div className={css.sectionBlock}>
+        <div className={css.sectionHeading}>{t('coreSectionTitle')}</div>
+
+        <div className={css.settingRow}>
+          <div className={css.rowText}>
+            <div className={css.rowTitle}>{t('lazyToolsLabel')}</div>
+            <div className={css.rowDesc}>{t('lazyToolsDesc')}</div>
           </div>
-          <div className={css.statBox}>
-            <div className={css.statValue}>{state.counters.filesReadInBatches}</div>
-            <div className={css.statLabel}>{t('statsFilesBatched')}</div>
+          <label className={css.switchControl}>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label={t('lazyToolsLabel')}
+              className={css.switchInput}
+              checked={draft.lazySpecializedTools}
+              onChange={e => setDraft(prev => ({ ...prev, lazySpecializedTools: e.target.checked }))}
+            />
+            <span className={css.switchTrack} aria-hidden="true" />
+          </label>
+        </div>
+
+        <div className={css.settingRow}>
+          <div className={css.rowText}>
+            <div className={css.rowTitle}>{t('batchGuidanceLabel')}</div>
+            <div className={css.rowDesc}>{t('batchGuidanceDesc')}</div>
           </div>
-          <div className={css.statBox}>
-            <div className={css.statValue}>{state.counters.cacheSpills}</div>
-            <div className={css.statLabel}>{t('statsSpills')}</div>
+          <label className={css.switchControl}>
+            <input
+              type="checkbox"
+              role="switch"
+              aria-label={t('batchGuidanceLabel')}
+              className={css.switchInput}
+              checked={draft.batchingGuidance}
+              onChange={e => setDraft(prev => ({ ...prev, batchingGuidance: e.target.checked }))}
+            />
+            <span className={css.switchTrack} aria-hidden="true" />
+          </label>
+        </div>
+      </div>
+
+      <div className={css.legendPanel}>
+        <div className={css.legendRow}>
+          <span className={css.legendGroupLabel}>{t('residentLabel')}</span>
+          {RESIDENT_TOOL_NAMES.map(name => (
+            <code key={name} className={`${css.toolTag} ${css.toolTagPrimary}`}>{name}</code>
+          ))}
+        </div>
+        <div className={css.legendRow}>
+          <span className={css.legendGroupLabel}>{t('specializedLabel')}</span>
+          {SPECIALIZED_TOOL_NAMES.map(name => (
+            <code key={name} className={css.toolTag}>{name}</code>
+          ))}
+        </div>
+      </div>
+
+      <details className={css.disclosure}>
+        <summary className={css.disclosureSummary}>{t('advancedTitle')}</summary>
+        <div className={css.disclosureBody}>
+          <div className={css.fieldGroup}>
+            <div className={css.fieldTitle}>{t('maxInlineLabel')}</div>
+            <div className={css.fieldDesc}>{t('maxInlineDesc')}</div>
+            <div className={css.segmented4} role="group" aria-label={t('maxInlineLabel')}>
+              {INLINE_BYTE_OPTIONS.map(bytes => (
+                <button
+                  key={bytes}
+                  type="button"
+                  className={css.segBtn}
+                  aria-pressed={draft.maxInlineBytes === bytes}
+                  onClick={() => setDraft(prev => ({ ...prev, maxInlineBytes: bytes }))}
+                >
+                  {`${bytes / 1024} KB`}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className={css.statBox}>
-            <div className={css.statValue}>{state.counters.toolsActivated}</div>
-            <div className={css.statLabel}>{t('statsActivated')}</div>
-          </div>
-          <div className={css.statBox}>
-            <div className={css.statValue}>{`${state.cache.totalRefs} (${formatBytes(state.cache.totalBytes)})`}</div>
-            <div className={css.statLabel}>{t('statsCacheRefs')}</div>
+
+          <div className={css.fieldGroup}>
+            <div className={css.fieldTitle}>{t('ttlLabel')}</div>
+            <div className={css.segmented3} role="group" aria-label={t('ttlLabel')}>
+              {TTL_MS_OPTIONS.map(ms => (
+                <button
+                  key={ms}
+                  type="button"
+                  className={css.segBtn}
+                  aria-pressed={draft.resultCacheTtlMs === ms}
+                  onClick={() => setDraft(prev => ({ ...prev, resultCacheTtlMs: ms }))}
+                >
+                  {ttlLabel(ms)}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      )}
-
-      <label className={css.checkRow}>
-        <input
-          type="checkbox"
-          checked={draft.enabled}
-          onChange={e => setDraft(prev => ({ ...prev, enabled: e.target.checked }))}
-        />
-        <span>{t('enableLabel')}</span>
-      </label>
-
-      <label className={css.checkRow}>
-        <input
-          type="checkbox"
-          checked={draft.lazySpecializedTools}
-          onChange={e => setDraft(prev => ({ ...prev, lazySpecializedTools: e.target.checked }))}
-        />
-        <span>{t('lazyToolsLabel')}</span>
-      </label>
-
-      <label className={css.checkRow}>
-        <input
-          type="checkbox"
-          checked={draft.batchingGuidance}
-          onChange={e => setDraft(prev => ({ ...prev, batchingGuidance: e.target.checked }))}
-        />
-        <span>{t('batchGuidanceLabel')}</span>
-      </label>
-
-      <div className={css.grid}>
-        <label className={css.field}>
-          <span>{t('maxInlineLabel')}</span>
-          <select
-            className={css.select}
-            value={String(draft.maxInlineBytes)}
-            onChange={e => setDraft(prev => ({ ...prev, maxInlineBytes: Number(e.target.value) }))}
-          >
-            {INLINE_BYTE_OPTIONS.map(bytes => (
-              <option key={bytes} value={String(bytes)}>{`${bytes / 1024} KB`}</option>
-            ))}
-          </select>
-        </label>
-
-        <label className={css.field}>
-          <span>{t('ttlLabel')}</span>
-          <select
-            className={css.select}
-            value={String(draft.resultCacheTtlMs)}
-            onChange={e => setDraft(prev => ({ ...prev, resultCacheTtlMs: Number(e.target.value) }))}
-          >
-            {TTL_MS_OPTIONS.map(ms => (
-              <option key={ms} value={String(ms)}>{ttlLabel(ms)}</option>
-            ))}
-          </select>
-        </label>
-      </div>
+      </details>
 
       <footer className={css.footer}>
         <div>
-          {feedback && (
+          {feedback ? (
             <span className={feedback.kind === 'ok' ? css.notice : css.error}>{feedback.text}</span>
-          )}
+          ) : isDirty ? (
+            <span className={css.dirty}>{t('dirtyNotice')}</span>
+          ) : null}
         </div>
         <div className={css.actions}>
           <button type="button" className={css.btn} disabled={busy} onClick={() => void refresh()}>
