@@ -1343,6 +1343,17 @@ button.secondary:hover:not(:disabled),
 }
 .toast[hidden] { display: none; }
 .toast-action { min-height: 24px; padding-inline: var(--space-2); color: var(--harness-accent); }
+body[data-dock-settings-view-visible='true'] .toast {
+  left: 12px;
+  right: auto;
+  bottom: 12px;
+  max-width: 196px;
+}
+@media (max-width: 800px) {
+  body[data-dock-settings-view-visible='true'] .toast {
+    max-width: 156px;
+  }
+}
 .market-masthead { background: transparent; }
 .market-masthead::before { display: none; }
 .native-masthead::before { display: none; }

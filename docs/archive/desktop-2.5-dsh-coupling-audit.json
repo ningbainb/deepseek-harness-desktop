@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "desktopVersion": "5.5.0",
+  "desktopVersion": "5.6.0",
   "upstreamVersion": "0.2.3-alpha.2",
   "lockfileSha256": "c10f7e94e0c807db2b03d04dcdd524303e1e0d141a0c146208a4a1b9213909ed",
   "policy": {
@@ -14553,114 +14553,6 @@
     },
     {
       "category": "profile-home",
-      "path": "capture-3.3.0-extension-tabs.mjs",
-      "line": 61,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "capture-3.3.0-source-surfaces-v3.mjs",
-      "line": 63,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "capture-3.3.0-source-surfaces.mjs",
-      "line": 86,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "capture-3.3.0-surfaces.mjs",
-      "line": 71,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-extension-settle.mjs",
-      "line": 58,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-main.mjs",
-      "line": 65,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-mode-flow.mjs",
-      "line": 48,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-mode-flow2.mjs",
-      "line": 48,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-mode-prompt.mjs",
-      "line": 48,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-mode-prompt2.mjs",
-      "line": 48,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-model-menu.mjs",
-      "line": 20,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-session.mjs",
-      "line": 79,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-source-mode.mjs",
-      "line": 55,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-workspace-flow.mjs",
-      "line": 76,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-workspace-flow2.mjs",
-      "line": 55,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-workspace-flow3.mjs",
-      "line": 48,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-workspace-select.mjs",
-      "line": 59,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "diagnose-3.3.0-workspace.mjs",
-      "line": 78,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
       "path": "packages/dsh-data-location/src/client/Panel.tsx",
       "line": 22,
       "operation": "DSH_HOME"
@@ -15560,42 +15452,6 @@
       "operation": "DSH_HOME"
     },
     {
-      "category": "profile-home",
-      "path": "verify-3.3.0-drag-drop.mjs",
-      "line": 103,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "verify-3.3.0-source-drag-drop.mjs",
-      "line": 131,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "verify-3.3.0-source-mode-selection-v2.mjs",
-      "line": 20,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "verify-3.3.0-source-mode-selection-v3.mjs",
-      "line": 20,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "verify-3.3.0-source-mode-selection.mjs",
-      "line": 68,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "verify-3.3.0-source-paste-large.mjs",
-      "line": 68,
-      "operation": "DSH_HOME"
-    },
-    {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/scripts/verify-history-host-performance.mjs",
       "line": 117,
@@ -16330,7 +16186,7 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/test/updater.test.mjs",
-      "line": 110,
+      "line": 111,
       "operation": "start"
     },
     {

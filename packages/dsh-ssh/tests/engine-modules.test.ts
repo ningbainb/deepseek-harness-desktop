@@ -5,12 +5,13 @@
  * covered by tests/engine.test.ts against the embedded ssh2 server.
  */
 
+import { EventEmitter } from 'node:events'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { Client } from 'ssh2'
-import { acquire, appendOutput, disposeRecord, sweepPool, withClient, DEFAULTS, type PoolEngine, type PoolRecord } from '../src/engine/connection-pool.ts'
+import { acquire, appendOutput, buildConnectConfig, disposeRecord, installKeyboardInteractiveFallback, sweepPool, withClient, DEFAULTS, type PoolEngine, type PoolRecord } from '../src/engine/connection-pool.ts'
 import { openShell } from '../src/engine/pty.ts'
 import { walkLocalDir, upload } from '../src/engine/sftp.ts'
 import { listTunnels, stopAllTunnels, stopTunnel, type TunnelEngine, type TunnelRecord } from '../src/engine/tunnel.ts'
@@ -236,5 +237,52 @@ describe('cluster', () => {
     const engine = fakeEngine([{ alias: 'a', environment: 'prod', tags: ['web'] }])
     const results = await cluster(engine, { command: 'true', aliases: ['missing'] })
     expect(results).toEqual([])
+  })
+})
+
+describe('keyboard-interactive auth fallback', () => {
+  it('sets tryKeyboard on password entries and answers prompts at most once', () => {
+    const passwordCfg = buildConnectConfig({
+      alias: 'pam',
+      host: '127.0.0.1',
+      port: 22,
+      user: 'alice',
+      auth: { kind: 'password', password: 'secret' },
+      proxyJump: [],
+      tags: [],
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    expect(passwordCfg.tryKeyboard).toBe(true)
+
+    const keyDir = mkdtempSync(join(tmpdir(), 'dsh-engine-key-'))
+    const keyPath = join(keyDir, 'id_test')
+    writeFileSync(keyPath, 'dummy-key', 'utf8')
+    try {
+      const keyCfg = buildConnectConfig({
+        alias: 'key',
+        host: '127.0.0.1',
+        port: 22,
+        user: 'alice',
+        auth: { kind: 'key', keyPath },
+        proxyJump: [],
+        tags: [],
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      expect(keyCfg.tryKeyboard).toBeUndefined()
+    } finally {
+      rmSync(keyDir, { recursive: true, force: true })
+    }
+
+    const emitter = new EventEmitter()
+    installKeyboardInteractiveFallback(emitter as unknown as Client, 'secret')
+    const replies: string[][] = []
+    // Empty banner prompt does not consume the single password attempt.
+    emitter.emit('keyboard-interactive', '', '', '', [], (answers: string[]) => replies.push(answers))
+    emitter.emit('keyboard-interactive', '', '', '', [{ prompt: 'Password: ', echo: false }], (answers: string[]) => replies.push(answers))
+    // Retry must abort with empty answers to avoid PAM lockouts.
+    emitter.emit('keyboard-interactive', '', '', '', [{ prompt: 'Password: ', echo: false }], (answers: string[]) => replies.push(answers))
+    expect(replies).toEqual([[], ['secret'], []])
   })
 })

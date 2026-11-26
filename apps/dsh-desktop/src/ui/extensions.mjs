@@ -1456,16 +1456,24 @@ async function activateTab(tab, focus = false, settingOverride, plugin, userActi
     }
   }
   if (setting) applyPanels()
-  else for (const panel of document.querySelectorAll('.panel')) {
-    panel.hidden = true
-    panel.classList.remove('active')
+  else {
+    delete document.body.dataset.dockSettingsViewVisible
+    for (const panel of document.querySelectorAll('.panel')) {
+      panel.hidden = true
+      panel.classList.remove('active')
+    }
   }
   void Promise.resolve().then(() => window.dshDesktop.selectDockSetting?.(setting ?? null, plugin)).then(() => {
     if (request !== settingsRequest) return
     settingState.hidden = true
-    if (!setting) applyPanels()
+    if (setting) document.body.dataset.dockSettingsViewVisible = 'true'
+    else {
+      delete document.body.dataset.dockSettingsViewVisible
+      applyPanels()
+    }
   }).catch(error => {
     if (request === settingsRequest) {
+      delete document.body.dataset.dockSettingsViewVisible
       settingState.hidden = false
       settingState.textContent = error.message || '设置加载失败，请重试。'
       settingRetry.hidden = false

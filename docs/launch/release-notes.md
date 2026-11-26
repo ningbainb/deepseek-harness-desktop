@@ -1,15 +1,14 @@
-# DeepSeek Harness Desktop 5.5.0
+# DeepSeek Harness Desktop 5.6.0
 
 ## 中文
 
-5.5.0 将办公连接器带入原生对话，新增通用 ACP v1 适配，并完善升级提示和更新下载线路。
+5.6.0 为维护修复版本，重点修复拓展坞与对话界面中 SSH 远程开发无法打开及部分连接场景失效的问题，同时修复 Windows 环境下默认自动升级失败的问题。
 
 ### 本次亮点
 
-- **原生对话办公模式。** 在侧边栏切换到办公模式，通过输入框上方的面板管理飞书、腾讯文档、语雀、金山文档、企业微信、钉钉、腾讯会议和 WPS 365。支持自动安装的连接器可一键安装，无需手动配置 PATH。Windows 安装和登录时隐藏命令行窗口。飞书首次连接会自动执行 `config init --new`，并在系统浏览器中打开授权页。连接器官网和授权链接也在系统浏览器中打开。
-- **通用 ACP v1 与 Antigravity OAuth。** 通过标准输入输出接入符合 ACP v1 的本地 Agent，支持能力协商、会话管理及权限请求。Antigravity 个人与企业 OAuth 仅限本机人工交互，手机远程端、省钱模式、定时任务和普通模型后端均无法调用。
-- **升级提示与插件归属。** 精简升级后邀请用户为项目点 Star 的弹窗版式，并补齐内置插件的来源与维护者信息。
-- **按地区选择更新线路。** 本版内置下载源为 GitHub。在中国大陆，已配置的 CDN 可用且更快时，或 GitHub 不可用时，自动选线可以优先使用该 CDN。其他地区优先使用 GitHub。更新面板也支持手动选线。Cloudflare R2 镜像已预留接入能力，本版尚未上线。
+- **恢复 SSH 远程开发入口与挂载可靠性。** 兼容拓展坞「更多工具 → SSH 远程开发」在不同原生布局容器中的懒加载挂载，并在打开前自动收起可能遮挡对话区的全局面板或快捷键设置弹窗；增加重复挂载保护；调整原生设置视图显示时的 Toast 提示位置，避免错误反馈被原生视图遮挡。
+- **增强 SSH 连接与配置导入兼容性。** 为密码主机补充 PAM `keyboard-interactive` 认证兜底；兼容 Windows 下带引号路径与 `~\` 路径展开；支持 `~/.ssh/config` 中的 `Key=Value` 语法、带引号 `IdentityFile`、自动探测同目录默认私钥（`id_ed25519` / `id_rsa` / `id_ecdsa`）及 `USERNAME` 用户兜底。
+- **修复 Windows 自动更新检查失败。** 修复当安装目录旁存在 `.dsh-desktop-updates` 缓存目录时 `NsisUpdater` 未初始化 `ElectronHttpExecutor` 导致的空指针报错（`Cannot read properties of null (reading 'request')`），恢复新版本检测与自动下载安装流程。
 
 ### 验证
 
@@ -27,14 +26,13 @@
 
 ## English
 
-Desktop 5.5.0 brings office connectors into native conversations, adds generic ACP v1 support, and improves the post-upgrade prompt and update download routing.
+Desktop 5.6.0 is a maintenance release that restores SSH remote access from Extension Dock and native conversations and fixes Windows automatic update failures.
 
 ### Highlights
 
-- **Work Mode in native conversations.** Switch to Work Mode in the sidebar and manage Feishu, Tencent Docs, Yuque, Kingsoft Docs, WeCom, DingTalk, Tencent Meeting, and WPS 365 from the panel above the composer. Supported connectors install in one click without a manual PATH change. Windows keeps the console hidden during installation and sign-in. On first connection, Feishu runs `config init --new` and opens its authorization page in the system browser. Connector websites and other authorization links also open in the system browser.
-- **Generic ACP v1 and Antigravity OAuth.** Connect local ACP v1 agents over standard input and output with capability negotiation, session management, and permission requests. Antigravity personal and enterprise OAuth require direct local interaction and are unavailable to mobile remote access, Value Mode, scheduled tasks, and regular model backends.
-- **Post-upgrade prompt and plugin attribution.** Refined the prompt to star the project after upgrading and filled in source and maintainer details for built-in plugins.
-- **Region-aware update downloads.** GitHub is the built-in download source for this release. In mainland China, automatic routing can prefer a configured, reachable CDN if it responds faster or GitHub is unavailable. GitHub comes first elsewhere. The update panel also supports manual route selection. Cloudflare R2 integration is reserved for a future mirror.
+- **Restored SSH entry & conversation mounting.** Supports lazy mounting across both `[data-pane="conversation"]` and `[class*="centerCol"]`, dismisses blocking global panels or settings modals when launched from Extension Dock, guards against duplicate `apply` registration, and keeps Dock toast notifications visible in the sidebar while native `WebContentsView` tabs are open.
+- **Improved SSH authentication & config import.** Adds bounded `keyboard-interactive` fallback for PAM password hosts, handles quoted and Windows `~\` key paths, parses `Key=Value` entries in `~/.ssh/config`, detects default keys (`id_ed25519` / `id_rsa` / `id_ecdsa`) when `IdentityFile` is omitted, and falls back to `USERNAME` on Windows.
+- **Fixed Windows auto-update check failures.** Initializes `ElectronHttpExecutor` on the custom `NsisUpdater` instance used when the sibling `.dsh-desktop-updates` cache directory exists, resolving `Cannot read properties of null (reading 'request')` and restoring update checks and downloads.
 
 ### Verification
 

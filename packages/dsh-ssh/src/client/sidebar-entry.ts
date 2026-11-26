@@ -97,7 +97,10 @@ function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
  * @param controller - the panel controller the entry toggles.
  * @returns disposer removing the entry and its observers.
  */
-export function mountSidebarEntry(controller: PanelController): () => void {
+export function mountSidebarEntry(
+  controller: PanelController,
+  options?: { ensureView?: () => boolean; prepareMainSurface?: () => void },
+): () => void {
   const candidate = typeof window === 'undefined' ? undefined : (window as typeof window & { dshDesktop?: {
     onDesktopToolOpen?: (tool: 'task-board' | 'ssh', callback: () => boolean) => () => void
   } }).dshDesktop
@@ -179,7 +182,9 @@ export function mountSidebarEntry(controller: PanelController): () => void {
   document.addEventListener('click', closeForNativeNavigation, true)
   document.addEventListener(SURFACE_NAVIGATION_EVENT, closeForOtherSurface)
   const unsubscribeDesktop = desktop?.onDesktopToolOpen?.('ssh', () => {
-    if (!document.querySelector('[data-dsh-ssh-view]')?.isConnected) return false
+    options?.prepareMainSurface?.()
+    const ready = (options?.ensureView?.() ?? false) || Boolean(document.querySelector('[data-dsh-ssh-view]')?.isConnected)
+    if (!ready) return false
     document.dispatchEvent(new CustomEvent(SURFACE_NAVIGATION_EVENT, { detail: { surface: SURFACE_ID } }))
     controller.open()
     return true

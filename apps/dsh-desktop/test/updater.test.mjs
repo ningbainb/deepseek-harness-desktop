@@ -11,6 +11,7 @@ import {
   UPDATE_INSTALL_LAUNCH_TIMEOUT_MS,
   UPDATE_INSTALL_PREPARATION_TIMEOUT_MS,
   formatUpdateDetails,
+  loadElectronAutoUpdater,
   normalizeReleaseNotes,
   targetVolumeUpdaterCache,
 } from '../src/updater.mjs'
@@ -616,4 +617,26 @@ test('proxy diagnostics report only routing shape and never credentials or endpo
     describeDesktopProxyConfiguration({ mode: 'pac_script', pacScript: `https://alice:${secret}@proxy.example/proxy.pac` }),
     'mode=pac_script rules=0 kinds=none bypass=0 pac=yes',
   )
+})
+
+test('Windows packaged updater with volume cache initializes a usable httpExecutor', { skip: process.platform !== 'win32' }, async t => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-updater-exec-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const install = join(root, 'DeepSeek Harness Desktop')
+  const cache = `${install}.dsh-desktop-updates`
+  await mkdir(install, { recursive: true })
+  await mkdir(cache, { recursive: true })
+  const fakeApp = {
+    isPackaged: true,
+    getPath: name => (name === 'exe' ? join(install, 'DeepSeek Harness Desktop.exe') : join(root, name)),
+    getVersion: () => '5.6.0',
+    getName: () => 'DeepSeek Harness Desktop',
+    whenReady: () => Promise.resolve(),
+    quit: () => {},
+    relaunch: () => {},
+    once: () => {},
+  }
+  const updater = await loadElectronAutoUpdater(fakeApp)
+  assert.equal(typeof updater.httpExecutor?.request, 'function')
+  assert.equal(updater.createProviderRuntimeOptions().executor, updater.httpExecutor)
 })

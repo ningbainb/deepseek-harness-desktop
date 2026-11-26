@@ -7,6 +7,84 @@ export const RELEASE_GUIDE_VERSION = JSON.parse(readFileSync(new URL('../package
 export const RELEASE_GUIDE_SURFACE_ID = 'dsh-desktop-release-guide'
 
 export const RELEASE_GUIDES = Object.freeze({
+  '5.6.0': Object.freeze({
+    zh: Object.freeze({
+      badge: '版本新功能',
+      title: '欢迎使用 DeepSeek Harness Desktop',
+      subtitle: '修复 Windows 自动更新异常，并恢复拓展坞与原生对话中的 SSH 远程开发入口与连接可靠性。',
+      hint: '可在顶部「帮助 → 本版本新功能」随时查看',
+      done: '开始使用',
+      closeLabel: '关闭版本新功能引导',
+      items: Object.freeze([
+        Object.freeze({
+          id: 'ssh-remote-fix',
+          icon: 'terminal',
+          title: 'SSH 远程开发恢复与增强',
+          description: '修复拓展坞「更多工具 → SSH 远程开发」点击无响应及部分界面容器无法挂载的问题，补充 PAM 键盘交互认证与 Windows 密钥路径/配置导入支持。',
+        }),
+        Object.freeze({
+          id: 'models-and-acp',
+          icon: 'layout',
+          title: '模型设置与本地 Agent',
+          description: '在模型设置中统一管理接口、代理路线与本地 ACP v1 Agent 配置。',
+          actionLabel: '查看模型设置',
+          actionKind: 'models',
+        }),
+        Object.freeze({
+          id: 'dock-tools-and-toast',
+          icon: 'inbox',
+          title: '拓展坞工具与提示优化',
+          description: '修复原生设置视图显示时拓展坞错误提示被遮挡的问题，可在「更多工具」直达 SSH 远程开发。',
+          actionLabel: '打开拓展坞',
+          actionKind: 'dock',
+        }),
+        Object.freeze({
+          id: 'windows-updater-fix',
+          icon: 'sparkles',
+          title: 'Windows 自动更新修复',
+          description: '修复已存在更新缓存目录的 Windows 安装环境检查更新时出现空网络执行器异常的问题，恢复版本检测与自动升级链路。',
+        }),
+      ]),
+    }),
+    en: Object.freeze({
+      badge: "What's New",
+      title: 'Welcome to DeepSeek Harness Desktop',
+      subtitle: 'Fixes Windows auto-update failures and restores SSH remote access from both Extension Dock and native conversations.',
+      hint: "Reopen anytime via Help → What's New",
+      done: 'Get started',
+      closeLabel: "Close What's New guide",
+      items: Object.freeze([
+        Object.freeze({
+          id: 'ssh-remote-fix',
+          icon: 'terminal',
+          title: 'SSH Remote Access & Reliability',
+          description: 'Fixes unresponsive Dock "More tools → SSH Remote" clicks, conversation container mounting, PAM keyboard-interactive login, and Windows SSH key/config import.',
+        }),
+        Object.freeze({
+          id: 'models-and-acp',
+          icon: 'layout',
+          title: 'Model Settings & Local Agents',
+          description: 'Manage API backends, proxy routes, and local ACP v1 agent settings in Model Settings.',
+          actionLabel: 'Open Model Settings',
+          actionKind: 'models',
+        }),
+        Object.freeze({
+          id: 'dock-tools-and-toast',
+          icon: 'inbox',
+          title: 'Extension Dock Tools & Toast Fix',
+          description: 'Keeps Dock error toasts visible alongside native settings views and restores one-click navigation to SSH Remote under More tools.',
+          actionLabel: 'Open Extension Dock',
+          actionKind: 'dock',
+        }),
+        Object.freeze({
+          id: 'windows-updater-fix',
+          icon: 'sparkles',
+          title: 'Windows Auto-Updater Fix',
+          description: 'Initializes ElectronHttpExecutor when Windows uses the sibling volume update cache directory, restoring version checks and upgrades.',
+        }),
+      ]),
+    }),
+  }),
   '5.5.0': Object.freeze({
     zh: Object.freeze({
       badge: '版本新功能',

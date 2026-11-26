@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "status": "supported",
-  "verifiedAt": "2026-11-25",
+  "verifiedAt": "2026-11-26",
   "desktopRange": "current",
   "matrixArtifact": "docs/launch/release-notes.md",
   "knownIssues": [
-    "Exact public DSH 0.2.3-alpha.2 SDK cohort for Desktop 5.5.0. Package, session and native acceptance each require executed evidence.",
+    "Exact public DSH 0.2.3-alpha.2 SDK cohort for Desktop 5.6.0. Package, session and native acceptance each require executed evidence.",
     "Optional M2/P2 combination, legacy team history and actual installed upgrade/rollback remain subject to executed acceptance.",
     "Windows results do not certify macOS/Linux; preview acceptance requires matching native workflow SHA and uploaded artifacts."
   ]

@@ -2,11 +2,11 @@
  * HostStore unit tests: CRUD, validation, ssh-config import. No network.
  */
 
-import { mkdtempSync, writeFileSync, rmSync, statSync, readdirSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync, statSync, readdirSync, readFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { HostStore, validateAlias, validateHostPayload } from '../src/store.ts'
+import { HostStore, expandHome, validateAlias, validateHostPayload } from '../src/store.ts'
 import type { HostPayload } from '../src/protocol.ts'
 
 const dirs: string[] = []
@@ -253,5 +253,53 @@ describe('partial updates', () => {
     store.create({ ...basePayload, auth: { kind: 'key', keyPath: '~/keys/same', passphrase: 'secret' } })
     const touched = store.update('web-01', { auth: { kind: 'key', keyPath: '~/keys/same' } })
     expect(touched.auth.passphrase).toBe('secret')
+  })
+
+  it('expandHome unwraps quotes and expands Windows ~\\ paths', () => {
+    expect(expandHome('"~/.ssh/id_ed25519"')).toBe(join(homedir(), '.ssh', 'id_ed25519'))
+    expect(expandHome("'~\\keys\\work'")).toBe(join(homedir(), 'keys', 'work'))
+    expect(expandHome('~\\id_rsa')).toBe(join(homedir(), 'id_rsa'))
+  })
+
+  it('importFromSshConfig parses Key=Value, unquotes IdentityFile, detects default keys, and falls back to USERNAME', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dsh-ssh-import-'))
+    dirs.push(dir)
+    const sshDir = join(dir, 'ssh-import')
+    mkdirSync(sshDir, { recursive: true })
+    const defaultKey = join(sshDir, 'id_ed25519')
+    writeFileSync(defaultKey, 'dummy-key', 'utf8')
+    const cfgPath = join(sshDir, 'config')
+    writeFileSync(cfgPath, [
+      'Host quoted-box',
+      '  HostName=10.20.30.40',
+      '  Port = 2222',
+      '  IdentityFile "~/.ssh/custom_ed25519"',
+      '',
+      'Host default-key-box',
+      '  HostName 10.20.30.41',
+    ].join('\n'), 'utf8')
+    const prevUser = process.env.USER
+    const prevUsername = process.env.USERNAME
+    delete process.env.USER
+    process.env.USERNAME = 'win-alice'
+    try {
+      const store = new HostStore(join(dir, 'import-store.json'), cfgPath)
+      const result = store.importFromSshConfig()
+      expect(result.added).toBe(2)
+      const quoted = store.find('quoted-box')!
+      expect(quoted.host).toBe('10.20.30.40')
+      expect(quoted.port).toBe(2222)
+      expect(quoted.user).toBe('win-alice')
+      expect(quoted.auth.kind).toBe('key')
+      expect(quoted.auth.keyPath).toBe(join(homedir(), '.ssh', 'custom_ed25519'))
+      const inferred = store.find('default-key-box')!
+      expect(inferred.auth.kind).toBe('key')
+      expect(inferred.auth.keyPath).toBe(defaultKey)
+    } finally {
+      if (prevUser === undefined) delete process.env.USER
+      else process.env.USER = prevUser
+      if (prevUsername === undefined) delete process.env.USERNAME
+      else process.env.USERNAME = prevUsername
+    }
   })
 })

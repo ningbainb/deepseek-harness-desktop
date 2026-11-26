@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
 import { lstat, realpath } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { classifyUpdateError, updateDiagnostic } from './update-diagnostics.mjs'
 
@@ -500,10 +501,12 @@ export async function loadElectronAutoUpdater(app) {
     const baseCachePath = await targetVolumeUpdaterCache(dirname(app.getPath('exe')))
     if (baseCachePath) {
       const NsisUpdater = electronUpdater.NsisUpdater ?? electronUpdater.default?.NsisUpdater
-      return new NsisUpdater(undefined, {
+      const require = createRequire(import.meta.url)
+      const { ElectronHttpExecutor } = require('electron-updater/out/electronHttpExecutor')
+      const updater = new NsisUpdater(undefined, {
         baseCachePath,
         isPackaged: true,
-        appUpdateConfigPath: join(process.resourcesPath, 'app-update.yml'),
+        appUpdateConfigPath: join(process.resourcesPath || dirname(app.getPath('exe')), 'app-update.yml'),
         get version() { return app.getVersion() },
         get name() { return app.getName() },
         get userDataPath() { return app.getPath('userData') },
@@ -512,6 +515,13 @@ export async function loadElectronAutoUpdater(app) {
         relaunch: () => app.relaunch(),
         onQuit: handler => app.once('quit', (_, exitCode) => handler(exitCode)),
       })
+      updater.httpExecutor = new ElectronHttpExecutor((authInfo, callback) => {
+        updater.emit('login', authInfo, callback)
+      })
+      if (typeof updater.httpExecutor?.request !== 'function') {
+        throw new Error('Windows updater httpExecutor did not initialize properly')
+      }
+      return updater
     }
   }
   return electronUpdater.autoUpdater || electronUpdater.default?.autoUpdater

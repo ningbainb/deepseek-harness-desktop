@@ -46,19 +46,54 @@ export type { TunnelsTabProps } from './panel/TunnelsTab.tsx'
 export type { ClusterTabProps } from './panel/ClusterTab.tsx'
 export type { SshKey } from './locales.ts'
 
+let activeApplyToken: symbol | undefined
+
+function clearBlockingSurfaces(ctx: ClientContext): void {
+  const layout = (ctx as unknown as {
+    get?: (name: string) => { selectPanel?: (panel: string | null) => void } | undefined
+  }).get?.('layout')
+  try {
+    layout?.selectPanel?.(null)
+  } catch {
+    // Best-effort clear of global panels before opening SSH.
+  }
+  const settingsModal = document.querySelector('[data-shortcut-modal="settings"]')
+  if (settingsModal !== null) {
+    const closeButton = settingsModal.querySelector('button[aria-label]') as HTMLButtonElement | null
+    closeButton?.click()
+    if (document.querySelector('[data-shortcut-modal="settings"]') !== null) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    }
+  }
+}
+
 /**
  * Mount the SSH panel.
  * @param ctx - client root context (locale service).
  */
 export function apply(ctx: ClientContext): void {
+  if (activeApplyToken !== undefined) {
+    console.warn('[dsh-ssh] duplicate apply skipped while an instance is still mounted')
+    return
+  }
+  const applyToken = Symbol('dsh-ssh:apply')
+  activeApplyToken = applyToken
+  ctx.effect(() => () => {
+    if (activeApplyToken === applyToken) activeApplyToken = undefined
+  }, 'dsh-ssh: apply guard')
+
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-ssh: dictionaries')
 
   const controller = new PanelController()
   const api = new SshApi()
   const disposers: Array<() => void> = []
+  let ensureView: (() => boolean) | undefined
   try {
-    disposers.push(mountSidebarEntry(controller))
-    disposers.push(mountPanel(controller, api))
+    disposers.push(mountPanel(controller, api, { onReady: fn => { ensureView = fn } }))
+    disposers.push(mountSidebarEntry(controller, {
+      ensureView: () => ensureView?.() ?? false,
+      prepareMainSurface: () => clearBlockingSurfaces(ctx),
+    }))
   } catch (error) {
     // DOM failures degrade the panel, never the GUI.
     console.warn('[dsh-ssh] mount failed:', error)

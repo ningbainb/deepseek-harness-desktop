@@ -74,6 +74,7 @@ export function buildConnectConfig(entry: SshHostEntry, sock?: ConnectConfig['so
   if (sock !== undefined) config.sock = sock
   if (entry.auth.kind === 'password') {
     config.password = entry.auth.password
+    config.tryKeyboard = true
   } else {
     const keyPath = entry.auth.keyPath === undefined ? undefined : expandHome(entry.auth.keyPath)
     if (keyPath === undefined || !existsSync(keyPath)) {
@@ -87,11 +88,28 @@ export function buildConnectConfig(entry: SshHostEntry, sock?: ConnectConfig['so
   return config
 }
 
+export function installKeyboardInteractiveFallback(client: Client, password: string | undefined): void {
+  let keyboardAttempts = 0
+  client.on('keyboard-interactive', (_name, _instructions, _lang, prompts, finish) => {
+    if (prompts.length === 0) {
+      finish([])
+      return
+    }
+    if (password === undefined || keyboardAttempts >= 1) {
+      finish([])
+      return
+    }
+    keyboardAttempts += 1
+    finish(prompts.map(() => password))
+  })
+}
+
 /** Connect one ssh2 client and retain an error sink after the handshake. */
 function connectClient(config: ConnectConfig): Promise<Client> {
   return new Promise((resolve, reject) => {
     const client = new Client()
     let settled = false
+    installKeyboardInteractiveFallback(client, config.password)
     client.once('ready', () => {
       if (settled) return
       settled = true

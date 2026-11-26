@@ -608,3 +608,23 @@ test('More tools opens task board and SSH through the fixed Desktop bridge and r
   assert.equal(ssh.disabled, false, 'failed navigation remains retryable')
   dom.window.close()
 })
+
+test('activateTab marks body while dock-settings WebContentsView is active so toast remains visible', async () => {
+  const dom = new JSDOM(html, { url: 'https://desktop.invalid' })
+  const { document } = dom.window
+  const context = vm.createContext({
+    document,
+    localStorage: dom.window.localStorage,
+    tabs: [...document.querySelectorAll('[data-tab]')],
+    notify() {},
+    window: { dshDesktop: { selectDockSetting: async () => {} } },
+  })
+  vm.runInContext(section('let settingsRequest = 0', 'const searchEntries ='), context)
+  await vm.runInContext("activateTab(document.getElementById('agent-team-tab'))", context)
+  await tick()
+  assert.equal(document.body.dataset.dockSettingsViewVisible, 'true')
+  await vm.runInContext("activateTab(document.getElementById('plugins-tab'))", context)
+  await tick()
+  assert.equal(document.body.dataset.dockSettingsViewVisible, undefined)
+  dom.window.close()
+})

@@ -92,3 +92,74 @@ it('retains the existing ssh entry on older hosts without the new Desktop tool b
     expect(controller.toggle).toHaveBeenCalledOnce()
   } finally { dispose(); delete (window as typeof window & { dshDesktop?: unknown }).dshDesktop }
 })
+
+it('prepares surface and mounts SSH view lazily when opened from Desktop Dock', () => {
+  shell()
+  let toolOpenCallback: (() => boolean) | undefined
+  Object.assign(window, {
+    dshDesktop: {
+      onDesktopToolOpen: (_tool: string, cb: () => boolean) => {
+        toolOpenCallback = cb
+        return () => {}
+      },
+    },
+  })
+  const order: string[] = []
+  const controller = {
+    open: vi.fn(() => order.push('open')),
+    close: vi.fn(),
+    toggle: vi.fn(),
+    subscribe: () => () => {},
+    getSnapshot: () => ({ panelOpen: false }),
+  }
+  const dispose = mountSidebarEntry(controller as never, {
+    prepareMainSurface: () => {
+      order.push('prepare')
+    },
+    ensureView: () => {
+      order.push('ensure')
+      const view = document.createElement('div')
+      view.dataset.dshSshView = ''
+      document.body.appendChild(view)
+      return true
+    },
+  })
+  try {
+    expect(toolOpenCallback?.()).toBe(true)
+    expect(order).toEqual(['prepare', 'ensure', 'open'])
+    expect(controller.open).toHaveBeenCalledOnce()
+  } finally {
+    dispose()
+    delete (window as typeof window & { dshDesktop?: unknown }).dshDesktop
+  }
+})
+
+it('returns false for Desktop Dock SSH open when view cannot mount', () => {
+  shell()
+  let toolOpenCallback: (() => boolean) | undefined
+  Object.assign(window, {
+    dshDesktop: {
+      onDesktopToolOpen: (_tool: string, cb: () => boolean) => {
+        toolOpenCallback = cb
+        return () => {}
+      },
+    },
+  })
+  const controller = {
+    open: vi.fn(),
+    close: vi.fn(),
+    toggle: vi.fn(),
+    subscribe: () => () => {},
+    getSnapshot: () => ({ panelOpen: false }),
+  }
+  const dispose = mountSidebarEntry(controller as never, {
+    ensureView: () => false,
+  })
+  try {
+    expect(toolOpenCallback?.()).toBe(false)
+    expect(controller.open).not.toHaveBeenCalled()
+  } finally {
+    dispose()
+    delete (window as typeof window & { dshDesktop?: unknown }).dshDesktop
+  }
+})

@@ -247,10 +247,10 @@ export class HostStore {
     for (const raw of lines) {
       const line = raw.trim()
       if (line === '' || line.startsWith('#')) continue
-      const match = /^([A-Za-z0-9_\-]+)\s+(.+)$/.exec(line)
+      const match = /^([A-Za-z0-9_\-]+)(?:\s*=\s*|\s+)(.+)$/.exec(line)
       if (match === null) continue
       const key = match[1].toLowerCase()
-      const value = match[2].trim()
+      const value = unwrapQuotes(match[2])
       if (key === 'host') {
         current = { pattern: value, props: {} }
         blocks.push(current)
@@ -275,14 +275,26 @@ export class HostStore {
         skip(pattern, this.skippedNames)
         continue
       }
+      let detectedKeyPath: string | undefined
+      if (block.props.identityfile === undefined && block.props.password === undefined) {
+        const sshDir = dirname(configPath)
+        for (const candidateName of ['id_ed25519', 'id_rsa', 'id_ecdsa']) {
+          const candidatePath = join(sshDir, candidateName)
+          if (existsSync(candidatePath)) {
+            detectedKeyPath = candidatePath
+            break
+          }
+        }
+      }
+      const keyPath = block.props.identityfile ?? detectedKeyPath
       const payload: HostPayload = {
         alias: pattern,
         host: hostName,
         port: block.props.port !== undefined ? Number.parseInt(block.props.port, 10) : 22,
-        user: block.props.user ?? process.env.USER ?? 'root',
+        user: block.props.user ?? process.env.USER ?? process.env.USERNAME ?? 'root',
         auth: {
-          kind: block.props.identityfile !== undefined ? 'key' : 'password',
-          keyPath: block.props.identityfile,
+          kind: keyPath !== undefined ? 'key' : 'password',
+          keyPath,
           password: block.props.password,
         },
         proxyJump: block.props.proxyjump !== undefined
@@ -336,9 +348,22 @@ export class HostStore {
   }
 }
 
-/** Expand a leading `~` in a filesystem path. */
+function unwrapQuotes(raw: string): string {
+  const trimmed = raw.trim()
+  if (
+    trimmed.length >= 2 &&
+    ((trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'")))
+  ) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+/** Expand a leading `~` in a filesystem path and unwrap surrounding quotes. */
 export function expandHome(path: string): string {
-  if (path === '~') return homedir()
-  if (path.startsWith('~/')) return join(homedir(), path.slice(2))
-  return path
+  const unwrapped = unwrapQuotes(path)
+  if (unwrapped === '~') return homedir()
+  if (unwrapped.startsWith('~/') || unwrapped.startsWith('~\\')) return join(homedir(), unwrapped.slice(2))
+  return unwrapped
 }

@@ -1,6 +1,6 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.5.0.
+Authoritative Desktop version: 5.6.0.
 
 Stable DSH package version: 0.2.3-alpha.2.
 
@@ -2128,24 +2128,6 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 326 | profileDir |
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 340 | profileDir |
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 340 | profileDir |
-| profile-home | capture-3.3.0-extension-tabs.mjs | 61 | DSH_HOME |
-| profile-home | capture-3.3.0-source-surfaces-v3.mjs | 63 | DSH_HOME |
-| profile-home | capture-3.3.0-source-surfaces.mjs | 86 | DSH_HOME |
-| profile-home | capture-3.3.0-surfaces.mjs | 71 | DSH_HOME |
-| profile-home | diagnose-3.3.0-extension-settle.mjs | 58 | DSH_HOME |
-| profile-home | diagnose-3.3.0-main.mjs | 65 | DSH_HOME |
-| profile-home | diagnose-3.3.0-mode-flow.mjs | 48 | DSH_HOME |
-| profile-home | diagnose-3.3.0-mode-flow2.mjs | 48 | DSH_HOME |
-| profile-home | diagnose-3.3.0-mode-prompt.mjs | 48 | DSH_HOME |
-| profile-home | diagnose-3.3.0-mode-prompt2.mjs | 48 | DSH_HOME |
-| profile-home | diagnose-3.3.0-model-menu.mjs | 20 | DSH_HOME |
-| profile-home | diagnose-3.3.0-session.mjs | 79 | DSH_HOME |
-| profile-home | diagnose-3.3.0-source-mode.mjs | 55 | DSH_HOME |
-| profile-home | diagnose-3.3.0-workspace-flow.mjs | 76 | DSH_HOME |
-| profile-home | diagnose-3.3.0-workspace-flow2.mjs | 55 | DSH_HOME |
-| profile-home | diagnose-3.3.0-workspace-flow3.mjs | 48 | DSH_HOME |
-| profile-home | diagnose-3.3.0-workspace-select.mjs | 59 | DSH_HOME |
-| profile-home | diagnose-3.3.0-workspace.mjs | 78 | DSH_HOME |
 | profile-home | packages/dsh-data-location/src/client/Panel.tsx | 22 | DSH_HOME |
 | profile-home | packages/dsh-data-location/src/client/Panel.tsx | 37 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/acp/acp-agent-manager.ts | 53 | DSH_HOME |
@@ -2296,12 +2278,6 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | shared/tests/dsh-home.spec.ts | 20 | DSH_HOME |
 | profile-home | shared/tests/dsh-home.spec.ts | 21 | DSH_HOME |
 | profile-home | shared/tests/dsh-home.spec.ts | 25 | DSH_HOME |
-| profile-home | verify-3.3.0-drag-drop.mjs | 103 | DSH_HOME |
-| profile-home | verify-3.3.0-source-drag-drop.mjs | 131 | DSH_HOME |
-| profile-home | verify-3.3.0-source-mode-selection-v2.mjs | 20 | DSH_HOME |
-| profile-home | verify-3.3.0-source-mode-selection-v3.mjs | 20 | DSH_HOME |
-| profile-home | verify-3.3.0-source-mode-selection.mjs | 68 | DSH_HOME |
-| profile-home | verify-3.3.0-source-paste-large.mjs | 68 | DSH_HOME |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 117 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 77 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 233 | start |
@@ -2424,7 +2400,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/test/runtime-startup-phase.test.mjs | 220 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/update-diagnostics.test.mjs | 45 | start |
 | runtime-lifecycle | apps/dsh-desktop/test/update-diagnostics.test.mjs | 83 | start |
-| runtime-lifecycle | apps/dsh-desktop/test/updater.test.mjs | 110 | start |
+| runtime-lifecycle | apps/dsh-desktop/test/updater.test.mjs | 111 | start |
 | runtime-lifecycle | packages/dsh-particle-theme/src/client/index.ts | 76 | start |
 | runtime-lifecycle | packages/dsh-particle-theme/tests/controller.spec.ts | 31 | start |
 | runtime-lifecycle | packages/dsh-particle-theme/tests/controller.spec.ts | 57 | start |

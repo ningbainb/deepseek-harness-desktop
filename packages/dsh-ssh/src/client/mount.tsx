@@ -18,7 +18,7 @@ import css from './panel/panel.module.css'
 /** The injected panel container (kept in the DOM, hidden when inactive). */
 export const PANEL_VIEW_SELECTOR = '[data-dsh-ssh-view]'
 
-const CONVERSATION_COLUMN_SELECTOR = '[data-pane="conversation"]'
+const CONVERSATION_COLUMN_SELECTOR = '[data-pane="conversation"], [class*="centerCol"]'
 const ACTIVE_ATTR = 'data-dsh-ssh-active'
 /** The sibling panel's activation attribute (task board), removed when this panel opens. */
 const OTHER_ACTIVE_ATTR = 'data-dsh-taskboard-active'
@@ -38,13 +38,17 @@ function conversationColumn(): HTMLElement | undefined {
  * @param api - the SSH API client the tabs operate through.
  * @returns disposer unmounting the tree and restoring the column.
  */
-export function mountPanel(controller: PanelController, api: SshApi): () => void {
+export function mountPanel(
+  controller: PanelController,
+  api: SshApi,
+  options?: { onReady?: (ensureMounted: () => boolean) => void },
+): () => void {
   let root: Root | undefined
   let container: HTMLDivElement | undefined
 
-  const ensure = (): void => {
+  const ensure = (): boolean => {
     if (container !== undefined) {
-      if (container.isConnected) return
+      if (container.isConnected) return true
       // The conversation pane was replaced; drop the stale tree and remount.
       root?.unmount()
       root = undefined
@@ -52,13 +56,14 @@ export function mountPanel(controller: PanelController, api: SshApi): () => void
       container = undefined
     }
     const column = conversationColumn()
-    if (column === undefined) return
+    if (column === undefined) return false
     container = document.createElement('div')
     container.dataset.dshSshView = ''
     container.className = css.view
     column.appendChild(container)
     root = createRoot(container)
     root.render(<SshPanel controller={controller} api={api} />)
+    return container.isConnected
   }
 
   // The frame mounts after boot settlement; watch for the column's arrival.
@@ -99,6 +104,7 @@ export function mountPanel(controller: PanelController, api: SshApi): () => void
   const unsubscribe = controller.subscribe(applyActive)
   applyActive()
   ensure()
+  options?.onReady?.(ensure)
 
   return () => {
     document.removeEventListener('click', onClickSidebarRow, true)
