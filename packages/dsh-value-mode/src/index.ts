@@ -65,6 +65,52 @@ type DefaultModelService = {
 }
 
 const VALUE_MODE_RESTRICTED_PROVIDERS = new Set(['antigravity-cli'])
+const MAX_TRACKED_SESSION_PRESETS = 4_096
+
+type AgentPresetRegistryLike = {
+  presetForSession?: (session: unknown) => string | null | undefined
+}
+
+type SessionAwareAgent = {
+  id?: string
+  session?: {
+    header?: {
+      agentPreset?: unknown
+      origin?: unknown
+    }
+  }
+}
+
+/**
+ * Resolve the effective agent preset for a session: live session projection
+ * (authoritative across reloads and blank-window switches) -> live selection
+ * event cache -> creation-time frozen header fallback.
+ */
+export function resolveSessionAgentPreset(
+  ctx: Context,
+  agent: SessionAwareAgent | undefined,
+  presetBySessionId: ReadonlyMap<string, string | null>,
+): unknown {
+  const ctxLike = ctx as unknown as {
+    get?: (name: string) => unknown
+    agentPresets?: unknown
+  }
+  const registry = (ctxLike.get?.('agentPresets') ?? ctxLike.agentPresets) as AgentPresetRegistryLike | undefined
+  if (agent?.session !== undefined && typeof registry?.presetForSession === 'function') {
+    try {
+      const projected = registry.presetForSession(agent.session)
+      if (typeof projected === 'string' || projected === null) {
+        return projected
+      }
+    } catch {
+      // Fall through when synthetic/mock sessions have no projection handle.
+    }
+  }
+  if (typeof agent?.id === 'string' && presetBySessionId.has(agent.id)) {
+    return presetBySessionId.get(agent.id)
+  }
+  return agent?.session?.header?.agentPreset
+}
 
 function readDefaultExpert(ctx: Context): DefaultModelSelection | undefined {
   const service = (ctx as unknown as { agentDefaultModel?: DefaultModelService }).agentDefaultModel
@@ -108,6 +154,23 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
       ? field.get() : field]))
   const routedRequestAttempts = new Map<string, { timestamp: number; params: RouteParameters }>()
   const streams = new Map<string, string>()
+  const presetBySessionId = new Map<string, string | null>()
+
+  // Track live preset switches while a session is blank; header.agentPreset is
+  // deep-frozen at creation time and becomes stale once the user switches presets.
+  ;(ctx as unknown as {
+    on: (event: string, listener: (sessionId: unknown, agentPreset: unknown) => void) => void
+  }).on('agent-preset/selected', (sessionId, agentPreset) => {
+    if (typeof sessionId !== 'string' || sessionId.length === 0) return
+    if (typeof agentPreset !== 'string' && agentPreset !== null) return
+    presetBySessionId.delete(sessionId)
+    presetBySessionId.set(sessionId, agentPreset)
+    while (presetBySessionId.size > MAX_TRACKED_SESSION_PRESETS) {
+      const oldest = presetBySessionId.keys().next().value
+      if (typeof oldest !== 'string') break
+      presetBySessionId.delete(oldest)
+    }
+  })
 
   const requestKey = (payload: unknown): string | undefined => {
     const value = payload as {
@@ -149,7 +212,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
     name: VALUE_MODE_SECTION_NAME,
     order: VALUE_MODE_SECTION_ORDER,
     text: (assembly) => {
-      if (assembly.agent?.session.header?.agentPreset !== 'value-mode') {
+      if (resolveSessionAgentPreset(ctx, assembly.agent as SessionAwareAgent | undefined, presetBySessionId) !== 'value-mode') {
         return ''
       }
       const config = resolveEffectiveConfig(currentSource(), readDefaultExpert(ctx))
@@ -165,7 +228,7 @@ export function apply(ctx: Context, initialConfig: ValueModeConfig = {}): void {
   // sessions to the cheaper executor model.
   ctx.on('agent/request', async (payload, next) => {
     const resolved = await next()
-    if (payload.agent.session?.header?.agentPreset !== 'value-mode') {
+    if (resolveSessionAgentPreset(ctx, payload.agent as SessionAwareAgent | undefined, presetBySessionId) !== 'value-mode') {
       return resolved
     }
     const globalConfig = currentSource()

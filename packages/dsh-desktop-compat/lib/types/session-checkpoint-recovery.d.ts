@@ -5,7 +5,7 @@ export interface SessionCheckpointRecoveryServices {
     persistence: Pick<SessionPersistence, 'list'> & {
         open: (...args: Parameters<SessionPersistence['open']>) => Promise<Pick<SessionHandle, 'header' | 'inheritedEventCount' | 'read' | 'close'>>;
     };
-    cache: Pick<SessionProjectionCache, 'cachedSnapshot' | 'coldSnapshot'>;
+    cache: Pick<SessionProjectionCache, 'cachedSnapshot' | 'coldSnapshot'> & Partial<Pick<SessionProjectionCache, 'cachedPredecessorTitle'>>;
     sessions: Pick<SessionStore, 'get'>;
 }
 export declare function installSessionCheckpointRecovery(ctx: Context): void;

@@ -1,4 +1,5 @@
 .root {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
   max-width: var(--dsh-chat-content-width);
@@ -25,6 +26,22 @@
 }
 .summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .panel { max-width: 340px; max-height: 180px; overflow: auto; margin: 4px auto; text-align: start; }
+.root[data-preview="hover"] .panel {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 30;
+  width: max-content;
+  min-width: 240px;
+  max-width: 340px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-base, #ffffff));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
 .metrics { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; margin: 0; }
 .metrics dt, .metrics dd { margin: 0; overflow-wrap: anywhere; }
 .metrics dd { text-align: end; }

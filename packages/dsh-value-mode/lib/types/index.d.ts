@@ -20,6 +20,21 @@ export * from './core/runtime-telemetry.ts';
 export { dshHome } from './dsh-home.ts';
 /** Absolute path of the bundled Value Mode agent-preset tree. */
 export declare function bundledPresetsRoot(): string;
+type SessionAwareAgent = {
+    id?: string;
+    session?: {
+        header?: {
+            agentPreset?: unknown;
+            origin?: unknown;
+        };
+    };
+};
+/**
+ * Resolve the effective agent preset for a session: live session projection
+ * (authoritative across reloads and blank-window switches) -> live selection
+ * event cache -> creation-time frozen header fallback.
+ */
+export declare function resolveSessionAgentPreset(ctx: Context, agent: SessionAwareAgent | undefined, presetBySessionId: ReadonlyMap<string, string | null>): unknown;
 /**
  * Apply the Value Mode host plugin to Cordis context.
  */

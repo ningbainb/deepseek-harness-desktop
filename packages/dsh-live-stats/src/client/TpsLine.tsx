@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-token-meter/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
@@ -83,20 +83,63 @@ const defaultTranslation = (key: SettingsCardKey): string => zh[key]
 const validMeasurement = (value: number | undefined): value is number =>
   value !== undefined && Number.isFinite(value) && value >= 0
 
+const HOVER_CLOSE_DELAY_MS = 120
+
 /** Native stats stay authoritative; desktop-only readings live in one disclosure. */
 export const TpsLine = memo(function TpsLine({ useProjection, t = defaultTranslation }: TpsLineProps) {
+  const [pinned, setPinned] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  useEffect(() => () => {
+    if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current)
+  }, [])
+
   const projection = useProjection('liveTokenUsage')
   const rate = projection?.tokensPerSecond
   const peak = projection?.peakTokensPerSecond
+  const cacheRead = projection?.cacheReadTokens ?? 0
+  const cacheWrite = projection?.cacheWriteTokens ?? 0
   const input = projection === undefined ? 0 : projection.uncachedInputTokens
-    + projection.cacheReadTokens + projection.cacheWriteTokens
+    + cacheRead + cacheWrite
   const output = projection?.outputTokens ?? 0
   // A zero initial projection is not evidence of a billed conversation.
   if (projection === undefined || !(input > 0 || output > 0 || validMeasurement(rate) || validMeasurement(peak))) return null
   const estimated = projection.estimated ? '~' : ''
+  const isOpen = pinned || hovered
+
+  const handleMouseEnter = (): void => {
+    if (hoverCloseTimer.current !== undefined) {
+      clearTimeout(hoverCloseTimer.current)
+      hoverCloseTimer.current = undefined
+    }
+    setHovered(true)
+  }
+
+  const handleMouseLeave = (): void => {
+    if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current)
+    hoverCloseTimer.current = setTimeout(() => {
+      hoverCloseTimer.current = undefined
+      setHovered(false)
+    }, HOVER_CLOSE_DELAY_MS)
+  }
+
   return (
-    <details className={styles.root} data-dsh-live-stats>
-      <summary className={styles.summary}>
+    <details
+      className={styles.root}
+      open={isOpen}
+      data-dsh-live-stats
+      data-preview={hovered && !pinned ? 'hover' : undefined}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <summary
+        className={styles.summary}
+        onClick={(event) => {
+          event.preventDefault()
+          setPinned((prev) => !prev)
+        }}
+      >
         {validMeasurement(projection.estimatedCost)
           ? `≈${formatEstimatedCost(projection.estimatedCost, projection.costCurrency)}`
           : t('stats.live')}
@@ -106,6 +149,18 @@ export const TpsLine = memo(function TpsLine({ useProjection, t = defaultTransla
         <dl className={styles.metrics}>
           <dt>{t('stats.input')}</dt><dd>{estimated}{formatCompactTokens(input)}</dd>
           <dt>{t('stats.output')}</dt><dd>{estimated}{formatCompactTokens(output)}</dd>
+          {cacheRead > 0 && (
+            <>
+              <dt>{t('stats.cacheRead')}</dt>
+              <dd>{estimated}{formatCompactTokens(cacheRead)}{input > 0 ? ` (${Math.round((cacheRead / input) * 100)}%)` : ''}</dd>
+            </>
+          )}
+          {cacheWrite > 0 && (
+            <>
+              <dt>{t('stats.cacheWrite')}</dt>
+              <dd>{estimated}{formatCompactTokens(cacheWrite)}</dd>
+            </>
+          )}
           {validMeasurement(rate) && <><dt>{t('stats.rolling')}</dt><dd>{formatTokensPerSecond(rate)} tok/s</dd></>}
           {validMeasurement(peak) && <><dt>{t('stats.peak')}</dt><dd>{formatTokensPerSecond(peak)} tok/s</dd></>}
         </dl>

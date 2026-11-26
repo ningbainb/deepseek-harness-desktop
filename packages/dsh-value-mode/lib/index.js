@@ -1001,6 +1001,22 @@ function bundledPresetsRoot() {
 	return fileURLToPath(new URL("../presets/", import.meta.url));
 }
 const VALUE_MODE_RESTRICTED_PROVIDERS = /* @__PURE__ */ new Set(["antigravity-cli"]);
+const MAX_TRACKED_SESSION_PRESETS = 4096;
+/**
+* Resolve the effective agent preset for a session: live session projection
+* (authoritative across reloads and blank-window switches) -> live selection
+* event cache -> creation-time frozen header fallback.
+*/
+function resolveSessionAgentPreset(ctx, agent, presetBySessionId) {
+	const ctxLike = ctx;
+	const registry = ctxLike.get?.("agentPresets") ?? ctxLike.agentPresets;
+	if (agent?.session !== void 0 && typeof registry?.presetForSession === "function") try {
+		const projected = registry.presetForSession(agent.session);
+		if (typeof projected === "string" || projected === null) return projected;
+	} catch {}
+	if (typeof agent?.id === "string" && presetBySessionId.has(agent.id)) return presetBySessionId.get(agent.id);
+	return agent?.session?.header?.agentPreset;
+}
 function readDefaultExpert(ctx) {
 	const service = ctx.agentDefaultModel;
 	try {
@@ -1035,6 +1051,18 @@ function apply(ctx, initialConfig = {}) {
 	const currentSource = () => Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key, typeof field === "object" && field !== null && "get" in field && typeof field.get === "function" ? field.get() : field]));
 	const routedRequestAttempts = /* @__PURE__ */ new Map();
 	const streams = /* @__PURE__ */ new Map();
+	const presetBySessionId = /* @__PURE__ */ new Map();
+	ctx.on("agent-preset/selected", (sessionId, agentPreset) => {
+		if (typeof sessionId !== "string" || sessionId.length === 0) return;
+		if (typeof agentPreset !== "string" && agentPreset !== null) return;
+		presetBySessionId.delete(sessionId);
+		presetBySessionId.set(sessionId, agentPreset);
+		while (presetBySessionId.size > MAX_TRACKED_SESSION_PRESETS) {
+			const oldest = presetBySessionId.keys().next().value;
+			if (typeof oldest !== "string") break;
+			presetBySessionId.delete(oldest);
+		}
+	});
 	const requestKey = (payload) => {
 		const value = payload;
 		if (typeof value?.agent?.id !== "string" || !Number.isSafeInteger(value.turn) || !Number.isSafeInteger(value.step)) return void 0;
@@ -1056,7 +1084,7 @@ function apply(ctx, initialConfig = {}) {
 		name: VALUE_MODE_SECTION_NAME,
 		order: 145,
 		text: (assembly) => {
-			if (assembly.agent?.session.header?.agentPreset !== "value-mode") return "";
+			if (resolveSessionAgentPreset(ctx, assembly.agent, presetBySessionId) !== "value-mode") return "";
 			const config = resolveEffectiveConfig(currentSource(), readDefaultExpert(ctx));
 			if (!isEffectivelyActive(config)) return "";
 			return buildSystemPromptGuidance(config, { role: assembly.agent?.session.header?.origin === "subagent" ? "subagent" : "controller" });
@@ -1064,7 +1092,7 @@ function apply(ctx, initialConfig = {}) {
 	});
 	ctx.on("agent/request", async (payload, next) => {
 		const resolved = await next();
-		if (payload.agent.session?.header?.agentPreset !== "value-mode") return resolved;
+		if (resolveSessionAgentPreset(ctx, payload.agent, presetBySessionId) !== "value-mode") return resolved;
 		const globalConfig = currentSource();
 		const sessionId = payload.agent?.id || "default";
 		const effectiveConfig = resolveEffectiveConfig(resolveSessionConfig(globalConfig, valueModeState.getSessionOverride(sessionId)), readDefaultExpert(ctx));
@@ -1141,4 +1169,4 @@ function apply(ctx, initialConfig = {}) {
 	});
 }
 //#endregion
-export { BAI_PROVIDER_ID, Config, DEFAULT_ALLOW_REVIEW, DEFAULT_AUTO_REVIEW_KEYWORDS, DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD, DEFAULT_MAX_CONTEXT_CHARS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_EXPERT_CALLS_PER_TURN, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_SHOW_EXPERT_ACTIVITY, DEFAULT_STRATEGY, VALUE_MODE_RUNTIME_TELEMETRY_PREFIX, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, VALUE_MODE_SETTINGS_NAMESPACE, apply, assessValueModeHealth, buildExpertSystemPrompt, buildSystemPromptGuidance, bundledPresetsRoot, checkRouteAvailability, consultExpertCallView, createConsultExpertTool, dshHome, emitValueModeRuntimeTelemetry, hasExplicitModelRoutes, inject, isCompleteModelRoute, isConfigured, isEffectivelyActive, isPendingBaiModel, isRouteConfigured, name, parseExpertResponse, resolveEffectiveConfig, resolveExpertRoute, resolveResolvedConfig, resolveSessionConfig, routeErrorType, routeParameters, valueModeState };
+export { BAI_PROVIDER_ID, Config, DEFAULT_ALLOW_REVIEW, DEFAULT_AUTO_REVIEW_KEYWORDS, DEFAULT_CONSECUTIVE_FAILURES_THRESHOLD, DEFAULT_MAX_CONTEXT_CHARS, DEFAULT_MAX_DEPTH, DEFAULT_MAX_EXPERT_CALLS_PER_TURN, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_SHOW_EXPERT_ACTIVITY, DEFAULT_STRATEGY, VALUE_MODE_RUNTIME_TELEMETRY_PREFIX, VALUE_MODE_SECTION_NAME, VALUE_MODE_SECTION_ORDER, VALUE_MODE_SETTINGS_NAMESPACE, apply, assessValueModeHealth, buildExpertSystemPrompt, buildSystemPromptGuidance, bundledPresetsRoot, checkRouteAvailability, consultExpertCallView, createConsultExpertTool, dshHome, emitValueModeRuntimeTelemetry, hasExplicitModelRoutes, inject, isCompleteModelRoute, isConfigured, isEffectivelyActive, isPendingBaiModel, isRouteConfigured, name, parseExpertResponse, resolveEffectiveConfig, resolveExpertRoute, resolveResolvedConfig, resolveSessionAgentPreset, resolveSessionConfig, routeErrorType, routeParameters, valueModeState };

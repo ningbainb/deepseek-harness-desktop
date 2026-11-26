@@ -108,3 +108,13 @@ test('recreates profile junctions without copying the linked directory', async t
   assert.equal(await readFile(join(f.target, 'linked-cache', 'session'), 'utf8'), 'new data')
   assert.deepEqual(await readFile(join(f.home, 'cache', 'session')), f.payload)
 })
+
+test('quarantines truncated or NUL-filled migration journal during prepareBoot without throwing', async t => {
+  const f = await fixture(t)
+  await writeFile(join(f.options.userData, 'desktop-data-migration.json'), Buffer.alloc(64, 0))
+  const startup = createDesktopDataMigration(f.options)
+  assert.equal(await startup.prepareBoot({}), false)
+  const { readdir } = await import('node:fs/promises')
+  const files = await readdir(f.options.userData)
+  assert.ok(files.some(name => name.startsWith('desktop-data-migration.json.corrupt-')))
+})

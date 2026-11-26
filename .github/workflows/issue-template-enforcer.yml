@@ -1,4 +1,4 @@
-name: Enforce Issue Template
+name: Issue Template Helper
 
 on:
   issues:
@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   enforce:
-    name: Close issues that skip the template
+    name: Gently request missing details without closing technical issues
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
               return;
             }
 
-            const baseRequiredSections = [
+            const requiredSections = [
               '涉及插件',
               'Issue 类型',
               '摘要',
@@ -46,39 +46,35 @@ jobs:
               return normalized === '' || normalized === 'no response' || normalized === '_no response_';
             };
 
-            const hasScreenshotEvidence = (value) => {
-              return /!\[[^\]]*]\([^)]+\)/i.test(value)
-                || /https?:\/\/\S*(?:github\.com\/user-attachments\/assets\/|github\.com\/[^)\s]+\/assets\/|githubusercontent\.com\/|[./][^)\s]+\.(?:png|jpe?g|gif|webp))(?:[?#]\S*)?/i.test(value);
+            const hasTechnicalEvidence = (text) => {
+              const trimmed = text.trim();
+              if (trimmed.length < 240) return false;
+              return /```[\s\S]+?```/.test(trimmed)
+                || /(?:Error:|Exception|TypeError|SyntaxError|EACCES|ENOENT|at\s+\S+:\d+)/i.test(trimmed);
             };
 
-            const issueType = readSection('Issue 类型').trim().toLowerCase();
-            const bugScreenshot = readSection('Bug 截图');
-            const requiredSections = issueType === 'bug 报告'
-              ? [...baseRequiredSections, 'Bug 截图']
-              : baseRequiredSections;
-
             const missingSections = requiredSections.filter((label) => isBlank(readSection(label)));
-            const invalidSections = [];
-            if (issueType === 'bug 报告' && !isBlank(bugScreenshot) && !hasScreenshotEvidence(bugScreenshot)) {
-              invalidSections.push('Bug 截图必须包含上传的图片、Markdown 图片或图片链接。');
-            }
-            const missingSectionMessages = missingSections.length > 0
-              ? [`缺少或为空的必填部分：${missingSections.join(', ')}`]
-              : [];
-
-            if (missingSections.length === 0 && invalidSections.length === 0) {
+            if (missingSections.length === 0 || hasTechnicalEvidence(body)) {
               return;
             }
 
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: ['needs-info'],
+              });
+            } catch {
+              // Best-effort labeling even if repository permissions restrict label creation.
+            }
+
             const comment = [
-              '该 Issue 因未使用仓库要求的 Issue 模板而被自动关闭。',
+              '感谢反馈！为了让维护者更快定位问题，建议补充以下模板信息（不会自动关闭您的 Issue）：',
               '',
-              '请从仓库的 Issue 表单重新发起，并填写所有必填部分：',
+              `待补充部分：${missingSections.join(', ')}`,
               '',
-              ...requiredSections.map((label) => `- ${label}`),
-              '',
-              ...missingSectionMessages,
-              ...invalidSections,
+              '如果是运行报错或故障排查，也欢迎直接贴出相关日志片段、版本号和系统环境。',
             ].join('\n');
 
             await github.rest.issues.createComment({
@@ -86,12 +82,4 @@ jobs:
               repo: context.repo.repo,
               issue_number: issue.number,
               body: comment,
-            });
-
-            await github.rest.issues.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              state: 'closed',
-              state_reason: 'not_planned',
             });

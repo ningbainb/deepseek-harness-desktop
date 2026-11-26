@@ -1,14 +1,14 @@
 name: Bug 报告 (Bug report)
-description: 提交可复现的 Bug。必须附截图证据，无截图将被关闭。
+description: 提交可复现的 Bug，建议附带日志或截图以便定位。
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        请保持本模板完整并填写所有必填部分。缺少截图证据的 Bug 报告将被自动关闭。
+        请尽量填写以下信息以帮助定位问题；日志类或纯代码 Bug 无需强制附截图。
 
-        提交前请先搜索确认没有重复：[搜索现有 Issue](https://github.com/zhu1090093659/dsh-web-ui/issues?q=is%3Aissue)
+        提交前请先搜索确认没有重复：[搜索现有 Issue](https://github.com/ningbainb/deepseek-harness-desktop/issues?q=is%3Aissue)
   - type: checkboxes
     id: duplicate-check
     attributes:
@@ -23,6 +23,9 @@ body:
       label: 涉及插件
       description: 选择问题涉及的插件或区域。
       options:
+        - 桌面端本体 / 安装与更新 (dsh-desktop)
+        - 性价比模式 (dsh-value-mode)
+        - 智能操控 / 浏览器操控 (control-center)
         - 任务看板 (dsh-task-board)
         - Git 图谱 (dsh-git-graph)
         - 右侧面板 (dsh-aionui-panel)
@@ -87,10 +90,10 @@ body:
     id: bug-screenshot
     attributes:
       label: Bug 截图
-      description: 粘贴或上传展示 Bug 的截图。无截图证据的 Bug 报告将被自动关闭。
+      description: 建议粘贴或上传展示界面异常的截图（纯逻辑、配置或日志报错可留空）。
       placeholder: 将图片拖到此处，或粘贴 GitHub 图片 / 文件链接。
     validations:
-      required: true
+      required: false
   - type: textarea
     id: additional-context
     attributes:

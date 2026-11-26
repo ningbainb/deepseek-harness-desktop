@@ -76,11 +76,26 @@ export function createDesktopDataMigration({ userData, forbidden = [], choose, c
   let phase = 'idle'
   let cleanupIncomplete = false
   const persist = record => atomicWrite(journalPath, JSON.stringify(record) + '\n')
-  const read = async () => {
+  const read = async ({ recoverCorrupt = false } = {}) => {
     const raw = await optional(() => readFile(journalPath, 'utf8'))
     if (!raw) return undefined
-    const record = JSON.parse(raw)
-    if (!/^[a-f0-9-]{36}$/.test(record.id) || !['copying', 'ready-to-boot', 'booting', 'complete', 'rolled-back'].includes(record.phase)) {
+    const quarantine = async () => {
+      await rename(journalPath, `${journalPath}.corrupt-${Date.now()}`).catch(() => {})
+      return undefined
+    }
+    if (raw.replace(/\0/gu, '').trim().length === 0) {
+      if (recoverCorrupt) return quarantine()
+      throw Error('Invalid data migration journal')
+    }
+    let record
+    try {
+      record = JSON.parse(raw)
+    } catch (error) {
+      if (recoverCorrupt) return quarantine()
+      throw error
+    }
+    if (!record || typeof record !== 'object' || !/^[a-f0-9-]{36}$/.test(record.id) || !['copying', 'ready-to-boot', 'booting', 'complete', 'rolled-back'].includes(record.phase)) {
+      if (recoverCorrupt) return quarantine()
       throw Error('Invalid data migration journal')
     }
     return record
@@ -129,7 +144,7 @@ export function createDesktopDataMigration({ userData, forbidden = [], choose, c
   return {
     async prepareBoot(env = process.env) {
       if (env.DSH_HOME) return false
-      const record = await read()
+      const record = await read({ recoverCorrupt: true })
       if (!record) return false
       phase = record.phase
       cleanupIncomplete = record.cleanupIncomplete === true

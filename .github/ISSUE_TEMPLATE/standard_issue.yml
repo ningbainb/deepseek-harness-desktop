@@ -5,9 +5,9 @@ body:
   - type: markdown
     attributes:
       value: |
-        请保持本模板完整并填写所有必填部分。删除必填部分的 Issue 将被自动关闭。Bug 请使用「Bug 报告」表单。
+        请尽量填写以下部分以便理解需求或背景。Bug 请优先使用「Bug 报告」表单。
 
-        提交前请先搜索确认没有重复：[搜索现有 Issue](https://github.com/zhu1090093659/dsh-web-ui/issues?q=is%3Aissue)
+        提交前请先搜索确认没有重复：[搜索现有 Issue](https://github.com/ningbainb/deepseek-harness-desktop/issues?q=is%3Aissue)
   - type: checkboxes
     id: duplicate-check
     attributes:
@@ -22,6 +22,9 @@ body:
       label: 涉及插件
       description: 选择问题涉及的插件或区域；不确定可选「其他」。
       options:
+        - 桌面端本体 / 安装与更新 (dsh-desktop)
+        - 性价比模式 (dsh-value-mode)
+        - 智能操控 / 浏览器操控 (control-center)
         - 任务看板 (dsh-task-board)
         - Git 图谱 (dsh-git-graph)
         - 右侧面板 (dsh-aionui-panel)

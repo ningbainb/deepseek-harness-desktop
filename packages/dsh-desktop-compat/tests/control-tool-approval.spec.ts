@@ -1,5 +1,12 @@
+import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
-import { controlToolApprovalDecision } from '../src/control-tool-approval.ts'
+import { controlToolApprovalDecision, installControlToolApproval } from '../src/control-tool-approval.ts'
+
+async function runPreExecute(ctx: Context, name: string, session: unknown) {
+  return (ctx as unknown as {
+    waterfall: (target: unknown, event: string, exec: unknown, next: () => Promise<unknown>) => Promise<unknown>
+  }).waterfall(ctx, 'tools/pre-execute', { name, agent: { session } }, async () => ({ kind: 'allow' }))
+}
 
 describe('Desktop control tool approval policy', () => {
   it('allows browser observations without prompting', () => {
@@ -34,5 +41,43 @@ describe('Desktop control tool approval policy', () => {
     })
     expect(controlToolApprovalDecision('desktop_wsl', 'off')?.kind).toBe('deny')
     expect(controlToolApprovalDecision('desktop_wsl', 'allow')).toEqual({ kind: 'allow' })
+  })
+
+  it('passes through mutating browser and computer tools under danger-full-access + never policy', async () => {
+    const ctx = new Context()
+    const session = { id: 'full-never' }
+    ;(ctx as unknown as Record<string, unknown>).approval = { effectivePolicy: () => 'never' }
+    ;(ctx as unknown as Record<string, unknown>).permissionPresets = {
+      current: () => 'danger-full-access',
+      permissionState: () => ({ sandbox: 'danger-full-access', approval: 'never' }),
+    }
+    installControlToolApproval(ctx)
+
+    expect(await runPreExecute(ctx, 'mcp__playwright-mcp__browser_navigate', session)).toEqual({ kind: 'allow' })
+    expect(await runPreExecute(ctx, 'mcp__chrome-devtools-mcp__click', session)).toEqual({ kind: 'allow' })
+    expect(await runPreExecute(ctx, 'cua_driver_native__click', session)).toEqual({ kind: 'allow' })
+    expect((await runPreExecute(ctx, 'desktop_wsl', session) as { kind: string }).kind).toBe('ask')
+  })
+
+  it('keeps one-shot approval when approval policy is ask or sandbox is not danger-full-access', async () => {
+    const askCtx = new Context()
+    const session = { id: 'full-ask' }
+    ;(askCtx as unknown as Record<string, unknown>).approval = { effectivePolicy: () => 'ask' }
+    ;(askCtx as unknown as Record<string, unknown>).permissionPresets = {
+      current: () => 'desktop-full-access-ask',
+      permissionState: () => ({ sandbox: 'danger-full-access', approval: 'ask' }),
+    }
+    installControlToolApproval(askCtx)
+    expect((await runPreExecute(askCtx, 'mcp__playwright-mcp__browser_navigate', session) as { kind: string }).kind).toBe('ask')
+    expect((await runPreExecute(askCtx, 'cua_driver_native__click', session) as { kind: string }).kind).toBe('ask')
+
+    const restrictedCtx = new Context()
+    ;(restrictedCtx as unknown as Record<string, unknown>).approval = { effectivePolicy: () => 'never' }
+    ;(restrictedCtx as unknown as Record<string, unknown>).permissionPresets = {
+      current: () => 'workspace-write',
+      permissionState: () => ({ sandbox: 'workspace-write', approval: 'never' }),
+    }
+    installControlToolApproval(restrictedCtx)
+    expect((await runPreExecute(restrictedCtx, 'mcp__playwright-mcp__browser_navigate', session) as { kind: string }).kind).toBe('ask')
   })
 })

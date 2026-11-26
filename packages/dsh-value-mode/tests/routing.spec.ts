@@ -259,4 +259,90 @@ describe('ValueMode Request Routing', () => {
     expect(subResult.provider).toBe('default-prov')
     expect(subResult.model).toBe('default-model')
   })
+
+  it('tracks live preset switches in and out of value-mode despite frozen session headers', async () => {
+    let sectionText: ((assembly: unknown) => string) | undefined
+    ctx.systemPrompt = {
+      section: vi.fn((sec: { text: (assembly: unknown) => string }) => {
+        sectionText = sec.text
+      }),
+    } as never
+
+    apply(ctx, {
+      enabled: true,
+      executor: { provider: 'deepseek', model: 'deepseek-chat' },
+      expert: { provider: 'openai', model: 'gpt-4o' },
+    })
+
+    // Switch IN: session started as standard, user switched to value-mode before first turn.
+    const switchInAgent = { id: 'switch-in', session: { header: { agentPreset: 'standard' } } }
+    ;(ctx as unknown as { emit: (event: string, ...args: unknown[]) => void }).emit('agent-preset/selected', 'switch-in', 'value-mode')
+
+    const switchedInResult = await ctx.bail('agent/request', {
+      agent: switchInAgent,
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+    } as never, async () => ({ provider: 'default-prov', model: 'default-model' }))
+    expect(switchedInResult.provider).toBe('openai')
+    expect(switchedInResult.model).toBe('gpt-4o')
+    expect(sectionText?.({ agent: switchInAgent })).not.toBe('')
+
+    // Switch OUT: session started as value-mode, user switched to standard before first turn.
+    const switchOutAgent = { id: 'switch-out', session: { header: { agentPreset: 'value-mode' } } }
+    ;(ctx as unknown as { emit: (event: string, ...args: unknown[]) => void }).emit('agent-preset/selected', 'switch-out', 'standard')
+
+    const switchedOutResult = await ctx.bail('agent/request', {
+      agent: switchOutAgent,
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+    } as never, async () => ({ provider: 'default-prov', model: 'default-model' }))
+    expect(switchedOutResult.provider).toBe('default-prov')
+    expect(switchedOutResult.model).toBe('default-model')
+    expect(sectionText?.({ agent: switchOutAgent })).toBe('')
+  })
+
+  it('prefers live agentPresets.presetForSession projection across reloads', async () => {
+    let sectionText: ((assembly: unknown) => string) | undefined
+    ctx.systemPrompt = {
+      section: vi.fn((sec: { text: (assembly: unknown) => string }) => {
+        sectionText = sec.text
+      }),
+    } as never
+    const projectedPresets = new Map<unknown, string>()
+    ;(ctx as unknown as { agentPresets: unknown }).agentPresets = {
+      presetForSession: (session: unknown) => projectedPresets.get(session),
+    }
+
+    apply(ctx, {
+      enabled: true,
+      executor: { provider: 'deepseek', model: 'deepseek-chat' },
+      expert: { provider: 'openai', model: 'gpt-4o' },
+    })
+
+    const restoredOutSession = { header: { agentPreset: 'value-mode' } }
+    projectedPresets.set(restoredOutSession, 'standard')
+    const restoredOutAgent = { id: 'restored-out', session: restoredOutSession }
+    const outRes = await ctx.bail('agent/request', {
+      agent: restoredOutAgent,
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+    } as never, async () => ({ provider: 'default-prov', model: 'default-model' }))
+    expect(outRes.provider).toBe('default-prov')
+    expect(sectionText?.({ agent: restoredOutAgent })).toBe('')
+
+    const restoredInSession = { header: { agentPreset: 'standard' } }
+    projectedPresets.set(restoredInSession, 'value-mode')
+    const restoredInAgent = { id: 'restored-in', session: restoredInSession }
+    const inRes = await ctx.bail('agent/request', {
+      agent: restoredInAgent,
+      turn: 1,
+      step: 1,
+      signal: new AbortController().signal,
+    } as never, async () => ({ provider: 'default-prov', model: 'default-model' }))
+    expect(inRes.provider).toBe('openai')
+    expect(sectionText?.({ agent: restoredInAgent })).not.toBe('')
+  })
 })

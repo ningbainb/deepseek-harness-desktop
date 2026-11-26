@@ -1374,8 +1374,42 @@ function stripPrefix(name, prefixes) {
 	const prefix = prefixes.find((candidate) => name.startsWith(candidate));
 	return prefix === void 0 ? void 0 : name.slice(prefix.length);
 }
+function getDynamicService(ctx, key) {
+	const ctxLike = ctx;
+	return ctxLike.get?.(key) ?? ctxLike[key];
+}
+/**
+* Return true only when the active session runs under `danger-full-access` with
+* `approval` set to `'never'` (i.e. full unattended control without prompts).
+* Keeps `desktop-full-access-ask` (`approval: 'ask'`) and non-full-access
+* sandboxes gated by one-shot prompts.
+*/
+function isFullAccessUnattendedSession(ctx, exec) {
+	const session = exec.agent?.session;
+	if (!session) return false;
+	const approval = getDynamicService(ctx, "approval");
+	let policy;
+	try {
+		policy = approval?.effectivePolicy?.(session);
+	} catch {
+		return false;
+	}
+	if (policy !== "never") return false;
+	const presets = getDynamicService(ctx, "permissionPresets");
+	let currentPreset;
+	let sessionSandbox;
+	try {
+		currentPreset = presets?.current?.(session);
+		sessionSandbox = presets?.permissionState?.(session)?.sandbox;
+	} catch {
+		currentPreset = void 0;
+		sessionSandbox = void 0;
+	}
+	const shellSandbox = getDynamicService(ctx, "shell")?.sandboxMode;
+	return currentPreset === "danger-full-access" || sessionSandbox === "danger-full-access" || currentPreset === void 0 && sessionSandbox === void 0 && shellSandbox === "danger-full-access";
+}
 /** Classify Desktop control tools without inspecting arguments or page/window data. */
-function controlToolApprovalDecision(name, wslPermission = "ask") {
+function controlToolApprovalDecision(name, wslPermission = "ask", options = {}) {
 	if (name === "desktop_wsl") {
 		if (wslPermission === "off") return {
 			kind: "deny",
@@ -1390,16 +1424,20 @@ function controlToolApprovalDecision(name, wslPermission = "ask") {
 	const browserName = stripPrefix(name, BROWSER_PREFIXES);
 	if (browserName !== void 0) {
 		const normalized = name.startsWith("stagehand_") ? name : browserName;
-		return BROWSER_OBSERVATION_NAMES.has(normalized) ? void 0 : {
+		if (BROWSER_OBSERVATION_NAMES.has(normalized)) return void 0;
+		return options.fullAccessUnattended === true ? void 0 : {
 			kind: "ask",
 			reason: "浏览器操作可能改变页面或外部状态，需要本次授权。"
 		};
 	}
 	const computerName = stripPrefix(name, COMPUTER_PREFIXES);
-	if (computerName !== void 0) return COMPUTER_OBSERVATION_PATTERN.test(computerName) ? void 0 : {
-		kind: "ask",
-		reason: "鼠标、键盘或电脑输入操作需要本次授权。"
-	};
+	if (computerName !== void 0) {
+		if (COMPUTER_OBSERVATION_PATTERN.test(computerName)) return void 0;
+		return options.fullAccessUnattended === true ? void 0 : {
+			kind: "ask",
+			reason: "鼠标、键盘或电脑输入操作需要本次授权。"
+		};
+	}
 }
 /** Classify office connector MCP calls into L0-L3 approval gates. */
 function connectorToolApprovalDecision(name, lookupRisk) {
@@ -1423,7 +1461,7 @@ function connectorToolApprovalDecision(name, lookupRisk) {
 /** Require one-shot approval for mutating Browser Use, Computer Use, WSL, and office connector actions. */
 function installControlToolApproval(ctx, options = {}) {
 	ctx.on("tools/pre-execute", async (exec, next) => {
-		return controlToolApprovalDecision(exec.name, exec.name === "desktop_wsl" ? currentAgentWslPermission() : "ask") ?? connectorToolApprovalDecision(exec.name, options.lookupConnectorRisk) ?? next();
+		return controlToolApprovalDecision(exec.name, exec.name === "desktop_wsl" ? currentAgentWslPermission() : "ask", { fullAccessUnattended: isFullAccessUnattendedSession(ctx, exec) }) ?? connectorToolApprovalDecision(exec.name, options.lookupConnectorRisk) ?? next();
 	});
 }
 //#endregion

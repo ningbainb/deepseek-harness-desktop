@@ -34,6 +34,31 @@ export function bundledPresetsRoot() {
     return fileURLToPath(new URL('../presets/', import.meta.url));
 }
 const VALUE_MODE_RESTRICTED_PROVIDERS = new Set(['antigravity-cli']);
+const MAX_TRACKED_SESSION_PRESETS = 4_096;
+/**
+ * Resolve the effective agent preset for a session: live session projection
+ * (authoritative across reloads and blank-window switches) -> live selection
+ * event cache -> creation-time frozen header fallback.
+ */
+export function resolveSessionAgentPreset(ctx, agent, presetBySessionId) {
+    const ctxLike = ctx;
+    const registry = (ctxLike.get?.('agentPresets') ?? ctxLike.agentPresets);
+    if (agent?.session !== undefined && typeof registry?.presetForSession === 'function') {
+        try {
+            const projected = registry.presetForSession(agent.session);
+            if (typeof projected === 'string' || projected === null) {
+                return projected;
+            }
+        }
+        catch {
+            // Fall through when synthetic/mock sessions have no projection handle.
+        }
+    }
+    if (typeof agent?.id === 'string' && presetBySessionId.has(agent.id)) {
+        return presetBySessionId.get(agent.id);
+    }
+    return agent?.session?.header?.agentPreset;
+}
 function readDefaultExpert(ctx) {
     const service = ctx.agentDefaultModel;
     try {
@@ -78,6 +103,21 @@ export function apply(ctx, initialConfig = {}) {
             ? field.get() : field]));
     const routedRequestAttempts = new Map();
     const streams = new Map();
+    const presetBySessionId = new Map();
+    ctx.on('agent-preset/selected', (sessionId, agentPreset) => {
+        if (typeof sessionId !== 'string' || sessionId.length === 0)
+            return;
+        if (typeof agentPreset !== 'string' && agentPreset !== null)
+            return;
+        presetBySessionId.delete(sessionId);
+        presetBySessionId.set(sessionId, agentPreset);
+        while (presetBySessionId.size > MAX_TRACKED_SESSION_PRESETS) {
+            const oldest = presetBySessionId.keys().next().value;
+            if (typeof oldest !== 'string')
+                break;
+            presetBySessionId.delete(oldest);
+        }
+    });
     const requestKey = (payload) => {
         const value = payload;
         if (typeof value?.agent?.id !== 'string'
@@ -113,7 +153,7 @@ export function apply(ctx, initialConfig = {}) {
         name: VALUE_MODE_SECTION_NAME,
         order: VALUE_MODE_SECTION_ORDER,
         text: (assembly) => {
-            if (assembly.agent?.session.header?.agentPreset !== 'value-mode') {
+            if (resolveSessionAgentPreset(ctx, assembly.agent, presetBySessionId) !== 'value-mode') {
                 return '';
             }
             const config = resolveEffectiveConfig(currentSource(), readDefaultExpert(ctx));
@@ -128,7 +168,7 @@ export function apply(ctx, initialConfig = {}) {
     // sessions to the cheaper executor model.
     ctx.on('agent/request', async (payload, next) => {
         const resolved = await next();
-        if (payload.agent.session?.header?.agentPreset !== 'value-mode') {
+        if (resolveSessionAgentPreset(ctx, payload.agent, presetBySessionId) !== 'value-mode') {
             return resolved;
         }
         const globalConfig = currentSource();

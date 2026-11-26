@@ -10,6 +10,7 @@ import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
 import { createDesktopDataMigration } from './desktop-data-migration.mjs'
 import { resolveDesktopDataLocation } from './desktop-data-location.mjs'
+import { recoverPowerLossStartupState } from './startup-crash-recovery.mjs'
 import {
   CLOSE_BEHAVIORS,
   createCloseBehaviorController,
@@ -738,6 +739,10 @@ export async function startElectronApp(metadata) {
     },
     relaunch: async () => { app.relaunch(); app.quit() },
   })
+  await recoverPowerLossStartupState({
+    userData,
+    log: line => void logStore.append(line).catch(() => {}),
+  })
   const verifyingDataMigration = await dataMigration.prepareBoot()
   let dataLocation
   try {
@@ -764,6 +769,10 @@ export async function startElectronApp(metadata) {
   const dataMigrationActions = Object.fromEntries(['status', 'choose', 'preflight', 'execute']
     .map(action => [action, () => dataMigration[action](dataLocation)]))
   const dshHome = dataLocation.home
+  await recoverPowerLossStartupState({
+    dshHome,
+    log: line => void logStore.append(line).catch(() => {}),
+  })
   const legacyHomeExists = await lstat(legacyHome).then(() => true, error => { if (error.code === 'ENOENT') return false; throw error })
   const explicitlySelectedHome = dataLocation.relocated || (['selected', 'persisted'].includes(dataLocation.source) && !legacyHomeExists)
   const communityHomeMigration = process.env.DSH_HOME || explicitlySelectedHome

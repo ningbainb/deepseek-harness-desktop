@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import { en } from '../src/client/locales.ts'
 import {
@@ -107,5 +107,40 @@ describe('TPS composer line', () => {
     expect(view.container.textContent).not.toContain('tok/s')
     view.rerender(<TpsLine useProjection={(() => undefined) as UseProjection} />)
     expect(view.container.textContent).toBe('')
+  })
+
+  it('opens a hover preview with cache breakdown without shifting pinned state, and toggles pin on click', () => {
+    vi.useFakeTimers()
+    try {
+      const useProjection = (() => ({
+        estimated: true, uncachedInputTokens: 200, cacheReadTokens: 700,
+        cacheWriteTokens: 100, outputTokens: 50, estimatedCost: 0.42,
+      })) as UseProjection
+      const view = render(<TpsLine useProjection={useProjection} />)
+      const details = view.container.querySelector('details') as HTMLDetailsElement
+      const summary = view.container.querySelector('summary') as HTMLElement
+
+      expect(details.open).toBe(false)
+      expect(view.container.textContent).toContain('缓存命中~700 (70%)')
+      expect(view.container.textContent).toContain('缓存写入~100')
+
+      fireEvent.mouseEnter(details)
+      expect(details.open).toBe(true)
+      expect(details.dataset.preview).toBe('hover')
+
+      fireEvent.mouseLeave(details)
+      act(() => { vi.advanceTimersByTime(150) })
+      expect(details.open).toBe(false)
+      expect(details.dataset.preview).toBeUndefined()
+
+      fireEvent.click(summary)
+      expect(details.open).toBe(true)
+      expect(details.dataset.preview).toBeUndefined()
+
+      fireEvent.click(summary)
+      expect(details.open).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
