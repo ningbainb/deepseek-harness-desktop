@@ -47,6 +47,7 @@
     "@ningbainb/dsh-chat-artifacts": "workspace:*",
     "@ningbainb/dsh-win-control": "workspace:*",
     "@ningbainb/dsh-fast-ops": "workspace:*",
+    "@ningbainb/dsh-im-hub": "workspace:*",
     "@linxin666/dsh-liangshen": "workspace:*",
     "@linxin666/dsh-client-ui-web-ui-settings": "workspace:*",
     "@ningbainb/dsh-user-scope": "workspace:*",

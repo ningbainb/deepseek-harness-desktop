@@ -215,6 +215,7 @@
     "@ningbainb/dsh-user-scope": "workspace:*",
     "@ningbainb/dsh-win-control": "workspace:*",
     "@ningbainb/dsh-fast-ops": "workspace:*",
+    "@ningbainb/dsh-im-hub": "workspace:*",
     "@tencent-connect/dsh-qqbot": "0.5.5",
     "@tencent-connect/qqbot-connector": "1.2.0",
     "@xterm/addon-fit": "0.11.0",

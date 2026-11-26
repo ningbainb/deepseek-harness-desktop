@@ -1357,6 +1357,37 @@
       }
     },
     {
+      "name": "@ningbainb/dsh-im-hub",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-im-hub"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-26T22:30:00.000Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-im-hub"
+      },
+      "reason": "Ship the Community Desktop lightweight 4-channel domestic IM Hub (Feishu WS, DingTalk Stream, WeCom, Generic Webhook) alongside built-in QQ Bot.",
+      "desktopContracts": [
+        "Zero-dependency Node 24 native channel adapters with fail-closed allowlist policy",
+        "Dual-side tool approval sync via approval/request waterfall and loopback-protected admin routes"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-im-hub/tests/settings-policy.spec.ts",
+          "packages/dsh-im-hub/tests/semantic-core.spec.ts",
+          "packages/dsh-im-hub/tests/channels.spec.ts",
+          "packages/dsh-im-hub/tests/hub-routes.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Configure IM Hub channel credentials, run Test Connection, and verify inbound webhook routing."
+        ],
+        "results": []
+      }
+    },
+    {
       "name": "@ningbainb/dsh-llm-antigravity",
       "selection": {
         "version": "0.1.0",

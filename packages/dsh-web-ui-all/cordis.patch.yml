@@ -116,6 +116,11 @@
     - id: fast-ops
       name: '@ningbainb/dsh-fast-ops'
 
+# from ../dsh-im-hub
+- insert:
+    - id: im-hub
+      name: '@ningbainb/dsh-im-hub'
+
 # from ../dsh-liangshen
 - insert:
     - id: liangshen

@@ -106,6 +106,7 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-win-control',
   '@ningbainb/dsh-fast-ops',
+  '@ningbainb/dsh-im-hub',
 ].toSorted())
 
 // Skin Center v1 exposed every shipped theme as a separate Cordis package.
@@ -231,6 +232,7 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-win-control',
   '@ningbainb/dsh-fast-ops',
+  '@ningbainb/dsh-im-hub',
   'dsh-better-sidebar',
   'reasoning-slider',
 ].toSorted())
@@ -326,6 +328,7 @@ export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-win-control',
   '@ningbainb/dsh-fast-ops',
+  '@ningbainb/dsh-im-hub',
 ].toSorted())
 
 // Desktop 2.1 first claimed this package as a managed compatibility link, but
@@ -533,6 +536,8 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
       name: '@ningbainb/dsh-win-control'
     - id: fast-ops
       name: '@ningbainb/dsh-fast-ops'
+    - id: im-hub
+      name: '@ningbainb/dsh-im-hub'
     - id: windows-mcp-bridge
       name: '@deepseek-ai/dsh-mcp-client'
       disabled: true

@@ -1,0 +1,1 @@
+{"version":3,"file":"ImHubCard.d.ts","sourceRoot":"","sources":["../../../src/client/ImHubCard.tsx"],"names":[],"mappings":"AAiBA,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,cAAc,CAAA;AAElD,MAAM,WAAW,cAAc;IAC7B,CAAC,EAAE,CAAC,GAAG,EAAE,cAAc,KAAK,MAAM,CAAA;CACnC;AAoBD,wBAAgB,SAAS,CAAC,EAAE,CAAC,EAAE,EAAE,cAAc,+BAshB9C"}
