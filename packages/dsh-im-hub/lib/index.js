@@ -2,7 +2,8 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-//#region src/core/host-types.ts
+//#region src/core/get-host-service.ts
+/** Read the current scoped service or its directly exposed context property. */
 function getHostService(ctx, name) {
 	const candidate = ctx;
 	try {

@@ -8,7 +8,8 @@ import { pathToFileURL } from "node:url";
 import ignore from "ignore";
 import { createHash, randomUUID } from "node:crypto";
 import { promisify, stripVTControlCharacters } from "node:util";
-//#region src/core/host-types.ts
+//#region src/core/get-host-service.ts
+/** Read the current scoped service or its directly exposed context property. */
 function getHostService(ctx, name) {
 	const candidate = ctx;
 	try {

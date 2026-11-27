@@ -30,7 +30,9 @@ test('stripHeader accepts a Windows CRLF separator', () => {
 
 test('copies cover each client and host helper and its consuming plugins', () => {
   const entries = copyEntries()
-  assert.equal(entries.length, 39)
+  assert.equal(entries.length, 42)
+  assert.deepEqual(entries.filter(entry => entry.file === 'get-host-service.ts').map(entry => entry.target),
+    ['dsh-fast-ops', 'dsh-im-hub', 'dsh-win-control'].map(pkg => join(REPO_ROOT, 'packages', pkg, 'src/core/get-host-service.ts')))
   assert.deepEqual(entries.filter(entry => entry.file === 'repair-path.mjs').map(entry => entry.target), [
     join(REPO_ROOT, 'apps/dsh-desktop/src/repair-path.mjs'),
     join(REPO_ROOT, 'packages/dsh-desktop-repair/src/repair-path.mjs'),
@@ -59,24 +61,11 @@ test('copies cover each client and host helper and its consuming plugins', () =>
 test('checkSync detects drift and applySync repairs it', async () => {
   const root = await mkdtemp(join(tmpdir(), 'sync-shared-test-'))
   try {
-    // Fake tree: shared source + one consumer copy with wrong content.
-    const sourceDir = join(root, 'shared', 'client', 'settings')
-    await mkdir(sourceDir, { recursive: true })
-    await writeFile(join(sourceDir, 'settings-form.ts'), 'export const good = 1' + String.fromCharCode(10))
-    await writeFile(join(sourceDir, 'PluginSettingsCard.tsx'), 'export const card = 1' + String.fromCharCode(10))
-    await writeFile(join(sourceDir, 'settings-card.module.css'), '.card { color: red }' + String.fromCharCode(10))
-    await writeFile(join(root, 'shared', 'client', 'feature-telemetry.ts'), 'export const event = 1\n')
-    await writeFile(join(root, 'shared', 'client', 'sidebar-entry-anchor.ts'), 'export {}\n')
-    const hostDir = join(root, 'shared', 'host')
-    await mkdir(hostDir, { recursive: true })
-    await writeFile(join(hostDir, 'repair-path.mjs'), 'export {}\n')
-    await writeFile(join(hostDir, 'poll-guard.ts'), 'export const guard = 1' + String.fromCharCode(10))
-    await writeFile(join(hostDir, 'dsh-home.ts'), 'export const home = 1' + String.fromCharCode(10))
-    await writeFile(join(hostDir, 'workspace-git-env.ts'), 'export const env = {}\n')
-    const presetDir = join(hostDir, 'presets')
-    await mkdir(presetDir, { recursive: true })
-    for (const file of ['preset-registry.ts', 'preset-schema.ts', 'sync.ts']) {
-      await writeFile(join(presetDir, file), 'export {}\n')
+    // Give each canonical source distinct content to detect incorrect copies.
+    const sources = new Set(copyEntries(root).map(entry => entry.source))
+    for (const source of sources) {
+      await mkdir(dirname(source), { recursive: true })
+      await writeFile(source, `/* ${source} */\n`)
     }
     const targetDir = join(root, 'packages', 'dsh-pet', 'src', 'client')
     await mkdir(targetDir, { recursive: true })
@@ -91,9 +80,11 @@ test('checkSync detects drift and applySync repairs it', async () => {
     const after = await checkSync(root)
     assert.deepEqual(after, [])
     const fixed = await readFile(join(targetDir, 'settings-form.ts'), 'utf8')
-    assert.equal(stripHeader(fixed, 'settings-form.ts', 'shared/client/settings/settings-form.ts'), 'export const good = 1' + String.fromCharCode(10))
+    assert.equal(stripHeader(fixed, 'settings-form.ts', 'shared/client/settings/settings-form.ts'),
+      await readFile(join(root, 'shared/client/settings/settings-form.ts'), 'utf8'))
     const telemetry = await readFile(join(root, 'packages/dsh-aionui-panel/src/client/feature-telemetry.ts'), 'utf8')
-    assert.equal(stripHeader(telemetry, 'feature-telemetry.ts', 'shared/client/feature-telemetry.ts'), 'export const event = 1\n')
+    assert.equal(stripHeader(telemetry, 'feature-telemetry.ts', 'shared/client/feature-telemetry.ts'),
+      await readFile(join(root, 'shared/client/feature-telemetry.ts'), 'utf8'))
   } finally {
     await rm(root, { recursive: true, force: true })
   }

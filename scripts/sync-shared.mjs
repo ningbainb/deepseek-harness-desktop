@@ -23,6 +23,11 @@ export const REPO_ROOT = resolve(SCRIPT_DIR, '..')
  */
 const MANIFEST = [
   {
+    file: 'get-host-service.ts',
+    source: 'shared/host/get-host-service.ts',
+    targets: ['dsh-fast-ops', 'dsh-im-hub', 'dsh-win-control'].map(pkg => `packages/${pkg}/src/core/get-host-service.ts`),
+  },
+  {
     file: 'repair-path.mjs',
     source: 'shared/host/repair-path.mjs',
     targets: ['apps/dsh-desktop/src/repair-path.mjs', 'packages/dsh-desktop-repair/src/repair-path.mjs'],

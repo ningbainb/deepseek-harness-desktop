@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { getHostService } from './core/get-host-service.ts'
 import type {
   ToolsServiceLike,
   UserScopeServiceLike,
@@ -72,15 +73,6 @@ export {
   isBridgedToolName,
 } from './host/tool-gate.ts'
 
-function getService<T>(ctx: Context, name: string): T | undefined {
-  const candidate = ctx as unknown as { get?: (key: string) => unknown } & Record<string, unknown>
-  try {
-    return (candidate.get?.(name) ?? candidate[name]) as T | undefined
-  } catch {
-    return undefined
-  }
-}
-
 function sendJson(response: WebRouteResponseLike, status: number, body: unknown): void {
   response.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
@@ -112,7 +104,7 @@ function isAuthorizedRequest(ctx: Context, request: WebRouteRequestLike, peer?: 
   if (request.headers['sec-fetch-site'] === 'cross-site') return false
   if (peer?.principal?.kind !== undefined && peer.principal.kind !== 'owner') return false
 
-  const userScope = getService<UserScopeServiceLike>(ctx, 'userScope')
+  const userScope = getHostService<UserScopeServiceLike>(ctx, 'userScope')
   if (userScope?.currentScope) {
     const current = userScope.currentScope()
     const scope = userScope.desktopScope?.()
@@ -140,7 +132,7 @@ export function apply(ctx: Context): void {
   })
 
   const buildStatePayload = (sessionId?: string | null) => {
-    const tools = getService<ToolsServiceLike>(ctx, 'tools')
+    const tools = getHostService<ToolsServiceLike>(ctx, 'tools')
     const catalog = collectBridgedCatalog(tools)
     const installed = listManagedVersions(managedToolchainRoot(home))
     return {
@@ -244,14 +236,14 @@ export function apply(ctx: Context): void {
     return () => { for (const stop of stops) stop() }
   }
 
-  const existingWebServer = getService<WebServerLike>(ctx, 'webServer')
+  const existingWebServer = getHostService<WebServerLike>(ctx, 'webServer')
   if (existingWebServer) {
     ctx.effect(() => mountWebServer(existingWebServer))
   } else if (typeof (ctx as unknown as { inject?: unknown }).inject === 'function') {
     (ctx as unknown as {
       inject: (deps: string[], cb: (scoped: { webServer?: WebServerLike }) => (() => void) | void) => void
     }).inject(['webServer'], (scoped) => {
-      const ws = scoped?.webServer ?? getService<WebServerLike>(ctx, 'webServer')
+      const ws = scoped?.webServer ?? getHostService<WebServerLike>(ctx, 'webServer')
       if (!ws) return
       return mountWebServer(ws)
     })

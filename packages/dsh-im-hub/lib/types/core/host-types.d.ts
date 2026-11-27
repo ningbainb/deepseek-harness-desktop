@@ -1,4 +1,4 @@
-import type { Context } from '@deepseek-ai/cordis';
+export { getHostService } from './get-host-service.ts';
 export interface SessionLike {
     id?: string;
     header?: {
@@ -123,5 +123,4 @@ export interface LoggerLike {
     error?: (...args: unknown[]) => void;
     debug?: (...args: unknown[]) => void;
 }
-export declare function getHostService<T>(ctx: Context, name: string): T | undefined;
 //# sourceMappingURL=host-types.d.ts.map

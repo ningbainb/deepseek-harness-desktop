@@ -1,3 +1,4 @@
+import { getHostService } from "./core/get-host-service.js";
 import { PINNED_WINDOWS_MCP_VERSION, ROUTE_PREFIX, defaultSettings, } from "./core/settings.js";
 import { readSettings, resolveDshHome, writeSettingsAtomic, } from "./host/settings-store.js";
 import { probeMirrors } from "./host/mirrors.js";
@@ -9,15 +10,6 @@ export { MIRROR_CANDIDATES, parseSimpleIndex, pickWheelEntry, probeMirrors } fro
 export { PROBE_TIMEOUT_MS, UPSTREAM_UIA_ISSUE, describeProbe, parseProbeOutput, probeDesktop } from "./host/desktop-probe.js";
 export { PROFILE_BLOCK_BEGIN, PROFILE_BLOCK_END, buildBridgeOverrideBlock, createToolchainInstaller, executableIn, listManagedVersions, managedExecutable, managedToolchainRoot, parseProcessLines, processesUnder, upsertBridgeOverride, } from "./host/toolchain.js";
 export { BRIDGE_TOOL_PREFIX, DOCTOR_TOOL_NAME, REVEAL_TOOL_NAME, WinControlGate, collectBridgedCatalog, isBridgedToolName, } from "./host/tool-gate.js";
-function getService(ctx, name) {
-    const candidate = ctx;
-    try {
-        return (candidate.get?.(name) ?? candidate[name]);
-    }
-    catch {
-        return undefined;
-    }
-}
 function sendJson(response, status, body) {
     response.writeHead(status, {
         'content-type': 'application/json; charset=utf-8',
@@ -51,7 +43,7 @@ function isAuthorizedRequest(ctx, request, peer) {
         return false;
     if (peer?.principal?.kind !== undefined && peer.principal.kind !== 'owner')
         return false;
-    const userScope = getService(ctx, 'userScope');
+    const userScope = getHostService(ctx, 'userScope');
     if (userScope?.currentScope) {
         const current = userScope.currentScope();
         const scope = userScope.desktopScope?.();
@@ -77,7 +69,7 @@ export function apply(ctx) {
         home,
     });
     const buildStatePayload = (sessionId) => {
-        const tools = getService(ctx, 'tools');
+        const tools = getHostService(ctx, 'tools');
         const catalog = collectBridgedCatalog(tools);
         const installed = listManagedVersions(managedToolchainRoot(home));
         return {
@@ -176,13 +168,13 @@ export function apply(ctx) {
         return () => { for (const stop of stops)
             stop(); };
     };
-    const existingWebServer = getService(ctx, 'webServer');
+    const existingWebServer = getHostService(ctx, 'webServer');
     if (existingWebServer) {
         ctx.effect(() => mountWebServer(existingWebServer));
     }
     else if (typeof ctx.inject === 'function') {
         ctx.inject(['webServer'], (scoped) => {
-            const ws = scoped?.webServer ?? getService(ctx, 'webServer');
+            const ws = scoped?.webServer ?? getHostService(ctx, 'webServer');
             if (!ws)
                 return;
             return mountWebServer(ws);

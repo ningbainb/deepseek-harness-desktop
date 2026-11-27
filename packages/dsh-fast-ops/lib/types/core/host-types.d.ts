@@ -1,4 +1,4 @@
-import type { Context } from '@deepseek-ai/cordis';
+export { getHostService } from './get-host-service.ts';
 export interface ToolSchemaLike {
     name?: string;
     description?: string;
@@ -126,6 +126,4 @@ export interface SlotsServiceLike {
 export interface LocaleServiceLike {
     register: (namespace: string, dictionaries: Record<string, Record<string, string>>) => () => void;
 }
-export declare function getHostService<T>(ctx: Context, name: string): T | undefined;
-export {};
 //# sourceMappingURL=host-types.d.ts.map

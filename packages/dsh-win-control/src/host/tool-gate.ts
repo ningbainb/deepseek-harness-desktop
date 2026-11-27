@@ -1,4 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { getHostService } from '../core/get-host-service.ts'
 import type {
   AgentLike,
   AgentSessionLike,
@@ -30,15 +31,6 @@ export interface BridgedToolDescriptor {
 
 export function isBridgedToolName(name: unknown): name is string {
   return typeof name === 'string' && name.startsWith(BRIDGE_TOOL_PREFIX)
-}
-
-function getService<T>(ctx: Context, name: string): T | undefined {
-  const candidate = ctx as unknown as { get?: (key: string) => unknown } & Record<string, unknown>
-  try {
-    return (candidate.get?.(name) ?? candidate[name]) as T | undefined
-  } catch {
-    return undefined
-  }
 }
 
 function extractSchemaInfo(entry: ToolSchemaLike | [string, ToolSchemaLike?]): BridgedToolDescriptor | null {
@@ -99,7 +91,7 @@ export class WinControlGate {
   }
 
   private lookupSession(sessionId: string): AgentSessionLike | null {
-    const sessions = getService<SessionsServiceLike>(this.ctx, 'sessions')
+    const sessions = getHostService<SessionsServiceLike>(this.ctx, 'sessions')
     try {
       return sessions?.get?.(sessionId) ?? null
     } catch {
@@ -175,7 +167,7 @@ export class WinControlGate {
   }
 
   private denyListFor(agent: AgentLike): string[] | null {
-    const tools = getService<ToolsServiceLike>(this.ctx, 'tools')
+    const tools = getHostService<ToolsServiceLike>(this.ctx, 'tools')
     if (!tools?.schemas) return null
     let raw: ReadonlyArray<ToolSchemaLike | [string, ToolSchemaLike?]>
     try {
@@ -240,14 +232,14 @@ export class WinControlGate {
       return
     }
     for (const live of this.liveAgents) this.applyToAgent(live)
-    const agents = getService<AgentsServiceLike>(this.ctx, 'agents')
+    const agents = getHostService<AgentsServiceLike>(this.ctx, 'agents')
     try {
       for (const candidate of agents?.list?.() ?? []) this.applyToAgent(candidate)
     } catch {}
   }
 
   async buildDoctorReport(agent?: AgentLike): Promise<{ report: string; probe: DesktopProbeOutcome; bridgedCount: number }> {
-    const tools = getService<ToolsServiceLike>(this.ctx, 'tools')
+    const tools = getHostService<ToolsServiceLike>(this.ctx, 'tools')
     const catalog = collectBridgedCatalog(tools)
     const installed = listManagedVersions(managedToolchainRoot(this.home))
     const probe = await this.probeImpl()
@@ -379,7 +371,7 @@ export class WinControlGate {
       }
     }
 
-    const existingTools = getService<ToolsServiceLike>(this.ctx, 'tools')
+    const existingTools = getHostService<ToolsServiceLike>(this.ctx, 'tools')
     if (existingTools) {
       mountTools(existingTools)
     } else if (typeof (this.ctx as unknown as { inject?: unknown }).inject === 'function') {

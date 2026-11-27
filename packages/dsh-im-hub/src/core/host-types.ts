@@ -1,4 +1,4 @@
-import type { Context } from '@deepseek-ai/cordis'
+export { getHostService } from './get-host-service.ts'
 
 export interface SessionLike {
   id?: string
@@ -126,13 +126,4 @@ export interface LoggerLike {
   warn?: (...args: unknown[]) => void
   error?: (...args: unknown[]) => void
   debug?: (...args: unknown[]) => void
-}
-
-export function getHostService<T>(ctx: Context, name: string): T | undefined {
-  const candidate = ctx as unknown as { get?: (key: string) => unknown } & Record<string, unknown>
-  try {
-    return (candidate.get?.(name) ?? candidate[name]) as T | undefined
-  } catch {
-    return undefined
-  }
 }

@@ -1,3 +1,4 @@
+import { getHostService } from "../core/get-host-service.js";
 import { describeProbe, probeDesktop } from "./desktop-probe.js";
 import { listManagedVersions, managedToolchainRoot } from "./toolchain.js";
 export const BRIDGE_TOOL_PREFIX = 'mcp__windows__';
@@ -6,15 +7,6 @@ export const DOCTOR_TOOL_NAME = 'windows_mcp_doctor';
 const MAX_GRANT_ENTRIES = 1024;
 export function isBridgedToolName(name) {
     return typeof name === 'string' && name.startsWith(BRIDGE_TOOL_PREFIX);
-}
-function getService(ctx, name) {
-    const candidate = ctx;
-    try {
-        return (candidate.get?.(name) ?? candidate[name]);
-    }
-    catch {
-        return undefined;
-    }
 }
 function extractSchemaInfo(entry) {
     if (Array.isArray(entry)) {
@@ -70,7 +62,7 @@ export class WinControlGate {
         this.probeImpl = options.probeImpl ?? probeDesktop;
     }
     lookupSession(sessionId) {
-        const sessions = getService(this.ctx, 'sessions');
+        const sessions = getHostService(this.ctx, 'sessions');
         try {
             return sessions?.get?.(sessionId) ?? null;
         }
@@ -148,7 +140,7 @@ export class WinControlGate {
         return state.all || state.names.has(name);
     }
     denyListFor(agent) {
-        const tools = getService(this.ctx, 'tools');
+        const tools = getHostService(this.ctx, 'tools');
         if (!tools?.schemas)
             return null;
         let raw;
@@ -230,7 +222,7 @@ export class WinControlGate {
         }
         for (const live of this.liveAgents)
             this.applyToAgent(live);
-        const agents = getService(this.ctx, 'agents');
+        const agents = getHostService(this.ctx, 'agents');
         try {
             for (const candidate of agents?.list?.() ?? [])
                 this.applyToAgent(candidate);
@@ -238,7 +230,7 @@ export class WinControlGate {
         catch { }
     }
     async buildDoctorReport(agent) {
-        const tools = getService(this.ctx, 'tools');
+        const tools = getHostService(this.ctx, 'tools');
         const catalog = collectBridgedCatalog(tools);
         const installed = listManagedVersions(managedToolchainRoot(this.home));
         const probe = await this.probeImpl();
@@ -371,7 +363,7 @@ export class WinControlGate {
                     disposers.push(disposeDoctor);
             }
         };
-        const existingTools = getService(this.ctx, 'tools');
+        const existingTools = getHostService(this.ctx, 'tools');
         if (existingTools) {
             mountTools(existingTools);
         }

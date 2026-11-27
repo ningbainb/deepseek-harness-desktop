@@ -3,6 +3,17 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+//#region src/core/get-host-service.ts
+/** Read the current scoped service or its directly exposed context property. */
+function getHostService(ctx, name) {
+	const candidate = ctx;
+	try {
+		return candidate.get?.(name) ?? candidate[name];
+	} catch {
+		return;
+	}
+}
+//#endregion
 //#region src/core/settings.ts
 const PACKAGE_ID = "@ningbainb/dsh-win-control";
 const BRIDGE_ROW_ID = "windows-mcp-bridge";
@@ -935,14 +946,6 @@ const MAX_GRANT_ENTRIES = 1024;
 function isBridgedToolName(name) {
 	return typeof name === "string" && name.startsWith("mcp__windows__");
 }
-function getService$1(ctx, name) {
-	const candidate = ctx;
-	try {
-		return candidate.get?.(name) ?? candidate[name];
-	} catch {
-		return;
-	}
-}
 function extractSchemaInfo(entry) {
 	if (Array.isArray(entry)) {
 		const [name, schema] = entry;
@@ -996,7 +999,7 @@ var WinControlGate = class {
 		this.probeImpl = options.probeImpl ?? probeDesktop;
 	}
 	lookupSession(sessionId) {
-		const sessions = getService$1(this.ctx, "sessions");
+		const sessions = getHostService(this.ctx, "sessions");
 		try {
 			return sessions?.get?.(sessionId) ?? null;
 		} catch {
@@ -1071,7 +1074,7 @@ var WinControlGate = class {
 		return state.all || state.names.has(name);
 	}
 	denyListFor(agent) {
-		const tools = getService$1(this.ctx, "tools");
+		const tools = getHostService(this.ctx, "tools");
 		if (!tools?.schemas) return null;
 		let raw;
 		try {
@@ -1138,13 +1141,13 @@ var WinControlGate = class {
 			return;
 		}
 		for (const live of this.liveAgents) this.applyToAgent(live);
-		const agents = getService$1(this.ctx, "agents");
+		const agents = getHostService(this.ctx, "agents");
 		try {
 			for (const candidate of agents?.list?.() ?? []) this.applyToAgent(candidate);
 		} catch {}
 	}
 	async buildDoctorReport(agent) {
-		const catalog = collectBridgedCatalog(getService$1(this.ctx, "tools"));
+		const catalog = collectBridgedCatalog(getHostService(this.ctx, "tools"));
 		const installed = listManagedVersions(managedToolchainRoot(this.home));
 		const probe = await this.probeImpl();
 		const described = describeProbe(probe);
@@ -1275,7 +1278,7 @@ var WinControlGate = class {
 				if (typeof disposeDoctor === "function") disposers.push(disposeDoctor);
 			}
 		};
-		const existingTools = getService$1(this.ctx, "tools");
+		const existingTools = getHostService(this.ctx, "tools");
 		if (existingTools) mountTools(existingTools);
 		else if (typeof this.ctx.inject === "function") try {
 			const stopInject = this.ctx.inject(["tools"], (scoped) => {
@@ -1295,14 +1298,6 @@ var WinControlGate = class {
 };
 //#endregion
 //#region src/index.ts
-function getService(ctx, name) {
-	const candidate = ctx;
-	try {
-		return candidate.get?.(name) ?? candidate[name];
-	} catch {
-		return;
-	}
-}
 function sendJson(response, status, body) {
 	response.writeHead(status, {
 		"content-type": "application/json; charset=utf-8",
@@ -1333,7 +1328,7 @@ function isAuthorizedRequest(ctx, request, peer) {
 	if (request.headers["x-dsh-win-control"] !== "1") return false;
 	if (request.headers["sec-fetch-site"] === "cross-site") return false;
 	if (peer?.principal?.kind !== void 0 && peer.principal.kind !== "owner") return false;
-	const userScope = getService(ctx, "userScope");
+	const userScope = getHostService(ctx, "userScope");
 	if (userScope?.currentScope) {
 		const current = userScope.currentScope();
 		const scope = userScope.desktopScope?.();
@@ -1357,7 +1352,7 @@ function apply(ctx) {
 		home
 	});
 	const buildStatePayload = (sessionId) => {
-		const catalog = collectBridgedCatalog(getService(ctx, "tools"));
+		const catalog = collectBridgedCatalog(getHostService(ctx, "tools"));
 		const installed = listManagedVersions(managedToolchainRoot(home));
 		return {
 			platform: process.platform,
@@ -1455,10 +1450,10 @@ function apply(ctx) {
 			for (const stop of stops) stop();
 		};
 	};
-	const existingWebServer = getService(ctx, "webServer");
+	const existingWebServer = getHostService(ctx, "webServer");
 	if (existingWebServer) ctx.effect(() => mountWebServer(existingWebServer));
 	else if (typeof ctx.inject === "function") ctx.inject(["webServer"], (scoped) => {
-		const ws = scoped?.webServer ?? getService(ctx, "webServer");
+		const ws = scoped?.webServer ?? getHostService(ctx, "webServer");
 		if (!ws) return;
 		return mountWebServer(ws);
 	});
