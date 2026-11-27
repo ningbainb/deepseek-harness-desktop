@@ -18,6 +18,7 @@ import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:p
 import { isScalar, parseDocument, visit } from 'yaml'
 
 import { UserPluginArchive } from '../user-plugin-archive.mjs'
+import { lstatIfPresent, syncDirectory } from '../plugin-transaction-files.mjs'
 
 export const PLUGIN_TRANSACTION_SCHEMA_VERSION = 1
 
@@ -76,15 +77,6 @@ const PROFILE_INPUTS = Object.freeze([
 
 function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`
-}
-
-async function lstatIfPresent(path) {
-  try {
-    return await lstat(path)
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
 }
 
 async function copyLeafIfPresent(source, destination) {
@@ -249,19 +241,6 @@ async function replaceJson(path, value) {
       await rename(displaced, path).catch(() => {})
     }
     throw error
-  }
-}
-
-/** Directory fsync is not available on Windows; file fsync plus rename remains the durable boundary there. */
-async function syncDirectory(path) {
-  let handle
-  try {
-    handle = await open(path, 'r')
-    await handle.sync()
-  } catch (error) {
-    if (!['EINVAL', 'EPERM', 'EISDIR', 'UNKNOWN'].includes(error?.code)) throw error
-  } finally {
-    await handle?.close().catch(() => {})
   }
 }
 

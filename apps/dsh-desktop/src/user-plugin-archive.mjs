@@ -1,4 +1,5 @@
 import { readFileIfPresent } from './read-file-if-present.mjs'
+import { lstatIfPresent, syncDirectory } from './plugin-transaction-files.mjs'
 import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants as fsConstants, createReadStream } from 'node:fs'
@@ -156,15 +157,6 @@ function normalizeProfileArtifacts(value) {
   }))
 }
 
-async function lstatIfPresent(path) {
-  try {
-    return await lstat(path)
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
-
 async function pathPresent(path) {
   return (await lstatIfPresent(path)) !== undefined
 }
@@ -175,19 +167,6 @@ function modeOf(stat) {
 
 function temporaryPath(path, label = 'tmp') {
   return `${path}.${label}-${process.pid}-${randomUUID()}`
-}
-
-/** Directory fsync is unavailable on Windows; a durable file+rename remains useful there. */
-async function syncDirectory(path) {
-  let handle
-  try {
-    handle = await open(path, 'r')
-    await handle.sync()
-  } catch (error) {
-    if (!['EINVAL', 'EPERM', 'EISDIR', 'UNKNOWN'].includes(error?.code)) throw error
-  } finally {
-    await handle?.close().catch(() => {})
-  }
 }
 
 async function writeDurableFile(path, content, { flag = 'wx', mode } = {}) {
