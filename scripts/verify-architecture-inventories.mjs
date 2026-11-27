@@ -37,8 +37,8 @@ const DATA_DOMAINS = Object.freeze([
   'tasks-runs-evidence', 'automation', 'ssh-qq-remote', 'window-theme-preferences', 'local-search-index',
 ])
 
-function parse(path) {
-  return JSON.parse(readFileSync(resolve(ROOT, path), 'utf8'))
+function parse(root, path) {
+  return JSON.parse(readFileSync(resolve(root, path), 'utf8'))
 }
 
 function nonEmpty(value) {
@@ -64,10 +64,10 @@ function validateRows(rows, fields, identity, label, errors) {
   }
 }
 
-export function validateArchitectureInventories() {
-  const transport = parse('docs/architecture/transport-inventory.json')
-  const data = parse('docs/architecture/data-ownership.json')
-  const native = parse('docs/architecture/native-dependency-inventory.json')
+export function validateArchitectureInventories(root = ROOT) {
+  const transport = parse(root, 'docs/architecture/transport-inventory.json')
+  const data = parse(root, 'docs/architecture/data-ownership.json')
+  const native = parse(root, 'docs/architecture/native-dependency-inventory.json')
   const errors = []
   if (transport.schemaVersion !== 1 || transport.runtimeProviderApiVersion !== 2 || transport.defaultTarget !== 'desktop-private-pipe') {
     errors.push('transport inventory must target RuntimeProvider v2 and desktop-private-pipe')
@@ -76,12 +76,23 @@ export function validateArchitectureInventories() {
   validateRows(data.domains, DATA_FIELDS, 'domain', 'data.domains', errors)
   validateRows(native.records, NATIVE_FIELDS, 'module', 'native.records', errors)
 
-  const transportSources = transport.records.map(record => record.sourcePath.replaceAll('\\', '/')).join('; ')
+  const localSources = new Set()
+  for (const record of transport.records) {
+    for (const entry of record.sourcePath.split(';')) {
+      const path = entry.trim().replaceAll('\\', '/')
+      if (/^@deepseek-ai\/[a-z0-9-]+$/.test(path)) continue
+      if (!path.startsWith('packages/') || path.split('/').includes('..') || !existsSync(resolve(root, path))) {
+        errors.push(`transport source is missing or invalid for ${record.pluginId}: ${path}`)
+      } else {
+        localSources.add(path)
+      }
+    }
+  }
   for (const path of ROUTE_PACKAGE_PATHS) {
-    if (!transportSources.includes(path)) errors.push(`transport inventory does not own ${path}`)
+    if (![...localSources].some(source => source.startsWith(path))) errors.push(`transport inventory does not own ${path}`)
   }
   for (const record of transport.records) {
-    if (!existsSync(resolve(ROOT, record.migrationTest))) errors.push(`transport migration test is missing: ${record.migrationTest}`)
+    if (!existsSync(resolve(root, record.migrationTest))) errors.push(`transport migration test is missing: ${record.migrationTest}`)
     if (record.status?.includes('adapter') || record.status === 'temporary-adapter') {
       if (!nonEmpty(record.adapterScope) || !nonEmpty(record.exitCondition)) {
         errors.push(`adapter record ${record.pluginId} requires scope and exit condition`)
