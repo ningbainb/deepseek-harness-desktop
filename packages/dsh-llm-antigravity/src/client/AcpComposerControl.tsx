@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { acpStore } from './acpStore.ts'
-import { AcpEnginePicker } from './AcpEnginePicker.tsx'
+import { AcpEnginePicker, type AcpWorkbenchActions } from './AcpEnginePicker.tsx'
 import css from './AcpChat.module.css'
 
-type Props = PropsRuntime<'conversation.input.right'> & PropsLocale<'llm-antigravity'> & { getCwd?: () => string | undefined }
+type Props = PropsRuntime<'conversation.input.right'> & PropsLocale<'llm-antigravity'> & AcpWorkbenchActions & { getCwd?: () => string | undefined }
 
-export function AcpComposerControl({ sessionId, useInput, inputActions, getCwd, t }: Props) {
+export function AcpComposerControl({ sessionId, useInput, inputActions, getCwd, registerWorkbench, t }: Props) {
   const state = useSyncExternalStore(acpStore.subscribe, acpStore.getSnapshot, acpStore.getSnapshot)
   const input = useInput(snapshot => snapshot)
   const latestInput = useRef(input)
@@ -98,7 +98,10 @@ export function AcpComposerControl({ sessionId, useInput, inputActions, getCwd, 
 
   return <>
     <span ref={anchor} hidden />
-    {mainComposer && <AcpEnginePicker conversationId={String(sessionId)} getCwd={getCwd} t={t} />}
+    {mainComposer && <AcpEnginePicker key={String(sessionId)} conversationId={String(sessionId)} getCwd={getCwd}
+      registerWorkbench={registerWorkbench} t={t} focusComposer={() => {
+        anchor.current?.closest('[data-composer-card]')?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus()
+      }} />}
     {stop && createPortal(<button className={stop.className} type="button" data-dsh-acp-stop="" aria-label={t('stop')} title={t('stop')}
       onMouseDown={event => event.preventDefault()} onClick={() => acpStore.cancelTurn()}>
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">

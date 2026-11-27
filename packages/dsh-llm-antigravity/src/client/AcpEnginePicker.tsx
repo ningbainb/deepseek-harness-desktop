@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { AcpChatView } from './AcpChatView.tsx'
@@ -6,7 +6,15 @@ import { AntigravityAcpStore, acpStore, type AcpEngine, type AcpEngineProbe } fr
 import css from './AcpChat.module.css'
 
 type Localized = PropsLocale<'llm-antigravity'>
-type Props = Localized & { conversationId: string; getCwd?: () => string | undefined }
+export interface AcpWorkbenchActions {
+  registerWorkbench: (open: () => void) => () => void
+}
+
+type Props = Localized & AcpWorkbenchActions & {
+  conversationId: string
+  getCwd?: () => string | undefined
+  focusComposer: () => void
+}
 const headers = { 'content-type': 'application/json', 'x-dsh-acp': '1' }
 
 const statusLabels = {
@@ -75,9 +83,8 @@ function AcpSidePane({ engine, store, close, active, tabs, t }: Localized & {
   </aside>
 }
 
-export function AcpEnginePicker({ conversationId, getCwd, t }: Props) {
+export function AcpEnginePicker({ conversationId, getCwd, registerWorkbench, focusComposer, t }: Props) {
   const active = useSyncExternalStore(acpStore.subscribe, acpStore.getSnapshot, acpStore.getSnapshot)
-  const menuId = useId()
   const [agents, setAgents] = useState<AcpEngine[]>([])
   const [probes, setProbes] = useState<Record<string, AcpEngineProbe>>({})
   const [loading, setLoading] = useState(false)
@@ -87,60 +94,40 @@ export function AcpEnginePicker({ conversationId, getCwd, t }: Props) {
   const [panes, setPanes] = useState<Array<{ engine: AcpEngine; store: AntigravityAcpStore }>>([])
   const [activePane, setActivePane] = useState<string>()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [menuPosition, setMenuPosition] = useState<CSSProperties>()
-  const detail = useRef<HTMLDetailsElement>(null)
-  const trigger = useRef<HTMLElement>(null)
-  const menu = useRef<HTMLDivElement>(null)
+  const dialog = useRef<HTMLDialogElement>(null)
   const current = active.active && active.conversationId === conversationId
   const selected = current ? agents.find(agent => agent.id === active.agentId) : undefined
 
+  useLayoutEffect(() => registerWorkbench(() => setMenuOpen(true)), [registerWorkbench])
   useLayoutEffect(() => {
-    if (!menuOpen) return
-    const positionMenu = () => {
-      const anchor = trigger.current?.getBoundingClientRect()
-      if (!anchor) return
-      const width = Math.min(336, window.innerWidth - 32)
-      const showAbove = anchor.top > window.innerHeight - anchor.bottom
-      const left = Math.min(Math.max(16, anchor.right - width), window.innerWidth - width - 16)
-      setMenuPosition({
-        left, width,
-        ...(showAbove ? { bottom: window.innerHeight - anchor.top + 8 } : { top: anchor.bottom + 8 }),
-        maxHeight: Math.max(80, Math.min(460, (showAbove ? anchor.top : window.innerHeight - anchor.bottom) - 20)),
-      })
-    }
-    const onOutsideClick = (event: PointerEvent) => {
-      if (event.target instanceof Node && (detail.current?.contains(event.target) || menu.current?.contains(event.target))) return
-      if (detail.current) detail.current.open = false
-      setMenuOpen(false)
-    }
-    positionMenu()
-    menu.current?.focus({ preventScroll: true })
-    window.addEventListener('resize', positionMenu)
-    window.addEventListener('scroll', positionMenu, true)
-    window.addEventListener('pointerdown', onOutsideClick, true)
-    return () => {
-      window.removeEventListener('resize', positionMenu)
-      window.removeEventListener('scroll', positionMenu, true)
-      window.removeEventListener('pointerdown', onOutsideClick, true)
-    }
+    const node = dialog.current
+    if (!menuOpen || !node) return
+    node.showModal()
+    return () => node.close()
   }, [menuOpen])
 
-  async function refresh() {
-    if (loading) return
-    setLoading(true)
-    setLoadError(false)
-    try {
-      const response = await fetch('/api/dsh-acp/agents', { headers })
-      if (!response.ok) throw new Error(String(response.status))
-      const data = await response.json() as { agents: AcpEngine[]; probes: AcpEngineProbe[] }
-      setAgents(data.agents)
-      setProbes(Object.fromEntries(data.probes.map(probe => [probe.agentId, probe])))
-    } catch {
-      setLoadError(true)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    if (!menuOpen) return
+    const controller = new AbortController()
+    async function refresh() {
+      setLoading(true)
+      setLoadError(false)
+      try {
+        const response = await fetch('/api/dsh-acp/agents', { headers, signal: controller.signal })
+        if (!response.ok) throw new Error(String(response.status))
+        const data = await response.json() as { agents: AcpEngine[]; probes: AcpEngineProbe[] }
+        if (controller.signal.aborted) return
+        setAgents(data.agents)
+        setProbes(Object.fromEntries(data.probes.map(probe => [probe.agentId, probe])))
+      } catch {
+        if (!controller.signal.aborted) setLoadError(true)
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }
-  }
+    void refresh()
+    return () => controller.abort()
+  }, [menuOpen])
 
   async function diagnose(agent: AcpEngine) {
     setChecking(agent.id)
@@ -164,8 +151,9 @@ export function AcpEnginePicker({ conversationId, getCwd, t }: Props) {
     || agent.id === 'antigravity' && active.diagnostic?.state === 'ready'
 
   const closePicker = () => {
-    if (detail.current) detail.current.open = false
+    dialog.current?.close()
     setMenuOpen(false)
+    focusComposer()
   }
   const openPane = (engine: AcpEngine) => {
     if (!panes.some(pane => pane.engine.id === engine.id)) {
@@ -179,7 +167,7 @@ export function AcpEnginePicker({ conversationId, getCwd, t }: Props) {
     const current = panes.filter(pane => pane.engine.id !== engineId)
     setPanes(current)
     setActivePane(current.at(-1)?.engine.id)
-    if (!current.length) trigger.current?.focus()
+    if (!current.length) focusComposer()
   }
   const engineRow = (agent: AcpEngine) => {
     const probe = probes[agent.id]
@@ -214,17 +202,18 @@ export function AcpEnginePicker({ conversationId, getCwd, t }: Props) {
   }
 
   return <>
-    <details ref={detail} className={css.enginePicker} onToggle={event => {
-      if (event.target !== event.currentTarget) return
-      setMenuOpen(event.currentTarget.open)
-      if (event.currentTarget.open) void refresh()
-    }}
-      onKeyDown={event => { if (event.key === 'Escape') { closePicker(); trigger.current?.focus() } }}>
-      <summary ref={trigger} data-dsh-acp-engines="" aria-label={t('engines')} aria-controls={menuId}>
-        {selected?.name ?? t('engines')}
-      </summary>
-      {menuOpen && createPortal(<div ref={menu} id={menuId} className={css.engineMenu}
-        style={menuPosition} role="group" tabIndex={-1} aria-label={t('engines')}>
+    {menuOpen && createPortal(
+      <dialog ref={dialog} className={css.engineMenu} data-dsh-acp-workbench="" aria-label={t('engines')}
+        onCancel={event => { event.preventDefault(); closePicker() }}
+        onClick={event => {
+          if (event.target !== event.currentTarget) return
+          const bounds = event.currentTarget.getBoundingClientRect()
+          if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) closePicker()
+        }}>
+        <header className={css.sideHeader}>
+          <strong>{t('engines')}</strong>
+          <button type="button" aria-label={t('closeWorkbench')} onClick={closePicker}>×</button>
+        </header>
         {loading && <p role="status">{t('enginesLoading')}</p>}
         {loadError && <p role="alert">{t('enginesUnavailable')}</p>}
         {current && <button type="button" onClick={() => { acpStore.closeToNormalChat(); closePicker() }}>{t('returnToDeepSeek')}</button>}
@@ -234,8 +223,7 @@ export function AcpEnginePicker({ conversationId, getCwd, t }: Props) {
           <summary>{t('discoverEngines')}</summary>
           <ul>{agents.filter(agent => !ready(agent)).map(engineRow)}</ul>
         </details>}
-      </div>, document.body)}
-    </details>
+      </dialog>, document.body)}
     {panes.length > 0 && createPortal(panes.map(pane => <AcpSidePane key={pane.engine.id}
       engine={pane.engine} store={pane.store} active={pane.engine.id === activePane}
       close={() => closePane(pane.engine.id)} t={t}

@@ -350,9 +350,31 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
   </section>
 }
 
+// The optional native command menu supplies the invoking session to a client action.
+interface AcpCommandMenu {
+  register(action: {
+    name: string
+    label(): string
+    available(session: { sessionId: string }): boolean
+    ui: { kind: 'action'; run(session: { sessionId: string }): void }
+  }): () => void
+}
+
 export const inject = ['slots', 'configForms', 'locale']
 
 export function apply(ctx: Context) {
+  const workbenches = new Map<string, () => void>()
+  ctx.inject(['commandUi'], scope => {
+    const commands = scope.get('commandUi') as AcpCommandMenu
+    const t = ctx.locale.bind(namespace)
+    scope.effect(() => commands.register({
+      name: 'acp',
+      label: () => t('engines'),
+      available: session => workbenches.has(session.sessionId),
+      ui: { kind: 'action', run: session => workbenches.get(session.sessionId)?.() },
+    }))
+  })
+
   ctx.effect(() => ctx.locale.register(namespace, { zh, en }))
   ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
     name: 'web-ui.plugin.item', id: namespace, order: 120, locale: namespace,
@@ -364,6 +386,11 @@ export function apply(ctx: Context) {
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
     name: 'conversation.input.right', id: `${namespace}-acp-composer`, locale: namespace,
     inject: sessionId => ({
+      registerWorkbench: (open: () => void) => {
+        const id = String(sessionId)
+        workbenches.set(id, open)
+        return () => { if (workbenches.get(id) === open) workbenches.delete(id) }
+      },
       getCwd: () => {
         const sessions = (ctx as { get?: (key: string) => unknown }).get?.('sessions') as {
           binding?(sessionId: string): { session: { projections: { faceOf(name: string): { getSnapshot(): unknown } } } } | undefined

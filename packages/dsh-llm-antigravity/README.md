@@ -6,7 +6,7 @@ English | [中文](README.zh.md)
 
 Community Desktop detects the local Google Antigravity CLI and supports direct interactive ACP through the Desktop compatibility layer.
 
-The composer’s **ACP engines** menu also discovers Claude Code ACP, OpenAI Codex ACP, OpenCode, and agents configured in `acp/agents.json` under the desktop profile. Select an engine to use the current conversation’s composer, or open an independent ACP pane beside DeepSeek chat. Model and reasoning controls use the options advertised by the active engine.
+Open **ACP engines** from the conversation’s **+** menu or type `/acp`. The workbench also discovers Claude Code ACP, OpenAI Codex ACP, OpenCode, and agents configured in `acp/agents.json` under the desktop profile. Select an engine to use the current conversation’s composer, or open an independent ACP pane beside DeepSeek chat. Model and reasoning controls use the options advertised by the active engine.
 
 ## Install
 

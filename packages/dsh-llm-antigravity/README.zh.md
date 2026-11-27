@@ -6,7 +6,7 @@
 
 社区桌面版可检测本机 Google Antigravity CLI，并通过桌面兼容层支持本机交互式 ACP。
 
-输入框的 **ACP 引擎**菜单也会发现 Claude Code ACP、OpenAI Codex ACP、OpenCode 和桌面 Profile 中 `acp/agents.json` 配置的引擎。选择引擎后可以使用当前对话的输入框，也可以在 DeepSeek 对话旁打开独立的 ACP 辅助窗。模型与推理档位依据当前引擎公开的会话选项显示。
+从会话的 **+** 菜单选择 **ACP 引擎**，或输入 `/acp` 打开工作台。工作台还会发现 Claude Code ACP、OpenAI Codex ACP、OpenCode 和桌面 Profile 中 `acp/agents.json` 配置的引擎。选择引擎后可以使用当前对话的输入框，也可以在 DeepSeek 对话旁打开独立的 ACP 辅助窗。模型与推理档位依据当前引擎公开的会话选项显示。
 
 ## 安装
 

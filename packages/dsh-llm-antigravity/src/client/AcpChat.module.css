@@ -69,26 +69,9 @@
 .stopMount, .transcriptMount { display: contents; }
 .nativeSendHidden { display: none !important; }
 
-.enginePicker {
-  position: relative;
-  color: var(--dsw-alias-label-primary);
-}
-
-.enginePicker > summary {
-  display: block;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: var(--dsw-alias-bg-module-platform);
-  font-size: 12px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.enginePicker > summary::-webkit-details-marker { display: none; }
-
 .engineMenu {
-  position: fixed;
-  z-index: 151;
+  box-sizing: border-box;
+  margin: auto;
   width: min(336px, calc(100vw - 40px));
   max-height: min(60vh, 460px);
   overflow: auto;
@@ -100,6 +83,8 @@
   box-shadow: 0 10px 28px color-mix(in srgb, var(--dsw-alias-label-primary) 15%, transparent);
   font-size: 12px;
 }
+
+.engineMenu::backdrop { background: var(--dsw-alias-mask, rgb(0 0 0 / 25%)); }
 
 .engineMenu ul {
   margin: 4px 0;
@@ -157,7 +142,6 @@
 .engineMenu button:disabled,
 .sidePane button:disabled { color: var(--dsw-alias-label-tertiary); }
 
-.enginePicker summary:focus-visible,
 .engineMenu button:focus-visible,
 .sidePane button:focus-visible,
 .sessionOptions select:focus-visible,

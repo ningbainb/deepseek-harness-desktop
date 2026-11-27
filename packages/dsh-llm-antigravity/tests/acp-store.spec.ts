@@ -172,22 +172,55 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
     expect(calls.some(c => c.url === '/api/dsh-acp/session/close')).toBe(true)
   })
 
-  it('registers settings and the inline Gemini view in DSH slots', () => {
-    const effects: Array<() => void> = []
+  it('opens the native /acp action only for the invoking conversation and disposes its binding', () => {
+    type Session = { sessionId: string }
+    type Command = { name: string; label(): string; available(session: Session): boolean; ui: { kind: string; run(session: Session): void } }
+    type Bind = (id: string) => { registerWorkbench(open: () => void): () => void }
+    const commands: Command[] = []
     const injectedSlots: string[] = []
     const registeredSlots: string[] = []
+    let bind!: Bind
     const fakeCtx = {
-      effect: (fn: () => void) => { effects.push(fn); return () => {} },
-      locale: { register: () => () => {} },
+      effect: (fn: () => unknown) => fn(),
+      locale: { register: vi.fn(), bind: () => (key: string) => key },
       configForms: { get: () => ({}) },
+      inject: (deps: string[], fn: (scope: unknown) => void) => {
+        expect(deps).toEqual(['commandUi'])
+        fn({ effect: (effect: () => unknown) => effect(), get: (name: string) => {
+          expect(name).toBe('commandUi')
+          return { register: (command: Command) => { commands.push(command); return () => {} } }
+        } })
+      },
       slots: {
         inject: (slot: string, fn: () => unknown) => { injectedSlots.push(slot); fn(); return () => {} },
-        register: (opts: { name: string }) => { registeredSlots.push(opts.name); return () => {} },
+        register: (opts: { name: string; inject?: Bind }) => {
+          registeredSlots.push(opts.name)
+          if (opts.name === 'conversation.input.right') bind = opts.inject!
+          return () => {}
+        },
       },
     }
     apply(fakeCtx as never)
     expect(injectedSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame', 'conversation.input.right'])
-    expect(registeredSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame', 'conversation.input.right'])
+    expect(registeredSlots).toEqual(injectedSlots)
+    expect(commands).toHaveLength(1)
+    const [command] = commands
+    expect([command.name, command.label(), command.ui.kind]).toEqual(['acp', 'engines', 'action'])
+    const a = { sessionId: 'a' }
+    const b = { sessionId: 'b' }
+    const openA = vi.fn(), openB = vi.fn()
+    expect(command.available(a)).toBe(false)
+    const unbindA = bind('a').registerWorkbench(openA)
+    bind('b').registerWorkbench(openB)
+    expect(command.available(a)).toBe(true)
+    command.ui.run(a)
+    expect(openA).toHaveBeenCalledTimes(1)
+    expect(openB).not.toHaveBeenCalled()
+    unbindA()
+    expect(command.available(a)).toBe(false)
+    expect(command.available(b)).toBe(true)
+    command.ui.run(a)
+    expect(openA).toHaveBeenCalledTimes(1)
   })
 
   it('requests separate Desktop interaction proofs for the exact start and prompt body', async () => {
