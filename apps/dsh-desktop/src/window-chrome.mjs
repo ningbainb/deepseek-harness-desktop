@@ -608,17 +608,17 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
       };
       if (canShowTools) addMenu({
         kind: 'tools',
-        label: '工具 / Tools',
+        label: '工具',
         entries: [
-          { label: '内置终端 / Built-in Terminal', action: 'terminal', shortcut: 'Ctrl+Alt+T' },
-          { label: '扩展坞 / Extension Dock', action: 'extensions', shortcut: 'Ctrl+Shift+X' },
-          { label: '从其他 AI 工具导入 / Migrate from Other AI Tools', action: 'conversation-import' },
+          { label: '内置终端', action: 'terminal', shortcut: 'Ctrl+Alt+T' },
+          { label: '扩展坞', action: 'extensions', shortcut: 'Ctrl+Shift+X' },
+          { label: '从其他 AI 工具导入', action: 'conversation-import' },
         ],
         invoke: (action) => window.dshDesktop.toolAction(action),
       });
       if (canShowHelp) addMenu({
         kind: 'help',
-        label: '帮助 / Help',
+        label: '帮助',
         entries: [
           { label: '加入社群', action: 'community' },
           { label: '提交建议', action: 'feedback' },

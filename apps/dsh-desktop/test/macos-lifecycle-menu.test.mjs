@@ -29,19 +29,19 @@ test('macOS uses the native application menu while Windows keeps the existing Ap
   const darwin = createApplicationMenuTemplate(menuOptions('darwin'))
   assert.equal(darwin[0].role, 'appMenu')
   assert.deepEqual(darwin[0].submenu.map(entry => entry.role ?? entry.type ?? entry.label), [
-    'about', 'separator', '关闭行为 / Close behavior', 'separator', 'services', 'separator',
+    'about', 'separator', '关闭行为', 'separator', 'services', 'separator',
     'hide', 'hideOthers', 'unhide', 'separator', 'quit',
   ])
-  assert.deepEqual(darwin[0].submenu.find(entry => entry.label === '关闭行为 / Close behavior').submenu
+  assert.deepEqual(darwin[0].submenu.find(entry => entry.label === '关闭行为').submenu
     .map(entry => ({ type: entry.type, checked: entry.checked })), [
     { type: 'radio', checked: true }, { type: 'radio', checked: false }, { type: 'radio', checked: false },
   ])
 
   const win32 = createApplicationMenuTemplate(menuOptions('win32'))
   assert.equal(win32[0].role, undefined)
-  assert.equal(win32[0].label, '应用 / App')
+  assert.equal(win32[0].label, '应用')
   assert.equal(win32[0].submenu.at(-1).role, 'quit')
-  assert.ok(win32[0].submenu.some((entry) => entry.label === '关闭行为 / Close behavior'))
+  assert.ok(win32[0].submenu.some((entry) => entry.label === '关闭行为'))
 })
 
 test('macOS close retains the main window for Dock activation unless quit is explicit', () => {

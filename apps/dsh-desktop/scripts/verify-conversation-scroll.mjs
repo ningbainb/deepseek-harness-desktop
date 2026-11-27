@@ -599,7 +599,7 @@ try {
       const scroll = document.querySelector('[data-conversation-scroll]')
       return scroll instanceof HTMLElement && scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 40
     })
-    await second.page.getByRole('button', { name: '工具 / Tools', exact: true }).click()
+    await second.page.getByRole('button', { name: '工具', exact: true }).click()
     assert.equal(await second.page.locator('[data-dsh-turn-navigator]').count(), 0)
     await second.page.keyboard.press('Escape')
     dark = await assertDarkReadability(second.page)

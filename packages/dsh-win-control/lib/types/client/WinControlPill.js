@@ -13,14 +13,12 @@ export function WinControlPill({ sessionId, t }) {
             .catch(() => { });
         return () => { active = false; };
     }, [sessionId]);
-    if (!state)
-        return null;
-    if (state.platform !== 'win32' && state.bridgedToolCount === 0 && state.installedVersions.length === 0) {
+    if (!state || state.bridgedToolCount === 0) {
         return null;
     }
-    const hasBridge = state.bridgedToolCount > 0 || state.installedVersions.length > 0;
     const granted = state.sessionGranted;
-    const disabled = busy || !sessionId || !hasBridge;
+    const disabled = busy || !sessionId;
+    const stateLabel = granted ? t('pillOn') : t('pillOff');
     async function toggle() {
         if (disabled || !sessionId)
             return;
@@ -36,5 +34,5 @@ export function WinControlPill({ sessionId, t }) {
             setBusy(false);
         }
     }
-    return (_jsxs("button", { type: "button", className: css.pill, "data-active": granted ? 'true' : 'false', "aria-pressed": granted, disabled: disabled, title: hasBridge ? t('pillTooltip') : t('pillUnavailable'), onClick: () => void toggle(), children: [_jsx("span", { className: css.dot, "aria-hidden": "true" }), _jsx("span", { children: granted ? t('pillOn') : t('pillOff') }), state.bridgedToolCount > 0 && _jsx("span", { className: css.countBadge, children: state.bridgedToolCount })] }));
+    return (_jsxs("button", { type: "button", className: css.pill, "data-active": granted ? 'true' : 'false', "aria-pressed": granted, "aria-label": stateLabel, disabled: disabled, title: `${stateLabel} — ${t('pillTooltip')}`, onClick: () => void toggle(), children: [_jsx("span", { className: css.dot, "aria-hidden": "true" }), _jsx("span", { children: t('pillLabel') }), _jsx("span", { className: css.countBadge, children: state.bridgedToolCount })] }));
 }

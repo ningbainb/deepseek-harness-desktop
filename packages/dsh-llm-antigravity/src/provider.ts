@@ -48,6 +48,9 @@ export class AntigravityAdapter extends LlmAdapter {
     }
     const result = await this.cache.probe
     const models = result.state === 'ready' ? this.models(result, settings.extraModels) : result.models
+    if (refresh && result.state === 'ready' && harnessLlmAllowed) {
+      this.catalogUpdated()
+    }
     return { ...result, authMode: settings.authMode, harnessLlmAllowed, models }
   }
 

@@ -342,11 +342,11 @@ try {
     url: location.href,
   }))
   const requiredChromeEntries = [
-    '工具 / Tools',
-    '内置终端 / Built-in TerminalCtrl+Alt+T',
-    '扩展坞 / Extension DockCtrl+Shift+X',
-    '从其他 AI 工具导入 / Migrate from Other AI Tools',
-    '帮助 / Help',
+    '工具',
+    '内置终端Ctrl+Alt+T',
+    '扩展坞Ctrl+Shift+X',
+    '从其他 AI 工具导入',
+    '帮助',
     '加入社群',
     '提交建议',
     'GitHub 项目',
@@ -482,19 +482,19 @@ try {
     popup?.close()
     return allowed
   }), true)
-  const toolsButton = page.getByRole('button', { name: '工具 / Tools', exact: true })
+  const toolsButton = page.getByRole('button', { name: '工具', exact: true })
   await toolsButton.click()
   assert.equal(await toolsButton.getAttribute('aria-expanded'), 'true')
-  const toolsMenu = page.getByRole('menu', { name: '工具 / Tools' })
+  const toolsMenu = page.getByRole('menu', { name: '工具' })
   await toolsMenu.waitFor({ state: 'visible' })
   assert.deepEqual(await toolsMenu.getByRole('menuitem').allTextContents(), [
-    '内置终端 / Built-in TerminalCtrl+Alt+T',
-    '扩展坞 / Extension DockCtrl+Shift+X',
-    '从其他 AI 工具导入 / Migrate from Other AI Tools',
+    '内置终端Ctrl+Alt+T',
+    '扩展坞Ctrl+Shift+X',
+    '从其他 AI 工具导入',
   ])
   if (screenshot) await page.screenshot({ path: screenshot })
   const extensionPagePromise = electronApp.waitForEvent('window')
-  await toolsMenu.getByRole('menuitem', { name: '扩展坞 / Extension Dock' }).click()
+  await toolsMenu.getByRole('menuitem', { name: '扩展坞' }).click()
   const extensionPage = await extensionPagePromise
   await extensionPage.waitForURL(/extensions\.html/u)
   await extensionPage.getByRole('heading', { name: '拓展坞', exact: true }).waitFor({ state: 'visible' })
@@ -515,10 +515,10 @@ try {
   })
   await extensionPage.close()
 
-  const helpButton = page.getByRole('button', { name: '帮助 / Help', exact: true })
+  const helpButton = page.getByRole('button', { name: '帮助', exact: true })
   await helpButton.click()
   assert.equal(await helpButton.getAttribute('aria-expanded'), 'true')
-  const helpMenu = page.getByRole('menu', { name: '帮助 / Help' })
+  const helpMenu = page.getByRole('menu', { name: '帮助' })
   await helpMenu.waitFor({ state: 'visible' })
   assert.deepEqual(await helpMenu.getByRole('menuitem').allTextContents(), [
     '加入社群',
@@ -547,8 +547,8 @@ try {
   assert.equal(await communityPage.locator('#community-group-number').textContent(), COMMUNITY_QQ_GROUP)
   assert.equal(await communityPage.locator('#qr-status').isVisible(), false)
   assert.equal(electronApp.windows().filter((window) => window.url().includes('community.html')).length, 1)
-  assert.equal(await communityPage.getByRole('button', { name: '帮助 / Help' }).count(), 0)
-  assert.equal(await communityPage.getByRole('button', { name: '工具 / Tools' }).count(), 0)
+  assert.equal(await communityPage.getByRole('button', { name: '帮助' }).count(), 0)
+  assert.equal(await communityPage.getByRole('button', { name: '工具' }).count(), 0)
   const communitySession = await electronApp.evaluate(({ BrowserWindow, session }, partition) => {
     const windows = BrowserWindow.getAllWindows()
     const main = windows.find((window) => window.webContents.getURL().startsWith('dsh-runtime://app/'))
@@ -677,10 +677,10 @@ try {
   assert.ok(compactDialog.bounds.height <= 281, JSON.stringify(compactDialog))
   const nativeWindowState = await electronApp.evaluate(({ app, BrowserWindow, Menu, nativeImage }) => {
     const window = BrowserWindow.getAllWindows()[0]
-    const helpMenu = Menu.getApplicationMenu()?.items.find((item) => item.label.includes('Help'))
-    const toolsMenu = Menu.getApplicationMenu()?.items.find((item) => item.label.includes('Tools'))
-    const extensionDockMenu = toolsMenu?.submenu?.items.find((item) => item.label.includes('Extension Dock'))
-    const updateMenu = helpMenu?.submenu?.items.find((item) => item.label.includes('Check for Updates'))
+    const helpMenu = Menu.getApplicationMenu()?.items.find((item) => item.label === '帮助')
+    const toolsMenu = Menu.getApplicationMenu()?.items.find((item) => item.label === '工具')
+    const extensionDockMenu = toolsMenu?.submenu?.items.find((item) => item.label === '扩展坞')
+    const updateMenu = helpMenu?.submenu?.items.find((item) => item.label === '检查更新')
     const packagedIcon = app.isPackaged
       ? nativeImage.createFromPath(`${process.resourcesPath}\\app-icon.png`)
       : undefined

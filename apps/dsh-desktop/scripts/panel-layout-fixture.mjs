@@ -54,7 +54,7 @@ export async function waitForNativeSidebarCollapsed(panel) {
 
 /** Verify each panel keeps its local control and Tools does not duplicate layout actions. */
 export async function verifyLocalPanelControls(page, output) {
-  const tools = page.getByRole('button', { name: '工具 / Tools', exact: true })
+  const tools = page.getByRole('button', { name: '工具', exact: true })
   const bottomToggle = page.locator('[data-dsh-bottom-toggle="true"]:visible')
   const native = page.locator('[data-sidebar-right-expand]:visible, [data-sidebar-right-toggle]:visible, [data-aionui-sidebar-return-button]:visible')
   await native.first().waitFor()

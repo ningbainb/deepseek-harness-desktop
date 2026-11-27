@@ -26,7 +26,8 @@ const en = {
   authBusiness: 'Gemini Enterprise (oauth-business, interactive ACP only)',
   authApiKey: 'Gemini API key (gemini-api-key)',
   authPlatform: 'Google Cloud / Vertex AI (agent-platform)',
-  oauthComplianceNotice: 'Personal and business OAuth are restricted to direct interactive ACP sessions. The CLI can reuse a saved Google login, so model backend access requires independently verified API-billed authentication.',
+  oauthComplianceNotice: 'Personal and business OAuth are restricted to direct interactive ACP sessions and will not appear in the chat model picker. Switch Authentication mode to Gemini API key (with GEMINI_API_KEY) or Google Cloud / Vertex AI (with ADC credentials) and save to add them to chat.',
+  missingApiCredentialNotice: 'API-billed credentials were not detected yet. Set GEMINI_API_KEY / GOOGLE_API_KEY (or GCP Application Default Credentials), then click Refresh models so Antigravity models appear in the chat picker.',
   expand: 'Show all models', collapse: 'Show fewer models', unsaved: 'Unsaved changes', saved: 'Settings saved.', saving: 'Saving settings',
   reset: 'Discard changes',
   title: 'Antigravity CLI (Gemini)', enabled: 'Enable provider', cliPath: 'Absolute agy executable path',
@@ -62,7 +63,8 @@ const zh: typeof en = {
   authBusiness: 'Gemini Enterprise（仅交互 ACP）',
   authApiKey: 'Gemini API Key（按量计费）',
   authPlatform: 'Google Cloud / Vertex AI（ADC 按量计费）',
-  oauthComplianceNotice: '个人与企业 OAuth 仅可用于本机人工交互的 ACP 会话。CLI 可能复用已保存的 Google 登录，因此只有独立验证了按量计费凭据才能开放模型后端。',
+  oauthComplianceNotice: '说明：个人或企业 Google OAuth 仅限终端/ACP 人工交互使用，不会出现在对话框模型下拉列表中。如需在对话框直接选用 Gemini 模型，请将上方「认证方式」切换为「Gemini API Key（按量计费）」或「Google Cloud / Vertex AI」，配置环境变量后点击保存并刷新模型。',
+  missingApiCredentialNotice: '当前环境尚未检测到按量计费凭据（GEMINI_API_KEY / GOOGLE_API_KEY 或 gcloud ADC 凭据文件）。配置对应环境变量并重启桌面端后，模型将自动出现在对话框下拉列表中。',
   expand: '显示全部模型', collapse: '收起模型', unsaved: '有未保存的修改', saved: '设置已保存。', saving: '正在保存设置',
   reset: '还原修改',
   title: 'Antigravity CLI (Gemini)', enabled: '启用模型提供商', cliPath: 'agy 可执行文件绝对路径',
@@ -306,7 +308,11 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
           </div>
           <p className={css.fieldHint}>{t('transportHint')}</p>
           {!diagnostic?.harnessLlmAllowed && <div className={css.guideBox} data-tone="warn">
-            <p className={css.guideText}>{t('oauthComplianceNotice')}</p>
+            <p className={css.guideText}>
+              {t(draft.authMode === 'gemini-api-key' || draft.authMode === 'agent-platform'
+                ? 'missingApiCredentialNotice'
+                : 'oauthComplianceNotice')}
+            </p>
           </div>}
 
           <details ref={advancedRef} className={css.advanced}>

@@ -144,8 +144,8 @@ test('Help menu exposes What’s New entry when openReleaseGuide is wired', () =
     openReleaseGuide: () => calls.push('opened'),
     checkForUpdates: () => {},
   })
-  const help = template.find((entry) => entry.label === '帮助 / Help')
-  const whatsNew = help.submenu.find((entry) => entry.label === "本版本新功能 / What's New")
+  const help = template.find((entry) => entry.label === '帮助')
+  const whatsNew = help.submenu.find((entry) => entry.label === '本版本新功能')
   assert.ok(whatsNew)
   whatsNew.click()
   assert.deepEqual(calls, ['opened'])

@@ -9,8 +9,8 @@ test('Tools contains actions only and does not relocate panel controls', () => {
   const script = createWindowChromeScript({ showToolsMenu: true })
   assert.doesNotMatch(script, /data-dsh-layout-action|dsh-layout-group|disposePanelLayout|installPanelLayoutMenu/u)
   assert.doesNotMatch(script, /Bottom Tools|Compatibility Sidebar|底部工具面板|兼容侧栏/u)
-  assert.match(script, /内置终端 \/ Built-in Terminal/u)
-  assert.match(script, /扩展坞 \/ Extension Dock/u)
+  assert.match(script, /内置终端/u)
+  assert.match(script, /扩展坞/u)
 })
 
 test('window chrome leaves the bottom and native sidebar controls in their owning surfaces', () => {

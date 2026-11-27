@@ -7,15 +7,15 @@ function asText(value, fallback) {
 }
 
 export function normalizeTrayTaskStatus(value) {
-  if (typeof value === 'string') return asText(value, '暂无后台任务 / No background tasks')
+  if (typeof value === 'string') return asText(value, '暂无后台任务')
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return '暂无后台任务 / No background tasks'
+    return '暂无后台任务'
   }
-  if (typeof value.label === 'string') return asText(value.label, '暂无后台任务 / No background tasks')
+  if (typeof value.label === 'string') return asText(value.label, '暂无后台任务')
   const active = Number.isInteger(value.active) && value.active >= 0 ? value.active : 0
   const queued = Number.isInteger(value.queued) && value.queued >= 0 ? value.queued : 0
-  if (active === 0 && queued === 0) return '暂无后台任务 / No background tasks'
-  return `运行中 ${active}，排队 ${queued} / Active ${active}, queued ${queued}`
+  if (active === 0 && queued === 0) return '暂无后台任务'
+  return `运行中 ${active}，排队 ${queued}`
 }
 
 /** Restore a hidden/minimized main window without exposing it to a renderer. */
@@ -134,16 +134,16 @@ export class DesktopTrayLifecycle {
   #buildMenu() {
     const action = (operation) => () => this.#run(operation)
     return [
-      { label: '打开 / Open', click: action(() => restoreDesktopWindow(this.getWindow())) },
+      { label: '打开', click: action(() => restoreDesktopWindow(this.getWindow())) },
       {
-        label: `任务状态 / Task status: ${this.lastTaskStatus}`,
+        label: `任务状态：${this.lastTaskStatus}`,
         click: action(() => this.openTaskStatus()),
       },
       { type: 'separator' },
-      { label: '扩展坞 / Extension Dock', click: action(() => this.openExtensions()) },
-      { label: '检查更新 / Check for Updates', click: action(() => this.checkForUpdates({ manual: true })) },
+      { label: '扩展坞', click: action(() => this.openExtensions()) },
+      { label: '检查更新', click: action(() => this.checkForUpdates({ manual: true })) },
       { type: 'separator' },
-      { label: '退出 / Quit', click: action(() => this.requestQuit()) },
+      { label: '退出', click: action(() => this.requestQuit()) },
     ]
   }
 

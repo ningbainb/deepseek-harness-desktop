@@ -26,23 +26,23 @@ export function createApplicationMenuTemplate({
   const closeBehavior = typeof getCloseBehavior === 'function' ? getCloseBehavior() : 'quit'
   const closeBehaviorEntry = typeof setCloseBehavior === 'function'
     ? {
-        label: '关闭行为 / Close behavior',
+        label: '关闭行为',
         submenu: [
           {
             type: 'radio',
-            label: '退出 / Quit',
+            label: '退出',
             checked: closeBehavior === 'quit',
             click: action(() => setCloseBehavior('quit')),
           },
           {
             type: 'radio',
-            label: '最小化到托盘并开启后台自动化 / Minimize to tray and enable background automation',
+            label: '最小化到托盘并开启后台自动化',
             checked: closeBehavior === 'minimize-to-tray',
             click: action(() => setCloseBehavior('minimize-to-tray')),
           },
           {
             type: 'radio',
-            label: '每次询问 / Ask every time',
+            label: '每次询问',
             checked: closeBehavior === 'ask',
             click: action(() => setCloseBehavior('ask')),
           },
@@ -50,7 +50,7 @@ export function createApplicationMenuTemplate({
       }
     : undefined
   const residencyEntry = typeof minimizeToTray === 'function'
-    ? { label: '最小化到托盘 / Minimize to tray', accelerator: 'CmdOrCtrl+Shift+M', click: action(minimizeToTray) }
+    ? { label: '最小化到托盘', accelerator: 'CmdOrCtrl+Shift+M', click: action(minimizeToTray) }
     : undefined
   const applicationMenu = platform === 'darwin'
     ? { role: 'appMenu', submenu: [
@@ -67,72 +67,72 @@ export function createApplicationMenuTemplate({
         { role: 'quit' },
       ] }
     : {
-        label: '应用 / App',
+        label: '应用',
         submenu: [
           ...(residencyEntry ? [residencyEntry] : []),
           ...(closeBehaviorEntry ? [closeBehaviorEntry, { type: 'separator' }] : []),
-          { role: 'quit', label: '退出 / Quit' },
+          { role: 'quit', label: '退出' },
         ],
       }
   return [
     applicationMenu,
     {
-      label: '运行时 / Runtime',
+      label: '运行时',
       submenu: [
-        { label: '重启 DSH / Restart DSH', accelerator: 'CmdOrCtrl+Shift+R', click: action(() => controller.restart()) },
-        { label: '打开日志 / Open Logs', click: action(openLogs) },
+        { label: '重启 DSH', accelerator: 'CmdOrCtrl+Shift+R', click: action(() => controller.restart()) },
+        { label: '打开日志', click: action(openLogs) },
       ],
     },
     {
-      label: '视图 / View',
+      label: '视图',
       submenu: [
-        { role: 'reload', label: '刷新界面 / Reload' },
-        { role: 'forceReload', label: '强制刷新 / Force Reload' },
+        { role: 'reload', label: '刷新界面' },
+        { role: 'forceReload', label: '强制刷新' },
         { type: 'separator' },
-        { role: 'resetZoom', label: '重置缩放 / Actual Size' },
-        { role: 'zoomIn', label: '放大 / Zoom In' },
-        { role: 'zoomOut', label: '缩小 / Zoom Out' },
+        { role: 'resetZoom', label: '重置缩放' },
+        { role: 'zoomIn', label: '放大' },
+        { role: 'zoomOut', label: '缩小' },
         { type: 'separator' },
-        { role: 'togglefullscreen', label: '全屏 / Full Screen' },
+        { role: 'togglefullscreen', label: '全屏' },
       ],
     },
     {
-      label: '工具 / Tools',
+      label: '工具',
       submenu: [
         ...(typeof openTerminal === 'function'
-          ? [{ label: '内置终端 / Built-in Terminal', accelerator: 'CmdOrCtrl+Alt+T', click: action(openTerminal) }]
+          ? [{ label: '内置终端', accelerator: 'CmdOrCtrl+Alt+T', click: action(openTerminal) }]
           : []),
-        { label: '从其他 AI 工具继续工作 / Continue from Other AI Tools', accelerator: 'CmdOrCtrl+Shift+I', click: action(openConversationImport) },
-        { label: '扩展坞 / Extension Dock', accelerator: 'CmdOrCtrl+Shift+X', click: action(openExtensions) },
+        { label: '从其他 AI 工具继续工作', accelerator: 'CmdOrCtrl+Shift+I', click: action(openConversationImport) },
+        { label: '扩展坞', accelerator: 'CmdOrCtrl+Shift+X', click: action(openExtensions) },
       ],
     },
     {
-      label: '编辑 / Edit',
+      label: '编辑',
       submenu: [
-        { role: 'undo', label: '撤销 / Undo' },
-        { role: 'redo', label: '重做 / Redo' },
+        { role: 'undo', label: '撤销' },
+        { role: 'redo', label: '重做' },
         { type: 'separator' },
-        { role: 'cut', label: '剪切 / Cut' },
-        { role: 'copy', label: '复制 / Copy' },
-        { role: 'paste', label: '粘贴 / Paste', accelerator: 'CmdOrCtrl+V' },
-        { role: 'selectAll', label: '全选 / Select All' },
+        { role: 'cut', label: '剪切' },
+        { role: 'copy', label: '复制' },
+        { role: 'paste', label: '粘贴', accelerator: 'CmdOrCtrl+V' },
+        { role: 'selectAll', label: '全选' },
       ],
     },
     {
-      label: '帮助 / Help',
+      label: '帮助',
       submenu: [
         ...(typeof openReleaseGuide === 'function'
-          ? [{ label: "本版本新功能 / What's New", click: action(openReleaseGuide) }]
+          ? [{ label: '本版本新功能', click: action(openReleaseGuide) }]
           : []),
-        { label: '检查更新 / Check for Updates', click: action(() => checkForUpdates({ manual: true })) },
-        { label: '导出诊断日志 / Export Diagnostics', click: action(exportDiagnostics) },
+        { label: '检查更新', click: action(() => checkForUpdates({ manual: true })) },
+        { label: '导出诊断日志', click: action(exportDiagnostics) },
         { type: 'separator' },
-        { label: '加入社群 / Join QQ Group', click: action(openCommunity) },
-        { label: '提建议 / Suggest an Idea', click: action(openFeedback) },
+        { label: '加入社群', click: action(openCommunity) },
+        { label: '提建议', click: action(openFeedback) },
         { label: 'GitHub 项目', click: action(openProject) },
-        { label: '隐私政策 / Privacy', click: action(openPrivacy) },
+        { label: '隐私政策', click: action(openPrivacy) },
         { type: 'separator' },
-        { label: `版本 / Version ${app.getVersion()}`, enabled: false },
+        { label: `版本 ${app.getVersion()}`, enabled: false },
       ],
     },
   ]
@@ -142,11 +142,11 @@ export function createApplicationMenuTemplate({
 export function installEditContextMenu({ webContents, Menu }) {
   const onContextMenu = (_event, params = {}) => {
     const menu = Menu.buildFromTemplate([
-      { role: 'cut', label: '剪切 / Cut', enabled: params.editFlags?.canCut === true },
-      { role: 'copy', label: '复制 / Copy', enabled: params.editFlags?.canCopy === true || Boolean(params.selectionText) },
-      { role: 'paste', label: '粘贴 / Paste' },
+      { role: 'cut', label: '剪切', enabled: params.editFlags?.canCut === true },
+      { role: 'copy', label: '复制', enabled: params.editFlags?.canCopy === true || Boolean(params.selectionText) },
+      { role: 'paste', label: '粘贴' },
       { type: 'separator' },
-      { role: 'selectAll', label: '全选 / Select All' },
+      { role: 'selectAll', label: '全选' },
     ])
     menu.popup()
   }

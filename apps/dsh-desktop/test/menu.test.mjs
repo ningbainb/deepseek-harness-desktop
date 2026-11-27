@@ -53,15 +53,15 @@ test('Tools and Help menus expose built-in terminal, Extension Dock, and communi
     openProject: () => calls.push(['project', GITHUB_PROJECT_URL]),
     checkForUpdates: (options) => calls.push(['updates', options]),
   })
-  const tools = template.find((entry) => entry.label === '工具 / Tools')
-  const extensions = tools.submenu.find((entry) => entry.label === '扩展坞 / Extension Dock')
-  const terminal = tools.submenu.find((entry) => entry.label === '内置终端 / Built-in Terminal')
-  const help = template.find((entry) => entry.label === '帮助 / Help')
-  const community = help.submenu.find((entry) => entry.label === '加入社群 / Join QQ Group')
-  const feedback = help.submenu.find((entry) => entry.label === '提建议 / Suggest an Idea')
+  const tools = template.find((entry) => entry.label === '工具')
+  const extensions = tools.submenu.find((entry) => entry.label === '扩展坞')
+  const terminal = tools.submenu.find((entry) => entry.label === '内置终端')
+  const help = template.find((entry) => entry.label === '帮助')
+  const community = help.submenu.find((entry) => entry.label === '加入社群')
+  const feedback = help.submenu.find((entry) => entry.label === '提建议')
   const project = help.submenu.find((entry) => entry.label === 'GitHub 项目')
-  const privacy = help.submenu.find((entry) => entry.label === '隐私政策 / Privacy')
-  const diagnostics = help.submenu.find((entry) => entry.label === '导出诊断日志 / Export Diagnostics')
+  const privacy = help.submenu.find((entry) => entry.label === '隐私政策')
+  const diagnostics = help.submenu.find((entry) => entry.label === '导出诊断日志')
 
   assert.equal(extensions.accelerator, 'CmdOrCtrl+Shift+X')
   assert.equal(terminal.accelerator, 'CmdOrCtrl+Alt+T')
@@ -97,10 +97,10 @@ test('App menu exposes all persisted close choices and makes background automati
     getCloseBehavior: () => 'ask',
     setCloseBehavior: async (value) => { changes.push(value) },
   })
-  const app = template.find((entry) => entry.label === '应用 / App')
-  const closeBehavior = app.submenu.find((entry) => entry.label === '关闭行为 / Close behavior')
-  const ask = closeBehavior.submenu.find((entry) => entry.label.includes('Ask every time'))
-  const background = closeBehavior.submenu.find((entry) => entry.label.includes('enable background automation'))
+  const app = template.find((entry) => entry.label === '应用')
+  const closeBehavior = app.submenu.find((entry) => entry.label === '关闭行为')
+  const ask = closeBehavior.submenu.find((entry) => entry.label.includes('每次询问'))
+  const background = closeBehavior.submenu.find((entry) => entry.label.includes('开启后台自动化'))
   assert.equal(ask.type, 'radio')
   assert.equal(ask.checked, true)
   assert.equal(background.type, 'radio')
@@ -123,10 +123,10 @@ test('native menus expose direct tray residency on every platform without changi
       setCloseBehavior: () => calls.push('preferences'),
     })
     const application = template[0]
-    const residency = application.submenu.find(entry => entry.label === '最小化到托盘 / Minimize to tray')
+    const residency = application.submenu.find(entry => entry.label === '最小化到托盘')
     assert.equal(residency.accelerator, 'CmdOrCtrl+Shift+M')
     assert.ok(application.submenu.some(entry => entry.role === 'quit'))
-    assert.ok(application.submenu.some(entry => entry.label === '关闭行为 / Close behavior'))
+    assert.ok(application.submenu.some(entry => entry.label === '关闭行为'))
     if (platform === 'darwin') {
       assert.equal(application.role, 'appMenu')
       for (const role of ['about', 'services', 'hide', 'hideOthers', 'unhide']) {
@@ -173,9 +173,9 @@ test('Edit menu and native context menu expose paste without renderer clipboard 
     openLogs: () => {},
     checkForUpdates: () => {},
   })
-  const edit = template.find((entry) => entry.label === '编辑 / Edit')
+  const edit = template.find((entry) => entry.label === '编辑')
   const paste = edit.submenu.find((entry) => entry.role === 'paste')
-  assert.equal(paste?.label, '粘贴 / Paste')
+  assert.equal(paste?.label, '粘贴')
   assert.equal(paste?.accelerator, 'CmdOrCtrl+V')
 
   const listeners = new Map()
@@ -227,8 +227,8 @@ test('menu actions report rejected operations without returning a rejected promi
     checkForUpdates: async () => { throw new Error('update failed') },
     onActionError: (error) => errors.push(error.message),
   })
-  const runtime = template.find((entry) => entry.label === '运行时 / Runtime')
-  const help = template.find((entry) => entry.label === '帮助 / Help')
+  const runtime = template.find((entry) => entry.label === '运行时')
+  const help = template.find((entry) => entry.label === '帮助')
 
   assert.equal(runtime.submenu[0].click(), undefined)
   assert.equal(help.submenu[0].click(), undefined)

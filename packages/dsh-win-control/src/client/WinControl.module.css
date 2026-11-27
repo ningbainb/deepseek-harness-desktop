@@ -1,9 +1,11 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  flex-shrink: 0;
+  gap: 5px;
   height: 28px;
-  padding: 0 11px;
+  padding: 0 9px;
+  white-space: nowrap;
   border-radius: 999px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.24));
   background: var(--dsw-alias-bg-layer-2, transparent);

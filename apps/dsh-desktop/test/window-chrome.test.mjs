@@ -377,14 +377,14 @@ test('main window chrome exposes accessible Tools and Help dropdowns with fixed 
   const script = createWindowChromeScript({ showHelpMenu: true, showToolsMenu: true })
   assert.match(script, /"showHelpMenu":true/)
   assert.match(script, /"showToolsMenu":true/)
-  assert.match(script, /工具 \/ Tools/)
-  assert.match(script, /扩展坞 \/ Extension Dock/)
+  assert.match(script, /label: '工具'/)
+  assert.match(script, /label: '扩展坞'/)
   assert.match(script, /action: 'extensions'/)
-  assert.match(script, /内置终端 \/ Built-in Terminal/)
+  assert.match(script, /label: '内置终端'/)
   assert.match(script, /action: 'terminal'/)
   assert.match(script, /Ctrl\+Alt\+T/)
   assert.match(script, /window\.dshDesktop\.toolAction/)
-  assert.match(script, /帮助 \/ Help/)
+  assert.match(script, /label: '帮助'/)
   for (const [label, action] of [
     ['加入社群', 'community'],
     ['提交建议', 'feedback'],

@@ -2283,7 +2283,7 @@
       "path": "packages/dsh-llm-antigravity/src/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-host-webserver",
-      "line": 3,
+      "line": 6,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -5968,13 +5968,13 @@
     {
       "category": "host-service",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 344,
+      "line": 350,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "host-service",
       "path": "packages/dsh-llm-antigravity/src/index.ts",
-      "line": 11,
+      "line": 33,
       "operation": "stream-json"
     },
     {
@@ -16792,7 +16792,7 @@
     {
       "category": "slot",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 348,
+      "line": 354,
       "operation": "web-ui.plugin.item"
     },
     {

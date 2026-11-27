@@ -273,7 +273,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-llm-antigravity/src/core/tool-bridge.ts | 1 | static-import | @deepseek-ai/dsh-llm/types | yes | public-stable | no |
 | packages/dsh-llm-antigravity/src/core/transport.ts | 1 | static-import | @deepseek-ai/dsh-llm/types | yes | public-stable | no |
 | packages/dsh-llm-antigravity/src/index.ts | 1 | static-import | @deepseek-ai/dsh-settings | yes | public-stable | no |
-| packages/dsh-llm-antigravity/src/index.ts | 3 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-llm-antigravity/src/index.ts | 6 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
 | packages/dsh-llm-antigravity/src/provider.ts | 1 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
 | packages/dsh-llm-antigravity/src/provider.ts | 2 | static-import | @deepseek-ai/dsh-llm/types | yes | public-stable | no |
 | packages/dsh-llm-antigravity/tests/provider.spec.ts | 1 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
@@ -697,8 +697,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-live-stats/src/client/index.ts | 69 | remote |
 | host-service | packages/dsh-live-stats/src/index.ts | 17 | live-stats |
 | host-service | packages/dsh-live-stats/src/invariant.ts | 14 | invariants |
-| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 344 | web-ui.plugin.item |
-| host-service | packages/dsh-llm-antigravity/src/index.ts | 11 | stream-json |
+| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 350 | web-ui.plugin.item |
+| host-service | packages/dsh-llm-antigravity/src/index.ts | 33 | stream-json |
 | host-service | packages/dsh-memory/src/client/index.ts | 34 | locale |
 | host-service | packages/dsh-memory/src/index.ts | 31 | tools |
 | host-service | packages/dsh-mode-switcher/src/client/index.ts | 11 | conversation |
@@ -2501,7 +2501,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-im-hub/src/client/index.ts | 25 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 85 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 95 | conversation.composer.dock |
-| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 348 | web-ui.plugin.item |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 354 | web-ui.plugin.item |
 | slot | packages/dsh-memory/src/client/index.ts | 53 | web-ui.plugin.item |
 | slot | packages/dsh-mode-switcher/src/client/index.ts | 34 | conversation.session.header.actions |
 | slot | packages/dsh-model-preferences/src/client/index.ts | 124 | settings.models.footer |

@@ -37,7 +37,7 @@ test('a disposed tray refresh cannot overwrite the status of a replacement tray'
   releases[0]({ active: 99, queued: 0 })
   await tick()
   assert.equal(templates.at(-1), template)
-  assert.match(template[1].label, /Active 2, queued 0/u)
+  assert.match(template[1].label, /运行中 2，排队 0/u)
   lifecycle.dispose()
 })
 
@@ -92,8 +92,8 @@ function createHarness({ Tray = FakeTray, icon = { isEmpty: () => false }, getTa
 }
 
 test('task status labels stay bounded and use a safe no-task fallback', () => {
-  assert.equal(normalizeTrayTaskStatus(), '暂无后台任务 / No background tasks')
-  assert.equal(normalizeTrayTaskStatus({ active: 2, queued: 3 }), '运行中 2，排队 3 / Active 2, queued 3')
+  assert.equal(normalizeTrayTaskStatus(), '暂无后台任务')
+  assert.equal(normalizeTrayTaskStatus({ active: 2, queued: 3 }), '运行中 2，排队 3')
   assert.equal(normalizeTrayTaskStatus(' one\n two '), 'one  two')
   assert.ok(normalizeTrayTaskStatus('a'.repeat(500)).length <= 180)
 })
@@ -111,11 +111,11 @@ test('tray provides all background actions, restores on click/double-click, and 
   assert.deepEqual(
     template.filter((entry) => entry.type !== 'separator').map((entry) => entry.label),
     [
-      '打开 / Open',
-      '任务状态 / Task status: 运行中 1，排队 2 / Active 1, queued 2',
-      '扩展坞 / Extension Dock',
-      '检查更新 / Check for Updates',
-      '退出 / Quit',
+      '打开',
+      '任务状态：运行中 1，排队 2',
+      '扩展坞',
+      '检查更新',
+      '退出',
     ],
   )
   template[0].click()

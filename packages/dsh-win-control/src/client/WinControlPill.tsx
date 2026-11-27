@@ -20,14 +20,13 @@ export function WinControlPill({ sessionId, t }: WinControlPillProps) {
     return () => { active = false }
   }, [sessionId])
 
-  if (!state) return null
-  if (state.platform !== 'win32' && state.bridgedToolCount === 0 && state.installedVersions.length === 0) {
+  if (!state || state.bridgedToolCount === 0) {
     return null
   }
 
-  const hasBridge = state.bridgedToolCount > 0 || state.installedVersions.length > 0
   const granted = state.sessionGranted
-  const disabled = busy || !sessionId || !hasBridge
+  const disabled = busy || !sessionId
+  const stateLabel = granted ? t('pillOn') : t('pillOff')
 
   async function toggle() {
     if (disabled || !sessionId) return
@@ -48,13 +47,14 @@ export function WinControlPill({ sessionId, t }: WinControlPillProps) {
       className={css.pill}
       data-active={granted ? 'true' : 'false'}
       aria-pressed={granted}
+      aria-label={stateLabel}
       disabled={disabled}
-      title={hasBridge ? t('pillTooltip') : t('pillUnavailable')}
+      title={`${stateLabel} — ${t('pillTooltip')}`}
       onClick={() => void toggle()}
     >
       <span className={css.dot} aria-hidden="true" />
-      <span>{granted ? t('pillOn') : t('pillOff')}</span>
-      {state.bridgedToolCount > 0 && <span className={css.countBadge}>{state.bridgedToolCount}</span>}
+      <span>{t('pillLabel')}</span>
+      <span className={css.countBadge}>{state.bridgedToolCount}</span>
     </button>
   )
 }

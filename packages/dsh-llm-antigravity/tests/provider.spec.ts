@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions } from '@deepseek-ai/dsh-llm/types'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { verifyHarnessAuth } from '../src/index.ts'
 import { AntigravityAdapter, providerId, registerProvider } from '../src/provider.ts'
 import { CliRunner, findCli, parseModels } from '../src/core/cli-runner.ts'
 import { defaults, type Diagnostic } from '../src/config.ts'
@@ -186,5 +187,23 @@ describe('Antigravity CLI provider', () => {
         }),
       ])
     }
+  })
+
+  it('verifies api-key env vars and notifies catalog update on manual refresh', async () => {
+    expect(verifyHarnessAuth('oauth-personal', { GEMINI_API_KEY: 'gk-test' })).toBe(false)
+    expect(verifyHarnessAuth('gemini-api-key', {})).toBe(false)
+    expect(verifyHarnessAuth('gemini-api-key', { GEMINI_API_KEY: 'gk-test' })).toBe(true)
+
+    const onUpdated = vi.fn()
+    const adapter = new AntigravityAdapter(
+      runner(),
+      () => config,
+      onUpdated,
+      mode => verifyHarnessAuth(mode, { GEMINI_API_KEY: 'gk-test' }),
+    )
+    const status = await adapter.status(true)
+    expect(status).toMatchObject({ state: 'ready', harnessLlmAllowed: true })
+    expect(onUpdated).toHaveBeenCalled()
+    expect((await adapter.listModels(providerId)).map(m => m.id)).toEqual(['gemini-test'])
   })
 })
