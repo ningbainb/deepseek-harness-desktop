@@ -13,6 +13,7 @@ import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { z, type ZodType } from 'zod'
 import { UnknownLanAddressError, isSecurePublicBaseUrl, type PairingService, type PairingSnapshot } from './pairing.ts'
 import { isLoopbackClient, readCookie } from './gate.ts'
+import { writeJson } from './json-response.ts'
 
 /**
  * Browser-trust fence for the /api/pair routes, mirroring the connection
@@ -152,13 +153,6 @@ export const sessionGrantPayloadSchema = z.object({
 function parsePairPayload<T>(schema: ZodType<T>, body: Record<string, unknown> | undefined): T | undefined {
   const result = schema.safeParse(body ?? {})
   return result.success ? result.data : undefined
-}
-
-/** One JSON response. */
-function writeJson(res: ServerResponse, status: number, body: unknown): void {
-  const payload = JSON.stringify(body)
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'referrer-policy': 'no-referrer' })
-  res.end(payload)
 }
 
 /** Read a request body up to MAX_BODY_BYTES and parse it as JSON. */
