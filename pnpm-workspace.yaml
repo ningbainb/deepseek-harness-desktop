@@ -9,6 +9,9 @@ packages:
 # turtle-ui convention used by the bundled plugins.
 autoInstallPeers: false
 
+# Reject circular workspace dependencies during installation.
+disallowWorkspaceCycles: true
+
 # Some retained aggregate peers still name the retired client runtime.
 # Desktop-owned builds use the official split controllers. Ignore this stale
 # peer declaration while still checking every other missing peer.
