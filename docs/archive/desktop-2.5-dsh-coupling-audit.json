@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "desktopVersion": "5.7.0-test.1",
   "upstreamVersion": "0.2.3-alpha.2",
-  "lockfileSha256": "567c63ec7cb23456f5cc18d1bc4159201d0ddb9436f8ee9409dc12d1c066a48f",
+  "lockfileSha256": "bb9233ee21743c9ac651d75cdb027aac5d5ef912868f39dab2061dcf6b8b460a",
   "policy": {
     "controlledImportPrefixes": [
       "apps/dsh-desktop/src/runtime-provider.mjs",
@@ -85,7 +85,7 @@
     },
     {
       "path": "apps/dsh-desktop/src/atomic-write-adapter.mjs",
-      "kind": "static-export",
+      "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-atomic-write",
       "line": 1,
       "typeOnly": false,
@@ -6526,8 +6526,8 @@
     {
       "category": "host-service",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 83,
-      "operation": "locale"
+      "line": 81,
+      "operation": "workspace-unknown"
     },
     {
       "category": "host-service",
@@ -6700,7 +6700,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-value-mode/src/client/index.ts",
-      "line": 60,
+      "line": 59,
       "operation": "remote.session"
     },
     {
@@ -7258,7 +7258,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-packaged-local-lan-gateway.mjs",
-      "line": 80,
+      "line": 81,
       "operation": "DSH_HOME"
     },
     {
@@ -7774,43 +7774,43 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 96,
+      "line": 89,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 115,
+      "line": 108,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 115,
+      "line": 108,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 127,
+      "line": 120,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 127,
+      "line": 120,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 201,
+      "line": 194,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/automatic-repair-runner.mjs",
-      "line": 201,
+      "line": 194,
       "operation": "profileDir"
     },
     {
@@ -7858,169 +7858,169 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 115,
+      "line": 116,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 117,
+      "line": 118,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 119,
+      "line": 120,
       "operation": "resolveRuntimePackages"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 223,
-      "operation": "runtimeHome"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
       "line": 224,
-      "operation": "DSH_HOME"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 751,
       "operation": "runtimeHome"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 779,
+      "line": 225,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1356,
+      "line": 749,
+      "operation": "runtimeHome"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 777,
+      "operation": "DSH_HOME"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 1354,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1385,
+      "line": 1383,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 1416,
+      "operation": "ensureDesktopProfile"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
       "line": 1418,
-      "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1420,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1423,
+      "line": 1421,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1466,
+      "line": 1464,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1522,
+      "line": 1520,
       "operation": "resolveDshCliPath"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1610,
+      "line": 1608,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1645,
+      "line": 1643,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1646,
+      "line": 1644,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1652,
+      "line": 1650,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1700,
+      "line": 1698,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1705,
+      "line": 1703,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1919,
+      "line": 1917,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1927,
+      "line": 1925,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1930,
+      "line": 1928,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2698,
+      "line": 2696,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2752,
+      "line": 2750,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2784,
+      "line": 2782,
       "operation": "ensureDesktopProfile"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2848,
+      "line": 2846,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2854,
+      "line": 2852,
       "operation": "profileDir"
     },
     {
@@ -8344,223 +8344,247 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 316,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
       "line": 317,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 329,
+      "line": 318,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 332,
+      "line": 321,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 344,
+      "line": 324,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 345,
+      "line": 336,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 461,
+      "line": 337,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 462,
+      "line": 453,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 465,
+      "line": 454,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 467,
+      "line": 457,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 468,
+      "line": 459,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 543,
+      "line": 460,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 558,
+      "line": 535,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 606,
+      "line": 550,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 619,
+      "line": 598,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 619,
+      "line": 611,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 654,
+      "line": 611,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 654,
+      "line": 646,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 657,
+      "line": 646,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 667,
+      "line": 649,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 669,
+      "line": 659,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 746,
+      "line": 661,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 765,
+      "line": 738,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 780,
+      "line": 757,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 810,
+      "line": 772,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 817,
+      "line": 802,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 819,
+      "line": 809,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 833,
+      "line": 811,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 854,
+      "line": 825,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 856,
+      "line": 846,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 870,
+      "line": 848,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 886,
+      "line": 862,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 890,
+      "line": 878,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 925,
+      "line": 882,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1011,
+      "line": 917,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1057,
+      "line": 1003,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1058,
+      "line": 1049,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
+      "line": 1050,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
+      "line": 1087,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
+      "line": 1087,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
+      "line": 1091,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
+      "line": 1092,
       "operation": "profileDir"
     },
     {
@@ -8572,43 +8596,37 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1095,
+      "line": 1102,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1099,
+      "line": 1107,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1100,
+      "line": 1181,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1103,
+      "line": 1181,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1110,
+      "line": 1185,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1115,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1189,
+      "line": 1186,
       "operation": "profileDir"
     },
     {
@@ -8620,25 +8638,13 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1193,
+      "line": 1195,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1194,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1197,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1203,
+      "line": 1204,
       "operation": "profileDir"
     },
     {
@@ -8650,193 +8656,175 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1220,
+      "line": 1267,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1275,
+      "line": 1334,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1342,
+      "line": 1334,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1342,
+      "line": 1354,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1362,
+      "line": 1359,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1367,
+      "line": 1381,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1389,
+      "line": 1392,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1400,
+      "line": 1398,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1406,
+      "line": 1404,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1412,
+      "line": 1408,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1416,
+      "line": 1415,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1423,
+      "line": 1474,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1482,
+      "line": 1518,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1526,
+      "line": 1518,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1526,
+      "line": 1561,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1569,
+      "line": 1562,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1570,
+      "line": 1571,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1579,
+      "line": 1580,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1588,
+      "line": 1597,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1605,
+      "line": 1650,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1658,
+      "line": 1653,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1661,
+      "line": 1663,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1671,
+      "line": 1710,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1718,
+      "line": 1717,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1725,
+      "line": 1735,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1743,
+      "line": 1745,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1753,
+      "line": 1773,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1781,
+      "line": 1796,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1804,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extensions/plugins.mjs",
-      "line": 1810,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extensions/qqbot.mjs",
-      "line": 168,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/extensions/qqbot.mjs",
-      "line": 169,
+      "line": 1802,
       "operation": "profileDir"
     },
     {
@@ -8854,7 +8842,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/extensions/qqbot.mjs",
-      "line": 172,
+      "line": 170,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extensions/qqbot.mjs",
+      "line": 171,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/extensions/qqbot.mjs",
+      "line": 173,
       "operation": "profileDir"
     },
     {
@@ -8872,85 +8872,103 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
+      "line": 233,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
+      "line": 240,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
+      "line": 240,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
       "line": 241,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 248,
+      "line": 241,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 248,
+      "line": 387,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 249,
+      "line": 388,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 249,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 395,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 396,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 522,
+      "line": 514,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 48,
+      "line": 49,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 52,
+      "line": 53,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 58,
+      "line": 59,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 70,
+      "line": 71,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 164,
+      "line": 156,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 165,
+      "line": 157,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
+      "line": 158,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
+      "line": 161,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
+      "line": 161,
       "operation": "profileDir"
     },
     {
@@ -8962,43 +8980,31 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 169,
+      "line": 178,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 169,
+      "line": 178,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 174,
+      "line": 242,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 186,
+      "line": 256,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 186,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 250,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 264,
+      "line": 266,
       "operation": "profileDir"
     },
     {
@@ -9010,67 +9016,49 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 282,
+      "line": 293,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 301,
+      "line": 323,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 331,
+      "line": 325,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 333,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile-baseline-quarantine.mjs",
-      "line": 360,
+      "line": 352,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-migration.mjs",
-      "line": 68,
+      "line": 60,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile-migration.mjs",
-      "line": 80,
+      "line": 72,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 747,
+      "line": 748,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 765,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 789,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 790,
+      "line": 766,
       "operation": "profileDir"
     },
     {
@@ -9088,19 +9076,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 793,
+      "line": 791,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 797,
+      "line": 792,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 798,
+      "line": 794,
       "operation": "profileDir"
     },
     {
@@ -9118,56 +9106,62 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 802,
+      "line": 799,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1139,
+      "line": 800,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1170,
+      "line": 803,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1411,
+      "line": 1140,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1417,
+      "line": 1171,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1479,
+      "line": 1412,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1481,
+      "line": 1418,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1506,
+      "line": 1480,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1482,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1507,
       "operation": "ensureDesktopProfile"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1531,
-      "operation": "profileDir"
     },
     {
       "category": "profile-home",
@@ -9190,19 +9184,19 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1543,
-      "operation": "resolveRuntimePackages"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1545,
+      "line": 1535,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1567,
+      "line": 1544,
+      "operation": "resolveRuntimePackages"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1546,
       "operation": "profileDir"
     },
     {
@@ -9214,43 +9208,49 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1588,
+      "line": 1569,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1631,
+      "line": 1586,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1649,
+      "line": 1629,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1662,
+      "line": 1647,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1677,
+      "line": 1660,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1729,
+      "line": 1675,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/profile.mjs",
+      "line": 1727,
       "operation": "resolveRuntimePackages"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/profile.mjs",
-      "line": 1803,
+      "line": 1801,
       "operation": "resolveDshCliPath"
     },
     {
@@ -9280,61 +9280,79 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 134,
+      "line": 127,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 145,
+      "line": 138,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 145,
+      "line": 138,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 146,
+      "line": 139,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 151,
+      "line": 144,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 151,
+      "line": 144,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 170,
+      "line": 163,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-transaction.mjs",
-      "line": 170,
+      "line": 163,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 70,
+      "line": 63,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 74,
+      "line": 67,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/repair-workspace.mjs",
+      "line": 78,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/repair-workspace.mjs",
+      "line": 79,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/repair-workspace.mjs",
+      "line": 79,
       "operation": "profileDir"
     },
     {
@@ -9346,55 +9364,37 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 86,
+      "line": 283,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 86,
+      "line": 291,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 92,
+      "line": 291,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 290,
+      "line": 299,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 298,
+      "line": 299,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 298,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 306,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 306,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/repair-workspace.mjs",
-      "line": 407,
+      "line": 400,
       "operation": "profileDir"
     },
     {
@@ -9442,79 +9442,79 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 79,
+      "line": 71,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 130,
+      "line": 122,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 145,
+      "line": 137,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 152,
+      "line": 144,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 191,
+      "line": 183,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 200,
+      "line": 192,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 200,
+      "line": 192,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 200,
+      "line": 192,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 206,
+      "line": 198,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 225,
+      "line": 217,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 250,
+      "line": 242,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 254,
+      "line": 246,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/runtime-graph-validator.mjs",
-      "line": 279,
+      "line": 271,
       "operation": "profileDir"
     },
     {
@@ -9610,163 +9610,169 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 60,
+      "line": 62,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 402,
+      "line": 387,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 403,
+      "line": 388,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 442,
+      "line": 427,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 445,
+      "line": 430,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 450,
+      "line": 435,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 451,
+      "line": 436,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 469,
+      "line": 454,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 471,
+      "line": 456,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 703,
+      "line": 688,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 704,
+      "line": 689,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 704,
+      "line": 689,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 705,
+      "line": 690,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 705,
+      "line": 690,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 706,
+      "line": 691,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 707,
+      "line": 692,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 708,
+      "line": 693,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 709,
+      "line": 694,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 711,
+      "line": 696,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 712,
+      "line": 697,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 736,
+      "line": 721,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 737,
+      "line": 722,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 739,
+      "line": 724,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 905,
+      "line": 890,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1023,
+      "line": 1008,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1024,
+      "line": 1009,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1079,
+      "line": 1064,
+      "operation": "profileDir"
+    },
+    {
+      "category": "profile-home",
+      "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
+      "line": 1086,
       "operation": "profileDir"
     },
     {
@@ -9778,13 +9784,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1116,
-      "operation": "profileDir"
-    },
-    {
-      "category": "profile-home",
-      "path": "apps/dsh-desktop/src/user-plugin-archive.mjs",
-      "line": 1172,
+      "line": 1157,
       "operation": "profileDir"
     },
     {
@@ -16228,61 +16228,61 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 734,
+      "line": 732,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 739,
+      "line": 737,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1331,
+      "line": 1329,
       "operation": "recover"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 1921,
+      "line": 1919,
       "operation": "recover"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2347,
+      "line": 2345,
       "operation": "recover"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/electron-app.mjs",
+      "line": 2680,
+      "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
       "line": 2682,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2684,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 2699,
+      "line": 2697,
       "operation": "recover"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 3207,
+      "line": 3205,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/electron-app.mjs",
-      "line": 3213,
+      "line": 3211,
       "operation": "start"
     },
     {
@@ -16330,91 +16330,91 @@
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
+      "line": 908,
+      "operation": "stop"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
       "line": 916,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
+      "line": 1026,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 924,
+      "line": 1037,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1034,
+      "line": 1046,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1045,
+      "line": 1059,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1054,
+      "line": 1079,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1067,
+      "line": 1088,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1087,
+      "line": 1102,
+      "operation": "start"
+    },
+    {
+      "category": "runtime-lifecycle",
+      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
+      "line": 1140,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1096,
+      "line": 1146,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1110,
+      "line": 1156,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1148,
+      "line": 1166,
       "operation": "stop"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1154,
+      "line": 1172,
       "operation": "start"
     },
     {
       "category": "runtime-lifecycle",
       "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1164,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1174,
-      "operation": "stop"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1180,
-      "operation": "start"
-    },
-    {
-      "category": "runtime-lifecycle",
-      "path": "apps/dsh-desktop/src/plugin-recovery.mjs",
-      "line": 1185,
+      "line": 1177,
       "operation": "start"
     },
     {
@@ -17482,13 +17482,13 @@
     {
       "category": "slot",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 204,
+      "line": 188,
       "operation": "conversation.input.selector.context"
     },
     {
       "category": "slot",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 213,
+      "line": 197,
       "operation": "conversation.input.dock"
     },
     {
@@ -17614,13 +17614,13 @@
     {
       "category": "slot",
       "path": "packages/dsh-value-mode/src/client/index.ts",
-      "line": 239,
+      "line": 238,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-value-mode/src/client/index.ts",
-      "line": 262,
+      "line": 261,
       "operation": "conversation.session.header.actions"
     },
     {

@@ -17,12 +17,13 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { IconBranchOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { BranchesView, GraphView, RepoStatus, SwitchResult } from '../../core/types.ts'
-import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { Chip, cx } from './Chip.tsx'
 import { BranchPopover } from './BranchPopover.tsx'
 import { CreateBranchDialog } from './CreateBranchDialog.tsx'
 import { GraphDialog } from '../graph/GraphDialog.tsx'
 import css from './context.module.css'
+
+type SessionId = PropsRuntime<'conversation.input.dock'>['sessionId']
 
 /** Injected business face of the branch chip: git verbs, keyed by the current session id. */
 export interface GitGraphInjected {
