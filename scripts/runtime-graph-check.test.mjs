@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test, { describe } from 'node:test'
 
 import {
   baseVersion,
+  runtimeManifests,
   checkRuntimeIdentityGraph,
   collectIdentityPackages,
   parseLockfileImporters,
@@ -222,4 +226,18 @@ describe('checkRuntimeIdentityGraph', () => {
       '@deepseek-ai/dsh-tools',
     ])
   })
+})
+
+test('runtime inventory rejects missing Desktop and malformed plugin manifests', t => {
+  const root = mkdtempSync(join(tmpdir(), 'runtime-manifests-'))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  assert.throws(() => runtimeManifests(root), /dsh-desktop.*package.json/)
+  const desktop = join(root, 'apps/dsh-desktop')
+  mkdirSync(desktop, { recursive: true })
+  writeFileSync(join(desktop, 'package.json'), '{"name":"desktop"}')
+  const plugin = join(root, 'packages/dsh-example')
+  mkdirSync(plugin, { recursive: true })
+  assert.deepEqual(runtimeManifests(root), [{ name: 'desktop' }])
+  writeFileSync(join(plugin, 'package.json'), '{invalid')
+  assert.throws(() => runtimeManifests(root), /dsh-example.*package.json/)
 })

@@ -1,7 +1,8 @@
-import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { familyPackageManifests } from './family-package-manifests.mjs'
 import { REPOSITORY_ROOT } from './generate-runtime-support.mjs'
 
 export const COMMUNITY_QUALITY_SOURCE_PATH = resolve(
@@ -101,27 +102,10 @@ function localPath(root, path) {
   return result
 }
 
-async function packageDirectories(root) {
-  const result = []
-  for (const base of ['packages', 'packages/skins']) {
-    const absolute = resolve(root, base)
-    const entries = await readdir(absolute, { withFileTypes: true }).catch((error) => {
-      if (error?.code === 'ENOENT') return []
-      throw error
-    })
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      result.push(resolve(absolute, entry.name))
-    }
-  }
-  return result.toSorted()
-}
-
 export async function listLocalCommunityPluginManifests(root = REPOSITORY_ROOT) {
-  const directories = await packageDirectories(root)
+  const files = familyPackageManifests(root, { followLinks: false })
   const manifests = []
-  for (const directory of directories) {
-    const manifestPath = resolve(directory, 'package.json')
+  for (const manifestPath of files) {
     let manifest
     try {
       manifest = JSON.parse(await readFile(manifestPath, 'utf8'))

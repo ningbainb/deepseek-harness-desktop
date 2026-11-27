@@ -53,7 +53,7 @@
  */
 
 import { readFileSync } from 'node:fs'
-import { readdir } from 'node:fs/promises'
+import { familyPackageManifests } from './family-package-manifests.mjs'
 import { join } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 
@@ -214,35 +214,21 @@ export function checkRuntimeIdentityGraph({ lockfileText, identityPackages = [] 
 }
 
 /** Workspace manifests whose `dependencies` describe a real Runtime graph. */
-async function runtimeManifests() {
-  const paths = ['apps/dsh-desktop/package.json']
-  for (const group of ['packages', 'packages/skins']) {
-    let entries = []
+export function runtimeManifests(root) {
+  const files = [join(root, 'apps/dsh-desktop/package.json'), ...familyPackageManifests(root, { followLinks: false })]
+  return files.map(file => {
     try {
-      entries = await readdir(join(ROOT, group), { withFileTypes: true })
-    } catch {
-      continue
+      return JSON.parse(readFileSync(file, 'utf8'))
+    } catch (cause) {
+      throw new Error(`Cannot read runtime manifest ${file}`, { cause })
     }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      paths.push(join(group, entry.name, 'package.json'))
-    }
-  }
-  const manifests = []
-  for (const relative of paths) {
-    try {
-      manifests.push(JSON.parse(readFileSync(join(ROOT, relative), 'utf8')))
-    } catch {
-      // A directory without a package.json is not a workspace package.
-    }
-  }
-  return manifests
+  })
 }
 
 const isCli = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url
 
 if (isCli) {
-  const manifests = await runtimeManifests()
+  const manifests = runtimeManifests(ROOT)
   const identityPackages = collectIdentityPackages(manifests)
   let lockfileText = ''
   try {
