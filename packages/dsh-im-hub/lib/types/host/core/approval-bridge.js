@@ -98,7 +98,7 @@ export class ApprovalBridge {
         }
         this.pending.set(id, entry);
         const lines = [
-            `🔐 工具审批请求 [${id}]`,
+            `工具审批请求 [${id}]`,
             `工具: \`${request.toolName}\``,
             ...(commandPreview ? [`参数: \`${commandPreview}\``] : []),
             `回复 \`/approve ${id}\` 允许，或 \`/reject ${id}\` 拒绝${this.dualApproval ? '（也可直接在桌面端确认）' : ''}`,
@@ -126,30 +126,30 @@ export class ApprovalBridge {
     resolveFromIm(conversationKey, approvalId, decision, senderId, policy) {
         if (!isApprovalAuthorized(senderId, policy)) {
             this.onLog?.('warn', `unauthorized approval attempt from ${senderId} on ${conversationKey}`);
-            return { ok: false, message: '⚠️ 当前发送者不在白名单中，无权执行审批操作。' };
+            return { ok: false, message: '当前发送者不在白名单中，无权执行审批操作。' };
         }
         const candidates = this.pendingForConversation(conversationKey);
         if (candidates.length === 0) {
-            return { ok: false, message: 'ℹ️ 当前会话没有等待确认的审批请求。' };
+            return { ok: false, message: '当前会话没有等待确认的审批请求。' };
         }
         const normalizedId = approvalId?.trim().toLowerCase();
         const target = normalizedId
             ? candidates.find((item) => item.id === normalizedId)
             : candidates[0];
         if (!target) {
-            return { ok: false, message: `⚠️ 未找到编号为 \`${approvalId}\` 的待审批请求。` };
+            return { ok: false, message: `未找到编号为 \`${approvalId}\` 的待审批请求。` };
         }
         const settled = this.finishEntry(target.id, decision);
         if (!settled) {
-            return { ok: false, message: `ℹ️ 审批 [${target.id}] 已被桌面端或其他方式处理。` };
+            return { ok: false, message: `审批 [${target.id}] 已被桌面端或其他方式处理。` };
         }
         return {
             ok: true,
             id: target.id,
             toolName: target.toolName,
             message: decision === 'allowed-once'
-                ? `✅ 已允许 [${target.id}] (\`${target.toolName}\`)`
-                : `🛑 已拒绝 [${target.id}] (\`${target.toolName}\`)`,
+                ? `已允许 [${target.id}] (\`${target.toolName}\`)`
+                : `已拒绝 [${target.id}] (\`${target.toolName}\`)`,
         };
     }
     resolveById(approvalId, decision) {

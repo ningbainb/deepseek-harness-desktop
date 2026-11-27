@@ -14,7 +14,7 @@ import { stringify } from 'yaml'
 import { DEFAULT_STARTUP_TIMEOUT_MS } from '../src/runtime-controller.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
-import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { prepareSkillMarketProbe } from './skill-market-probe-fixture.mjs'
 import { prepareSkillMarketMcpSentinel } from './skill-market-safety-fixture.mjs'
@@ -260,6 +260,7 @@ try {
   app = await electron.launch(launch)
   await useChineseFixtureLocale(app)
   page = await app.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(page)
   page.on('console', message => {
     if (message.type() === 'error' && /\[ui-(?:skill|input-trigger)\]/u.test(message.text())) {
       skillRendererErrors.push(message.text())
@@ -465,6 +466,7 @@ try {
   app = await electron.launch(launch)
   await useChineseFixtureLocale(app)
   page = await app.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(page)
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: DEFAULT_STARTUP_TIMEOUT_MS })
   const restarted = await openMarket()
   await restarted.market.locator('#agent-plugins-tab-skills').click()

@@ -28,7 +28,15 @@ export function FileAttachmentRail({ queue, addImages, nativeUploads = false }: 
     <div className={css.fileList}>{entries.map(entry => <div key={entry.id} className={css.fileCard} data-state={entry.state}>
       <strong title={entry.name}>{entry.name}</strong>
       <small>{entry.size ? `${Math.ceil(entry.size / 1024)} KB · ` : ''}{t(`attachment.${entry.state}`)}</small>
-      {entry.state === 'ready' && <small>{t('attachment.reference')}</small>}
+      {entry.state === 'ready' && (entry.path && queue.canSummarize(entry) ? <>
+        <div className={css.documentMode} role="group" aria-label={t('attachment.documentMode')}>
+          <button type="button" aria-pressed={entry.summaryState !== 'ready'} onClick={() => queue.useReference(entry.id)}>{t('attachment.pathMode')}</button>
+          <button type="button" aria-pressed={entry.summaryState === 'ready'} disabled={entry.summaryState === 'loading'} onClick={() => void queue.useSummary(entry.id)}>{t('attachment.summaryMode')}</button>
+        </div>
+        <small>{t(entry.summaryState === 'ready' ? 'attachment.summaryIncluded' : 'attachment.reference')}</small>
+        {entry.summaryState === 'loading' && <small role="status">{t('attachment.summaryLoading')}</small>}
+        {entry.summaryState === 'failed' && <small role="status">{t('attachment.summaryFailed')}</small>}
+      </> : <small>{t('attachment.reference')}</small>)}
       {entry.duplicate && <small role="status">{t('attachment.duplicate')}</small>}
       {entry.error && <span role="alert">{entry.error === 'reference-missing' ? t('attachment.missing') : entry.error === 'size-limit' ? t('attachment.tooLarge') : t('attachment.failedHint')}</span>}
       {entry.state === 'failed' && entry.file && <button type="button" onClick={() => queue.retry(entry.id)}>{t('attachment.retry')}</button>}

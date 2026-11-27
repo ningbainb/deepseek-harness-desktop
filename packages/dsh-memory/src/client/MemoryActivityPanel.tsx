@@ -57,9 +57,14 @@ export function MemoryActivityPanel({ t, enabled, sessionId, onEdit }: Props) {
       <p className={styles.muted}>{t('settings.activityHint')}</p>
       <p role="status">{t(('settings.activity.' + (!enabled ? 'disabled' : activity?.status ?? 'none')) as MemoryLocaleKey)}{activity?.preparedAt ? ' · ' + new Date(activity.preparedAt).toLocaleTimeString() : ''}</p>
       {error && <p className={styles.error} role="alert">{t('settings.activityError')}</p>}
-      {enabled && activity?.items.map(({ item, reason, truncated }) => <article className={styles.activityItem} key={item.id}>
+      {enabled && activity?.items.map(({ item, reason, truncated, score, reasons }) => <article className={styles.activityItem} key={item.id}>
         <p>{item.content}</p>
         <p className={styles.muted}>{t(('settings.' + item.scope) as MemoryLocaleKey)} · {t(('settings.reason.' + reason) as MemoryLocaleKey)}{truncated ? ' · ' + t('settings.truncated') : ''}</p>
+        {reasons && reasons.length > 0 && <div className={styles.searchStatus}>
+          {reasons.map(match => <span key={match}>{t(('search.reason.' + match) as MemoryLocaleKey)}</span>)}
+          {score !== undefined && score > 0 && <meter className={styles.scoreMeter} value={score} min={0}
+            max={Math.max(score, ...activity.items.map(entry => entry.score ?? 0))} aria-label={t('search.score')} title={score.toPrecision(3)} />}
+        </div>}
         <div className={styles.actions}>
           <button type="button" className={styles.button} disabled={busy} onClick={() => void mutate('/api/dsh-memory/activity' + activityQuery, { operation: 'ignore', id: item.id })}>{t('settings.ignore')}</button>
           <button type="button" className={styles.button} disabled={busy} onClick={() => { if (onEdit) onEdit(item); else { setEditing(item); setContent(item.content) } }}>{t('settings.edit')}</button>

@@ -1,10 +1,9 @@
 .root {
   position: relative;
   box-sizing: border-box;
-  width: 100%;
-  max-width: var(--dsh-chat-content-width);
-  margin: 0 auto;
-  padding: 0 var(--dsh-composer-side-clearance);
+  /* Share the native dock with the activity and usage pills at intrinsic width. */
+  min-width: 0;
+  max-width: 100%;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
@@ -41,6 +40,15 @@
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-3, var(--dsw-alias-bg-base, #ffffff));
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+}
+@media (max-width: 900px) {
+  .root[data-preview="hover"] .panel {
+    left: auto;
+    right: 0;
+    transform: none;
+    min-width: min(240px, 50vw);
+    max-width: min(340px, 50vw);
+  }
 }
 .metrics { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 16px; margin: 0; }
 .metrics dt, .metrics dd { margin: 0; overflow-wrap: anywhere; }

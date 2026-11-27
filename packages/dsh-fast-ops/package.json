@@ -1,6 +1,7 @@
 {
   "name": "@ningbainb/dsh-fast-ops",
-  "description": "Token-efficient batch file reading, unified workspace search, CAS multi-edit, RFC-4180 table reader, and bounded result-reference cache for DeepSeek Harness.",
+  "displayName": "nbfast",
+  "description": "nbfast provides token-efficient workspace tools with AST-aware search and CAS edits, compact terminal output, and scoped result paging for DeepSeek Harness.",
   "author": "ningbainb",
   "version": "0.1.0",
   "type": "module",
@@ -36,14 +37,29 @@
     "test": "vitest run",
     "prepare": "tsdown --config-loader native"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ignore": "7.0.17"
+  },
+  "optionalDependencies": {
+    "@ast-grep/lang-c": "0.0.6",
+    "@ast-grep/lang-cpp": "0.0.6",
+    "@ast-grep/lang-csharp": "0.0.6",
+    "@ast-grep/lang-go": "0.0.6",
+    "@ast-grep/lang-java": "0.0.7",
+    "@ast-grep/lang-json": "0.0.7",
+    "@ast-grep/lang-python": "0.0.6",
+    "@ast-grep/lang-rust": "0.0.7",
+    "@ast-grep/napi": "0.51.3"
+  },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.2.0-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.2.3-alpha.2",
     "@ningbainb/dsh-user-scope": "workspace:*",
     "react": "^18.3.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.2.0-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.2.3-alpha.2",
     "@ningbainb/dsh-user-scope": "workspace:*",
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
@@ -63,7 +79,8 @@
     "cordis.patch.yml",
     "README.md",
     "README.zh.md",
-    "README.i18n.yaml"
+    "README.i18n.yaml",
+    "NOTICE.md"
   ],
   "license": "BSD-3-Clause",
   "repository": {

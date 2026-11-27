@@ -26,6 +26,7 @@ const WORK_OFFICE_PLUGINS = [
   },
   { id: 'tool-office', name: '@deepseek-ai/dsh-tool-office' },
   { id: 'skill-office', name: '@deepseek-ai/dsh-skill-office' },
+  { id: 'doc-ingest', name: '@ningbainb/dsh-doc-ingest', config: { tools: true } },
   { id: 'tool-bash', name: '@deepseek-ai/dsh-tool-bash', config: { timeoutMs: 300000 } },
   { id: 'tool-str-replace-editor', name: '@deepseek-ai/dsh-tool-str-replace-editor', config: { maxOutputChars: 16000 } },
   { id: 'tool-fs', name: '@deepseek-ai/dsh-tool-fs' },

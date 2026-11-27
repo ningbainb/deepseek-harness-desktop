@@ -11,7 +11,7 @@ import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { prepareSourceSkins } from './prepare-source-skins.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
 import { closeIsolatedElectron, ownedProcessIds, ownedProcessesStopped } from './electron-cleanup-fixture.mjs'
 import { assertNativeFixtureStorage } from './native-fixture-storage.mjs'
@@ -235,6 +235,7 @@ try {
   main = await waitUntil(() => application.windows().find(page => page.url().startsWith('dsh-runtime://app/')
     && !page.url().includes('desktop-dock-setting=')), 'real Runtime main window', 600_000)
   main.setDefaultTimeout(30_000)
+  await dismissFirstRunModelChooserWhenShown(main)
   await main.locator('#dsh-desktop-window-chrome').waitFor({ state: 'visible' })
   await main.waitForFunction(() => window.__skinRuntime?.controller && document.querySelector('[data-rightbar-col]'), undefined,
     { timeout: 600_000 })

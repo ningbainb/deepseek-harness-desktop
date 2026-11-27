@@ -1,0 +1,5 @@
+- insert:
+    - id: doc-ingest
+      name: '@ningbainb/dsh-doc-ingest'
+      config:
+        tools: false

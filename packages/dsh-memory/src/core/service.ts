@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type {
   AccessResource,
   AccessScope,
@@ -10,6 +11,7 @@ import {
   createMemoryItem,
   isMemoryScope,
   isSafeMemoryId,
+  MAX_MEMORY_INJECTION_ITEMS,
   MAX_MEMORY_ITEMS,
   MAX_PENDING_MEMORY_SUGGESTIONS,
   MemoryValidationError,
@@ -26,7 +28,7 @@ import { memoryScopeMatches, rankMemories, type MemoryQuery, type RankedMemory }
 import { MemoryStore, MemoryStoreError } from '../store.ts'
 import { renderMemoryItems } from './rank.ts'
 import { MAX_MEMORY_INJECTION_LENGTH } from './schema.ts'
-import type { MemoryActivity } from './activity.ts'
+import type { MemoryActivity, MemoryMatchReason } from './activity.ts'
 
 export interface MemoryDraft {
   id?: string
@@ -94,7 +96,35 @@ export interface MemoryServiceOptions {
   now?: () => number
   resolveWorkspaceForSession?: (sessionId: string) => string | undefined
   warningSink?: (warning: MemoryWarning) => void
+  search?: () => MemorySearchBridge | undefined
 }
+
+interface MemorySearchDocument {
+  id: string
+  scope: MemoryScope
+  workspaceId?: string
+  sessionId?: string
+  title: string
+  text: string
+  tags: readonly string[]
+  updatedAt: number
+  expiresAt?: number
+  pinned: boolean
+}
+
+interface SearchGeneration { revision: string; docs: MemorySearchDocument[] }
+interface SearchMatch { id: string; updatedAt: number; reasons: readonly MemoryMatchReason[]; score: number }
+export interface MemorySearchBridge {
+  registerMemorySource(source: (scope: AccessScope) => Promise<SearchGeneration>): () => void
+  syncMemory(scope: AccessScope, revision: string, docs: MemorySearchDocument[]): Promise<void>
+  warmMemoryQuery(scope: AccessScope, query: string): Promise<void>
+  searchMemory(scope: AccessScope, revision: string, query: string, filter: {
+    workspaceId?: string; sessionId?: string; now: number; limit: number; exclude?: ReadonlySet<string>
+  }): SearchMatch[] | undefined
+}
+
+type ActivityMatch = Pick<MemoryActivity['items'][number], 'reason' | 'truncated' | 'score' | 'reasons'>
+  & { id: string; updatedAt: number }
 
 export interface PendingMemorySuggestion {
   readonly id: string
@@ -159,13 +189,15 @@ export class MemoryService {
   private readonly userScope: MemoryUserScopeLike
   private readonly resolveWorkspaceForSession?: (sessionId: string) => string | undefined
   private readonly warningSink?: (warning: MemoryWarning) => void
+  private readonly searchBridge?: () => MemorySearchBridge | undefined
+  private readonly indexGenerations = new WeakMap<MemorySnapshot, SearchGeneration>()
   private readonly cache = new Map<PrincipalId, MemorySnapshot>()
   private readonly loading = new Map<PrincipalId, Promise<MemorySnapshot | undefined>>()
   private readonly loadedAt = new Map<PrincipalId, number>()
   private readonly generations = new Map<PrincipalId, number>()
   private readonly pending = new Map<PrincipalId, Map<string, MemoryItem>>()
   // Process-local UI state contains identifiers/reasons, never query or prompt text.
-  private readonly activity = new Map<string, { context: MemoryRequestContext; status: MemoryActivity['status']; preparedAt: number; matches: { id: string; updatedAt: number; reason: 'content' | 'tag' | 'content-and-tag'; truncated: boolean }[] }>()
+  private readonly activity = new Map<string, { context: MemoryRequestContext; status: MemoryActivity['status']; preparedAt: number; matches: ActivityMatch[] }>()
   private readonly ignored = new Map<string, Set<string>>()
 
   constructor(options: MemoryServiceOptions) {
@@ -174,6 +206,74 @@ export class MemoryService {
     this.userScope = options.userScope
     this.resolveWorkspaceForSession = options.resolveWorkspaceForSession
     this.warningSink = options.warningSink
+    this.searchBridge = options.search
+  }
+
+  private indexGeneration(snapshot: MemorySnapshot): SearchGeneration {
+    const cached = this.indexGenerations.get(snapshot)
+    if (cached) return cached
+    const docs = snapshot.items.map(({ id, scope, workspaceId, sessionId, content, tags, updatedAt, expiresAt, pinned }) =>
+      ({ id, scope, workspaceId, sessionId, title: '', text: content, tags, updatedAt, expiresAt, pinned }))
+    const generation = { docs, revision: createHash('sha256').update(JSON.stringify(docs)).digest('hex') }
+    this.indexGenerations.set(snapshot, generation)
+    return generation
+  }
+
+  async memoryIndexSource(scope: AccessScope): Promise<SearchGeneration> {
+    if (!this.authorizedContext({ scope })) throw new MemoryAccessError()
+    const snapshot = await this.loadPrincipal(scope.principalId)
+    if (!snapshot || !this.authorizedContext({ scope })) throw new MemoryAccessError()
+    return this.indexGeneration(snapshot)
+  }
+
+  private primeIndex(context: MemoryRequestContext, snapshot: MemorySnapshot): void {
+    try {
+      const bridge = this.searchBridge?.()
+      if (!bridge || !this.authorizedContext(context)) return
+      const generation = this.indexGeneration(snapshot)
+      void bridge.syncMemory(context.scope, generation.revision, generation.docs).catch(() => {})
+    } catch {
+      // The validated memory JSON remains available when the derived index fails.
+    }
+  }
+
+  primeQuery(context: MemoryRequestContext, query: string): void {
+    if (!query.trim() || !this.authorizedContext(context)) return
+    try {
+      void this.searchBridge?.()?.warmMemoryQuery(context.scope, query).catch(() => {})
+    } catch {
+      // Optional vectors never delay or prevent prompt construction.
+    }
+  }
+
+  private rankSnapshot(snapshot: MemorySnapshot, context: MemoryRequestContext, query: string): RankedMemory[] {
+    const ignored = this.ignored.get(this.activityKey(context))
+    const request = this.queryFor(context, query)
+    try {
+      const bridge = this.searchBridge?.()
+      const hits = bridge?.searchMemory(context.scope, this.indexGeneration(snapshot).revision, query, {
+        ...request, limit: MAX_MEMORY_INJECTION_ITEMS, exclude: ignored,
+      })
+      if (hits !== undefined) {
+        return hits.flatMap(hit => {
+          const item = snapshot.items.find(row => row.id === hit.id && row.updatedAt === hit.updatedAt)
+          if (!item || ignored?.has(item.id) || !memoryScopeMatches(item, request) || isExpired(item, request.now)
+            || !this.targetContext(context, item)) return []
+          const tag = hit.reasons.includes('tags')
+          return [{
+            item: { ...item, tags: [...item.tags] },
+            scopeRank: (item.scope === 'session' ? 3 : item.scope === 'workspace' ? 2 : 1) as 1 | 2 | 3,
+            overlap: 0,
+            reason: tag && hit.reasons.includes('keyword') ? 'content-and-tag' as const : tag ? 'tag' as const : 'content' as const,
+            score: hit.score,
+            reasons: hit.reasons,
+          }]
+        })
+      }
+    } catch {
+      // Independent owner checks on the authoritative-memory fallback still apply.
+    }
+    return rankMemories(snapshot.items.filter(item => !ignored?.has(item.id)), request)
   }
 
   desktopScope(): AccessScope | undefined {
@@ -250,6 +350,7 @@ export class MemoryService {
   async preload(context: MemoryRequestContext): Promise<MemoryReadResult<MemorySnapshot>> {
     if (!this.authorizedContext(context)) return this.denied('access-denied')
     const snapshot = await this.loadPrincipal(context.scope.principalId)
+    if (snapshot) this.primeIndex(context, snapshot)
     return snapshot === undefined
       ? this.denied('store-unavailable')
       : { ok: true, value: snapshot }
@@ -263,12 +364,14 @@ export class MemoryService {
     const ranked = all?.filter(match => !this.ignored.get(key)?.has(match.item.id))
     const status: MemoryActivity['status'] = !enabled ? 'disabled' : !query.trim() ? 'empty-query' : ranked === undefined ? 'loading' : ranked.length ? 'ready' : 'no-match'
     let remaining = MAX_MEMORY_INJECTION_LENGTH
-    const matches: { id: string; updatedAt: number; reason: 'content' | 'tag' | 'content-and-tag'; truncated: boolean }[] = []
+    const matches: ActivityMatch[] = []
     for (const match of ranked ?? []) {
       const length = renderMemoryItems([match]).length
       const separator = matches.length ? 1 : 0
       if (remaining - separator <= 4) break
-      matches.push({ id: match.item.id, updatedAt: match.item.updatedAt, reason: match.reason ?? 'content', truncated: length + separator > remaining || match.item.content.length + 2 > MAX_MEMORY_INJECTION_LENGTH })
+      matches.push({ id: match.item.id, updatedAt: match.item.updatedAt, reason: match.reason ?? 'content',
+        score: match.score, reasons: match.reasons,
+        truncated: length + separator > remaining || match.item.content.length + 2 > MAX_MEMORY_INJECTION_LENGTH })
       remaining -= length + separator
       if (remaining <= 0) break
     }
@@ -291,7 +394,9 @@ export class MemoryService {
     }
     for (const match of entry.matches) {
       const item = snapshot.items.find(item => item.id === match.id && item.updatedAt === match.updatedAt)
-      if (item && !isExpired(item, this.now()) && this.targetContext(context, item) && !this.ignored.get(key)?.has(item.id)) base.items.push({ item: toPublicMemoryItem(item), reason: match.reason, truncated: match.truncated })
+      if (item && !isExpired(item, this.now()) && this.targetContext(context, item) && !this.ignored.get(key)?.has(item.id)) {
+        base.items.push({ item: toPublicMemoryItem(item), reason: match.reason, truncated: match.truncated, score: match.score, reasons: match.reasons })
+      }
     }
     return base
   }
@@ -319,7 +424,7 @@ export class MemoryService {
       void this.preload(context)
       return undefined
     }
-    return rankMemories(snapshot.items.filter(item => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query))
+    return this.rankSnapshot(snapshot, context, query)
   }
 
   async list(context: MemoryRequestContext): Promise<MemoryReadResult<MemoryItem[]>> {
@@ -350,7 +455,10 @@ export class MemoryService {
     if (query.trim() === '') return { ok: true, value: [] }
     const snapshot = await this.loadPrincipal(context.scope.principalId)
     if (snapshot === undefined) return this.denied('store-unavailable')
-    return { ok: true, value: rankMemories(snapshot.items.filter(item => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query)) }
+    if (!this.authorizedContext(context)) return this.denied('access-denied')
+    this.primeIndex(context, snapshot)
+    this.primeQuery(context, query)
+    return { ok: true, value: this.rankSnapshot(snapshot, context, query) }
   }
 
   async save(context: MemoryRequestContext, draft: MemoryDraft, source: MemorySource = 'explicit'): Promise<MemoryItem> {
@@ -578,6 +686,8 @@ export class MemoryService {
     this.generations.set(principalId, (this.generations.get(principalId) ?? 0) + 1)
     this.cache.set(principalId, snapshot)
     this.loadedAt.set(principalId, this.now())
+    const scope = this.currentScope()
+    if (scope?.principalId === principalId) this.primeIndex({ scope }, snapshot)
   }
 
   private denied<T>(code: MemoryWarningCode): MemoryReadResult<T> {

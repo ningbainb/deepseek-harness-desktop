@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MemoryService, MemoryStore, createMemoryItem, rankMemories, extractCurrentUserQuery } from '../src/index.ts'
+import type { MemorySearchBridge } from '../src/core/service.ts'
 import type { PrincipalId, SessionId, WorkspaceId } from '@ningbainb/dsh-user-scope'
 
 const owner = 'optimization-owner' as PrincipalId
@@ -10,7 +11,7 @@ const sessionId = 'session-a' as SessionId
 const workspaceId = 'workspace-a' as WorkspaceId
 const dirs: string[] = []
 afterEach(async () => { await Promise.all(dirs.splice(0).map(dir => rm(dir, { recursive: true, force: true }))) })
-async function fixture() {
+async function fixture(search?: MemorySearchBridge) {
   const root = await mkdtemp(join(tmpdir(), 'dsh-memory-optimization-')); dirs.push(root)
   const store = new MemoryStore({ rootDir: root })
   const authority = {
@@ -19,7 +20,7 @@ async function fixture() {
     canAccess: (scope: { principalId: string }) => ({ allowed: scope.principalId === owner }),
   }
   let now = 100
-  const service = new MemoryService({ userScope: authority, store, now: () => now })
+  const service = new MemoryService({ userScope: authority, store, now: () => now, search: () => search })
   const context = service.localContext()!
   const session = service.contextFor(context.scope, { sessionId })!
   return { service, context, session, store, tick: () => { now += 11_000 } }
@@ -66,6 +67,33 @@ describe('memory reliability and visible controls', () => {
     expect(service.prepare(session, 'typescript', true)).toBe('')
     await service.preload(context)
     expect(service.prepare(session, 'typescript', true)).toContain('typescript')
+  })
+
+  it('prepares authoritative lexical results while semantic workers remain pending', async () => {
+    let complete!: () => void
+    const pending = new Promise<void>(resolve => { complete = resolve })
+    let warmups = 0
+    const { service, context, session } = await fixture({
+      registerMemorySource: () => () => {},
+      syncMemory: () => pending,
+      warmMemoryQuery: () => { warmups++; return pending },
+      searchMemory: () => undefined,
+    })
+    try {
+      await service.save(context, { scope: 'global', content: 'Use strict TypeScript' })
+      const prepared = await Promise.race([
+        (async () => {
+          await service.preload(session)
+          await service.primeQuery(session, 'typescript')
+          return service.prepare(session, 'typescript', true)
+        })(),
+        new Promise<string>(resolve => setTimeout(() => resolve('semantic worker blocked prompt'), 500)),
+      ])
+      expect(prepared).toBe('- Use strict TypeScript')
+      expect(warmups).toBe(1)
+    } finally {
+      complete()
+    }
   })
 
   it('rejects stale edits/deletes and clears only the reviewed set', async () => {

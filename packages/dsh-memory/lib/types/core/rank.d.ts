@@ -1,4 +1,5 @@
 import type { PrincipalId, SessionId, WorkspaceId } from '@ningbainb/dsh-user-scope';
+import type { MemoryMatchReason } from './activity.ts';
 import { type MemoryItem } from './schema.ts';
 export interface MemoryQuery {
     principalId: PrincipalId;
@@ -13,6 +14,8 @@ export interface RankedMemory {
     scopeRank: 1 | 2 | 3;
     overlap: number;
     reason?: 'content' | 'tag' | 'content-and-tag';
+    score?: number;
+    reasons?: readonly MemoryMatchReason[];
 }
 export declare function memoryScopeMatches(item: MemoryItem, query: Pick<MemoryQuery, 'principalId' | 'workspaceId' | 'sessionId'>): boolean;
 /** Rank only the current principal's live memories with deterministic tie breaks. */

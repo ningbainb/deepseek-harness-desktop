@@ -4,6 +4,7 @@ import { type MemoryConfig } from '../core/config.ts';
 export type MemorySettingsCardProps = PropsRuntime<'web-ui.plugin.item'> & PropsLocale<'memory'> & {
     config: MemoryConfig;
     settingsScope: SettingsScope<MemoryConfig>;
+    onOpenSession?: (sessionId: string) => void;
 };
 export declare function MemorySettingsCard(props: MemorySettingsCardProps): import("react").JSX.Element;
 //# sourceMappingURL=MemorySettingsCard.d.ts.map

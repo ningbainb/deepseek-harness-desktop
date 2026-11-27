@@ -1,5 +1,13 @@
 const localizedContexts = new WeakSet()
 
+/** Complete the public first-run step before testing other UI in an unsigned-in profile. */
+export async function dismissFirstRunModelChooserWhenShown(page) {
+  const chooser = page.locator('[data-dsh-first-run-chooser]')
+  await page.addLocatorHandler(chooser, async () => {
+    await chooser.getByRole('button', { name: /^(?:稍后再说|Maybe later)$/u }).click()
+  })
+}
+
 /** Use the visible Desktop entry and More tools group, without forced input. */
 export async function openDockTools(app, mainPage) {
   // Tool navigation hides the Dock after focusing the existing main window.

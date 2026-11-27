@@ -35,6 +35,7 @@ describe('dsh-fast-ops settings', () => {
       maxInlineBytes: 65536,
       resultCacheTtlMs: 60000,
       maxCachedRefs: 512,
+      denoise: { enabled: true, git: true, test: true, build: true },
     })
     expect(problems.sort()).toEqual([
       'batchingGuidance',
@@ -56,6 +57,7 @@ describe('dsh-fast-ops settings', () => {
       maxInlineBytes: 32768,
       resultCacheTtlMs: 900000,
       maxCachedRefs: 64,
+      denoise: { enabled: false, git: true, test: false, build: true },
     }, home)
 
     expect(await readSettings(home)).toEqual({
@@ -66,6 +68,7 @@ describe('dsh-fast-ops settings', () => {
       maxInlineBytes: 32768,
       resultCacheTtlMs: 900000,
       maxCachedRefs: 64,
+      denoise: { enabled: false, git: true, test: false, build: true },
     })
   })
 })

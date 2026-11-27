@@ -58,6 +58,31 @@ test('loopback Runtime navigation stays inside Electron and never opens the syst
   assert.deepEqual(opened, [])
 })
 
+test('the Desktop lets a srcdoc frame refresh its document while blocking navigation out of it', () => {
+  const handlers = new Map()
+  installNavigationPolicy({
+    webContents: { on: (name, fn) => handlers.set(name, fn), setWindowOpenHandler() {} },
+    getRuntimeOrigin: () => 'dsh-runtime://app',
+    openExternal: () => assert.fail('a frame never opens an external browser'),
+  })
+  const createDetails = (url, current, initiator) => ({
+    url, isMainFrame: false, frame: { url: current }, initiator: { url: initiator },
+    prevented: false, preventDefault() { this.prevented = true },
+  })
+  for (const [url, current, initiator, prevented] of [
+    ['about:srcdoc', 'about:blank', 'dsh-runtime://app/', false],
+    ['about:srcdoc', 'about:srcdoc', 'dsh-runtime://app/', false],
+    ['https://example.test/help', 'about:srcdoc#section', 'about:srcdoc', true],
+    ['https://example.test/help', 'about:blank', 'about:srcdoc', true],
+    ['dsh-runtime://app/settings', 'about:srcdoc', 'about:srcdoc', true],
+    ['https://example.test/help', 'https://example.test/', 'https://example.test/', false],
+  ]) {
+    const details = createDetails(url, current, initiator)
+    handlers.get('will-frame-navigate')(details)
+    assert.equal(details.prevented, prevented, url)
+  }
+})
+
 test('renderer-owned HTTPS navigation and popups are denied without opening the system browser', () => {
   const handlers = new Map()
   const opened = []

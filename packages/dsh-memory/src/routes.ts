@@ -117,6 +117,7 @@ function draftFromBody(body: Record<string, unknown>): MemoryDraft | undefined {
 export function makeMemoryRoutes(options: {
   service: MemoryService
   enabled?: () => boolean
+  suggestTurn?: (context: NonNullable<ReturnType<MemoryService['localContext']>>) => Promise<boolean>
 }): WebRoute[] {
   const { service } = options
 
@@ -220,6 +221,14 @@ export function makeMemoryRoutes(options: {
       } catch (error) {
         writeJson(response, 400, { ok: false, code: genericErrorCode(error) })
       }
+      return
+    }
+
+    if (pathname === MEMORY_PENDING_PATH && body.operation === 'suggest-turn') {
+      try {
+        if (!context.sessionId || !options.suggestTurn) throw new MemoryAccessError('invalid-target')
+        writeJson(response, 200, { ok: true, suggested: await options.suggestTurn(context) })
+      } catch (error) { writeJson(response, 400, { ok: false, code: genericErrorCode(error) }) }
       return
     }
 

@@ -306,7 +306,7 @@ export class HarnessBridge {
     } catch (error) {
       this.onLog?.('warn', `turn interrupted for ${binding.conversationKey}: ${error instanceof Error ? error.message : String(error)}`)
       if (collector.chunks.length === 0) {
-        return `⚠️ 执行中断: ${error instanceof Error ? error.message : String(error)}`
+        return `执行中断: ${error instanceof Error ? error.message : String(error)}`
       }
     } finally {
       this.turnCollectors.delete(binding.sessionId)
@@ -314,10 +314,10 @@ export class HarnessBridge {
 
     const body = collector.chunks.join('\n\n').trim()
     if (collector.error && !body) {
-      return `⚠️ 本轮执行异常: ${collector.error}`
+      return `本轮执行异常: ${collector.error}`
     }
     if (collector.error && body) {
-      return `${body}\n\n⚠️ ${collector.error}`
+      return `${body}\n\n本轮执行异常: ${collector.error}`
     }
     return body || '（无文本输出）'
   }

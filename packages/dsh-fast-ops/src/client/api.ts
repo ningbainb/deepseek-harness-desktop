@@ -2,11 +2,14 @@ import type { FastOpsSettings } from '../core/settings.ts'
 
 export interface FastOpsStateResponse {
   settings: FastOpsSettings
+  astAvailable: boolean
   counters: {
     batchCalls: number
     filesReadInBatches: number
     cacheSpills: number
     toolsActivated: number
+    astCalls: number
+    denoiseTokensSaved: number
   }
   cache: {
     totalRefs: number

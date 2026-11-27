@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { openNativeSettings } from './native-settings-fixture.mjs'
 import { desktopLocalPath } from '../src/desktop-remote-path.mjs'
@@ -81,6 +81,7 @@ try {
     console.error(`startup surface:\n${(await page.locator('body').innerText().catch(() => '')).slice(-2_000) || '(unavailable)'}`)
     throw error
   }
+  await dismissFirstRunModelChooserWhenShown(page)
   page.on('pageerror', error => { rendererErrors.push(error.message) })
   page.on('console', message => {
     if (message.type() === 'error' || message.type() === 'warning') rendererConsole.push(`${message.type()}: ${message.text()}`)

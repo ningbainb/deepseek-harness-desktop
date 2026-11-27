@@ -1,0 +1,3 @@
+- insert:
+    - id: checkpoints
+      name: '@ningbainb/dsh-checkpoints'

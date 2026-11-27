@@ -48,8 +48,8 @@ export declare function normalizeRedundantSandboxEscalation(raw: string, tool: T
 /**
  * Normalize model tool-call payloads before dsh-agent-loop parses raw JSON.
  * Complete `block-end` calls are transformed in place. Delta-only calls are
- * held until they close so the raw JSON can be assessed as a complete value;
- * non-recovered deltas are replayed byte-for-byte.
+ * held until they close for envelope recovery, while canonical Artifact
+ * arguments stream live. Non-recovered deltas are preserved byte-for-byte.
  */
 export declare function normalizeToolCallArgumentStream(options: GenerateOptions, source: AsyncIterable<StreamChunk>, diagnostic?: (diagnostic: ToolCallNormalizationDiagnostic) => void, permissionMode?: string | undefined): AsyncGenerator<StreamChunk>;
 /** Install the Desktop-only stream compatibility hook through the public SDK. */

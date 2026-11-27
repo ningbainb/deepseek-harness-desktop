@@ -64,11 +64,14 @@ describe('Web UI settings section', () => {
     const inject = vi.fn((_name: string, callback: () => unknown) => callback())
     const localeRegister = vi.fn(() => () => {})
     const bind = vi.fn(() => (key: string) => key === 'title' ? 'Web UI Plugins' : key)
+    const RemoteCard = () => null
+    const remoteInjection = () => ({ revision: 1 })
+    const remoteCard = { options: { id: 'remote-web-ui' }, component: RemoteCard, inject: remoteInjection, locale: 'remote' }
     const ctx = {
       effect: ownedEffect,
       inject: vi.fn(),
       locale: { register: localeRegister, bind },
-      slots: { inject, register, entriesOfSlot: () => [], subscribe: () => () => {} },
+      slots: { inject, register, entriesOfSlot: (name: string) => name === 'web-ui.plugin.item' ? [remoteCard] : [], subscribe: () => () => {} },
     }
 
     apply(ctx as never)
@@ -79,8 +82,8 @@ describe('Web UI settings section', () => {
     expect(localeRegister).toHaveBeenCalledWith('chatgpt-auth', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('relay-onboarding', expect.any(Object))
     expect(localeRegister).toHaveBeenCalledWith('community-plugins', expect.any(Object))
-    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'settings.section', 'settings.models.footer', 'settings.models.footer', 'sidebar.footer.action'])
-    expect(register).toHaveBeenCalledTimes(6)
+    expect(inject.mock.calls.map(([name]) => name)).toEqual(['web-ui.plugin.item', 'settings.section', 'settings.section', 'plugins.row.config', 'settings.models.footer', 'settings.models.footer', 'sidebar.footer.action'])
+    expect(register).toHaveBeenCalledTimes(8)
     expect(register.mock.calls[0]).toEqual([expect.objectContaining({ name: 'web-ui.plugin.item', id: 'community-plugins', inject: expect.any(Function) }), CommunityPluginsSettingsCard])
     const [authOptions, AuthComponent] = register.mock.calls[1] as unknown as [Record<string, unknown>, typeof ChatGptAuthSection]
     expect(authOptions).toMatchObject({
@@ -100,7 +103,14 @@ describe('Web UI settings section', () => {
     })
     expect(options).not.toHaveProperty('key')
     expect(Component).toBe(WebUIPluginsSection)
-    const [relayOptions, RelayComponent] = register.mock.calls[3] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
+    const remoteRows = register.mock.calls.slice(3, 5) as unknown as Array<[Record<string, unknown>, (props: { view: string; revision?: number }) => unknown]>
+    expect(remoteRows.map(([entry]) => entry.key)).toEqual(['@linxin666/dsh-web-all#remote-web-ui', '@linxin666/dsh-web-all#web-ui-remote-web-ui'])
+    for (const [entry, renderRemoteRow] of remoteRows) {
+      expect(entry).toMatchObject({ name: 'plugins.row.config', inject: remoteInjection, locale: 'remote' })
+      expect(renderRemoteRow({ view: 'summary' })).toBeNull()
+      expect(renderRemoteRow({ view: 'page', revision: 1 })).toMatchObject({ type: RemoteCard, props: { revision: 1 } })
+    }
+    const [relayOptions, RelayComponent] = register.mock.calls[5] as unknown as [Record<string, unknown>, typeof RelayOnboardingCard]
     expect(relayOptions).toMatchObject({
       name: 'settings.models.footer',
       id: 'bai-onboarding',
@@ -108,10 +118,10 @@ describe('Web UI settings section', () => {
       locale: 'relay-onboarding',
     })
     expect(RelayComponent).toBe(RelayOnboardingCard)
-    expect((register.mock.calls[4] as unknown as [Record<string, unknown>])[0]).toMatchObject({ name: 'settings.models.footer', id: 'desktop-model-advanced', order: 100 })
+    expect((register.mock.calls[6] as unknown as [Record<string, unknown>])[0]).toMatchObject({ name: 'settings.models.footer', id: 'desktop-model-advanced', order: 100 })
     const footerIds = (register.mock.calls as unknown as Array<[Record<string, unknown>]>).filter(([options]) => options.name === 'sidebar.footer.action').map(([options]) => options.id)
     expect(footerIds).toEqual(['desktop-extension-dock'])
-    const [dockOptions, DockComponent] = register.mock.calls[5] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
+    const [dockOptions, DockComponent] = register.mock.calls[7] as unknown as [Record<string, unknown>, typeof DesktopExtensionDockEntry]
     expect(dockOptions).toMatchObject({
       name: 'sidebar.footer.action',
       id: 'desktop-extension-dock',

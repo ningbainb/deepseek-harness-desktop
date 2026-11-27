@@ -1,13 +1,13 @@
 import { getHostService, } from "./core/host-types.js";
 import { ROUTE_PREFIX, defaultSettings, } from "./core/settings.js";
 import { readSettings, resolveDshHome, writeSettingsAtomic } from "./host/settings-store.js";
-import { FastOpsController } from "./host/tool-registry.js";
+import { FAST_OPS_RESULTS_SERVICE, FastOpsController } from "./host/tool-registry.js";
 export { INLINE_BYTE_OPTIONS, PACKAGE_ID, ROUTE_PREFIX, SETTINGS_FILE, TTL_MS_OPTIONS, defaultSettings, normalizeSettings, } from "./core/settings.js";
 export { readSettings, resolveDshHome, writeSettingsAtomic } from "./host/settings-store.js";
 export { resolveSafeWorkspacePath, sha256Hex } from "./host/workspace-path.js";
 export { ResultCache } from "./host/result-cache.js";
 export { buildCompactDiff, diffPreview, editFilesBatch, parseDelimitedTable, readFilesBatch, readTableFile, replaceAcrossFiles, searchWorkspace, statFile, } from "./host/file-ops.js";
-export { ALL_FAST_OPS_TOOLS, FastOpsController, RESIDENT_TOOLS, SPECIALIZED_TOOLS, } from "./host/tool-registry.js";
+export { ALL_FAST_OPS_TOOLS, FAST_OPS_RESULTS_SERVICE, FastOpsController, RESIDENT_TOOLS, SPECIALIZED_TOOLS, } from "./host/tool-registry.js";
 function sendJson(response, status, body) {
     response.writeHead(status, {
         'content-type': 'application/json; charset=utf-8',
@@ -58,6 +58,8 @@ export function apply(ctx) {
         ctx,
         getSettings: () => cachedSettings,
     });
+    const results = { putText: input => controller.putText(input) };
+    ctx.provide(FAST_OPS_RESULTS_SERVICE, results);
     void readSettings(home).then((loaded) => {
         cachedSettings = loaded;
         controller.reapply();
@@ -74,6 +76,7 @@ export function apply(ctx) {
                 sendJson(response, 200, {
                     settings: cachedSettings,
                     counters: controller.counters,
+                    astAvailable: await controller.isAstAvailable(),
                     cache: controller.cache.stats(),
                 });
                 return;

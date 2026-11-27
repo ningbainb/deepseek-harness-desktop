@@ -8,6 +8,7 @@ import {
   CHATGPT_CREDENTIAL_KEY,
   chatGptAuthErrorCode,
   ChatGptAuthorizationController,
+  type ChatGptCredentialFace,
 } from '../src/chatgpt-auth.ts'
 import { readLocalCodexAuth } from '../src/local-codex-auth.ts'
 import { makeChatGptAuthRoutes } from '../src/chatgpt-auth-routes.ts'
@@ -64,16 +65,16 @@ function fakeRuntime(options: { available?: boolean; configured?: boolean } = {}
     },
     cancel: () => { cancelled += 1 },
   }
-  const credentials = {
+  const credentials: ChatGptCredentialFace = {
     describeRecord: async () => ({ configured, kind: configured ? 'grant' as const : undefined, writable: true }),
     deleteRecord: async () => { configured = false; storedGrant = undefined; deleted += 1 },
-    modifyRecord: async (_key: unknown, mutate: (current: undefined) => Promise<{ kind: string; payload: unknown } | undefined>) => {
+    modifyRecord: async (_key, mutate) => {
       const next = await mutate(undefined)
       if (next) {
         configured = true
-        storedGrant = next.payload
+        storedGrant = next.kind === 'grant' ? next.payload : undefined
       }
-      return next as never
+      return next
     },
   }
   return {

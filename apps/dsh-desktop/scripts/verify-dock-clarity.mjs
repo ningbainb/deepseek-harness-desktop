@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
-import { useChineseFixtureLocale, visitDockDestination } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale, visitDockDestination } from './dock-settings-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
@@ -32,6 +32,7 @@ try {
       DSH_DESKTOP_DISABLE_PROTOCOL_REGISTRATION: '1', DSH_DESKTOP_OPEN_EXTENSIONS: '1' } })
   await useChineseFixtureLocale(app)
   const main = await app.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(main)
   await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
   for (let attempt = 0; attempt < 240; attempt++) {
     dock = app.windows().find(page => page.url().includes('/extensions.html'))

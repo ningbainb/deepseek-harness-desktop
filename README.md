@@ -8,6 +8,12 @@ DeepSeek Harness Desktop 是基于官方 DSH 的社区开源桌面工作台，�
 
 [下载最新版](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [项目官网](https://1521003.xyz/) · [使用文档](docs/desktop.md) · [更新日志](CHANGELOG.md)
 
+## 5.7 开发预览
+
+- ACP 工作台支持按会话选择本机 Agent。nbfast 提供语法大纲、结构化搜索与改写，以及可取回原文的终端输出摘要。 [ACP](packages/dsh-llm-antigravity/README.zh.md) · [nbfast](packages/dsh-fast-ops/README.zh.md)
+- 办公模式提取文档与经授权的网页。记忆与知识库可按工作区检索会话、已确认记忆和选定资料。 [文档解析](packages/dsh-doc-ingest/README.zh.md) · [本地检索](packages/dsh-local-search/README.zh.md)
+- 会话内的 MCP Apps 支持受控工具交互，普通 Artifact 可离线渲染 Mermaid 并导出 SVG、PNG。工作区检查点可比较轮次变更，并在桌面确认后恢复和撤销。 [MCP Apps](packages/dsh-chat-artifacts/README.zh.md) · [检查点](packages/dsh-checkpoints/README.zh.md)
+
 ![Windows 会话主界面](website/assets/desktop-5.3.5-main.webp)
 
 ## 5.3.5 正式版

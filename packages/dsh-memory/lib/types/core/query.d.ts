@@ -7,4 +7,9 @@ export declare function extractCurrentUserQuery(session: {
     header: SessionHeader;
     events: readonly SessionEvent[];
 }): string;
+/** Propose one short, user-authored observation from the latest ended turn. */
+export declare function proposeTurnMemory(snapshot: {
+    header: SessionHeader;
+    events: readonly SessionEvent[];
+}, passive: boolean): string | undefined;
 //# sourceMappingURL=query.d.ts.map

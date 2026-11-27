@@ -1,13 +1,21 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { PostToolDecision, ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import { isAbsolute } from 'node:path'
 import {
   getHostService,
   type AgentLike,
   type ScopedToolsLike,
   type SystemPromptServiceLike,
+  type ToolRegistrationSpec,
   type ToolsServiceLike,
+  type UserScopeServiceLike,
+  type WorkingDirectoryServiceLike,
   type WorkspacesServiceLike,
 } from '../core/host-types.ts'
 import type { FastOpsSettings } from '../core/settings.ts'
+import { isNativeAstAvailable, outlineWorkspace } from './ast-outline.ts'
+import { rewriteAst, searchAst } from './ast-tools.ts'
+import { denoiseCommandOutput } from './command-output.ts'
 import {
   diffPreview,
   editFilesBatch,
@@ -17,10 +25,14 @@ import {
   searchWorkspace,
   statFile,
 } from './file-ops.ts'
-import { ResultCache } from './result-cache.ts'
+import { mapRepository } from './repo-map.ts'
+import { ResultCache, type StorageReference } from './result-cache.ts'
 
 export const RESIDENT_TOOLS = ['fast_read_files', 'fast_search', 'fast_edit_batch', 'fast_discover'] as const
-export const SPECIALIZED_TOOLS = ['fast_stat', 'fast_diff', 'fast_replace', 'fast_read_table', 'fast_result'] as const
+export const SPECIALIZED_TOOLS = [
+  'fast_stat', 'fast_diff', 'fast_replace', 'fast_read_table', 'fast_result',
+  'fast_outline', 'fast_ast_search', 'fast_ast_rewrite', 'fast_repo_map',
+] as const
 export const ALL_FAST_OPS_TOOLS = [...RESIDENT_TOOLS, ...SPECIALIZED_TOOLS] as const
 
 const SPECIALIZED_CATALOG: Record<(typeof SPECIALIZED_TOOLS)[number], string> = {
@@ -29,6 +41,10 @@ const SPECIALIZED_CATALOG: Record<(typeof SPECIALIZED_TOOLS)[number], string> = 
   fast_replace: 'Batch literal replacement across glob-matched files (dryRun defaults to true).',
   fast_read_table: 'Parse RFC-4180 CSV/TSV files with quoted fields, column projection, and row paging.',
   fast_result: 'Page, filter (equals), project (fields), or release cached ref:// overflow results.',
+  fast_outline: 'Read declaration names, signatures and exact line ranges without loading function bodies.',
+  fast_ast_search: 'Find syntax patterns with ast-grep metavariables. Returns exact revisions and optional line context.',
+  fast_ast_rewrite: 'Preview a syntax-pattern rewrite, or apply it using the exact file revisions from that preview.',
+  fast_repo_map: 'Return a credential-filtered repository map of paths and signatures within a token budget.',
 }
 
 export interface FastOpsCounters {
@@ -36,19 +52,33 @@ export interface FastOpsCounters {
   filesReadInBatches: number
   cacheSpills: number
   toolsActivated: number
+  astCalls: number
+  denoiseTokensSaved: number
 }
 
-function sessionIdOf(agent: AgentLike | undefined): string {
-  return agent?.session?.id || agent?.id || 'default'
+export const FAST_OPS_RESULTS_SERVICE = 'fastOpsResults'
+
+export interface FastOpsResultsService {
+  putText(input: { agent?: AgentLike; producerTool: string; text: string; preview?: string }): StorageReference | undefined
 }
 
-export class FastOpsController {
+interface CheckpointsServiceLike {
+  beforeWorkspaceWrite(input: { agent: AgentLike; workspacePath: string; paths: string[]; tool: string }): Promise<void>
+}
+
+interface PermissionPresetsLike {
+  permissionState?: (session: AgentLike['session']) => { sandbox?: string } | undefined
+}
+
+export class FastOpsController implements FastOpsResultsService {
   readonly cache: ResultCache
   readonly counters: FastOpsCounters = {
     batchCalls: 0,
     filesReadInBatches: 0,
     cacheSpills: 0,
     toolsActivated: 0,
+    astCalls: 0,
+    denoiseTokensSaved: 0,
   }
 
   private readonly activated = new WeakMap<object, Set<string>>()
@@ -64,6 +94,72 @@ export class FastOpsController {
     this.cache = new ResultCache({ getMaxRefs: () => this.getSettings().maxCachedRefs })
   }
 
+  private cacheScope(agent: AgentLike | undefined, requireSession = false) {
+    const sessionId = agent?.session?.id || (requireSession ? undefined : agent?.id || 'default')
+    if (!sessionId) return undefined
+    const userScope = getHostService<UserScopeServiceLike>(this.ctx, 'userScope')
+    const scope = userScope?.currentScope?.() ?? userScope?.desktopScope?.()
+    if (userScope && !scope?.principalId) return undefined
+    if (scope && userScope?.canAccess && (requireSession || scope.source === 'remote')) {
+      if (!userScope.canAccess(scope, { kind: 'session', sessionId }).allowed) return undefined
+    }
+    return { sessionId, principalId: scope?.principalId }
+  }
+
+  async isAstAvailable(): Promise<boolean> {
+    return isNativeAstAvailable()
+  }
+
+  putText(input: Parameters<FastOpsResultsService['putText']>[0]): StorageReference | undefined {
+    const settings = this.getSettings()
+    if (!settings.enabled || !input.agent) return undefined
+    const scope = this.cacheScope(input.agent, true)
+    if (!scope) return undefined
+    const ref = this.cache.putText({
+      ...scope, producerTool: input.producerTool, text: input.text,
+      preview: input.preview, ttlMs: settings.resultCacheTtlMs,
+    })
+    if (!ref) return undefined
+    this.counters.cacheSpills++
+    const activated = this.activatedSetFor(input.agent)
+    if (!activated.has('fast_result')) {
+      activated.add('fast_result')
+      this.counters.toolsActivated++
+      try { this.reapply(input.agent) } catch { /* The explicit discover tool remains available. */ }
+    }
+    return ref
+  }
+
+  private projectCommandResult(
+    exec: ToolExecution,
+    result: Readonly<ToolExecutionResult>,
+    decision: PostToolDecision,
+  ): PostToolDecision {
+    if (!['bash', 'pwsh'].includes(exec.name) || result.isError || decision.kind !== 'accept'
+      || decision.content !== undefined || decision.value !== undefined) return decision
+    const args = exec.arguments as { command?: unknown } | undefined
+    const original = result.content[0]
+    if (typeof args?.command !== 'string' || result.content.length !== 1 || original?.type !== 'text') return decision
+    const shell = result.value as {
+      kind?: string
+      stdout?: { truncated?: boolean }
+      stderr?: { truncated?: boolean }
+    } | null | undefined
+    if ((shell?.kind !== undefined && shell.kind !== 'foreground')
+      || shell?.stdout?.truncated || shell?.stderr?.truncated
+      || /(?:^|\n)\[output truncated; full output:/u.test(original.text)) return decision
+    const compact = denoiseCommandOutput(original.text, args.command, this.getSettings().denoise)
+    if (compact === undefined) return decision
+    const ref = this.putText({ agent: exec.agent, producerTool: exec.name, text: original.text })
+    if (!ref) return decision
+    const rawBytes = Buffer.byteLength(original.text, 'utf8')
+    const projectedBytes = Buffer.byteLength(compact, 'utf8')
+    const percent = Math.round((1 - projectedBytes / rawBytes) * 100)
+    const text = `${compact}\n[compressed ${rawBytes} B -> ${projectedBytes} B, saved ~${percent}%; full raw output: ${ref.refId} via fast_result]`
+    this.counters.denoiseTokensSaved += Math.max(0, Math.floor((original.text.length - text.length) / 4))
+    return { ...decision, content: [{ ...original, text }] }
+  }
+
   private resolveWorkspaceRoot(agent?: AgentLike): string {
     if (agent?.workspace?.path) return agent.workspace.path
     if (agent?.cwd) return agent.cwd
@@ -73,6 +169,32 @@ export class FastOpsController {
       if (first?.path) return first.path
     } catch {}
     return process.cwd()
+  }
+
+  private async resolveCodeWorkspace(agent: AgentLike | undefined, signal?: AbortSignal): Promise<string | undefined> {
+    if (!agent) return undefined
+    const directory = getHostService<WorkingDirectoryServiceLike>(this.ctx, 'workingDirectory')
+    try {
+      signal?.throwIfAborted()
+      const root = directory
+        ? await directory.ensure(agent, signal)
+        : agent.workspace?.path || agent.cwd || agent.session?.header?.cwd
+      return typeof root === 'string' && isAbsolute(root) ? root : undefined
+    } catch {
+      signal?.throwIfAborted()
+      return undefined
+    }
+  }
+
+  private canRewriteWorkspace(agent: AgentLike): boolean {
+    const permissions = getHostService<PermissionPresetsLike>(this.ctx, 'permissionPresets')
+    const shell = getHostService<{ sandboxMode?: string }>(this.ctx, 'shell')
+    try {
+      const sandbox = (agent.session ? permissions?.permissionState?.(agent.session)?.sandbox : undefined) ?? shell?.sandboxMode
+      return sandbox !== 'read-only'
+    } catch {
+      return false
+    }
   }
 
   private activatedSetFor(agent: AgentLike | undefined): Set<string> {
@@ -106,7 +228,7 @@ export class FastOpsController {
     this.liveAgents.add(agent)
     this.applying = true
     try {
-      const scoped = agent.ctx?.get?.('tools') as ScopedToolsLike | undefined ?? agent.ctx?.tools
+      const scoped = (agent.ctx?.get?.('tools') ?? agent.ctx?.tools) as ScopedToolsLike | undefined
       if (typeof scoped?.restrict !== 'function') return
       let deny = this.denyListFor(agent)
       if (typeof scoped.view === 'function') {
@@ -154,6 +276,16 @@ export class FastOpsController {
       disposers.push(ctxAny.on('tools/change', () => {
         this.reapply()
       }))
+      disposers.push(ctxAny.on('tools/post-execute', async (
+        exec: ToolExecution, result: Readonly<ToolExecutionResult>, next: () => Promise<PostToolDecision>,
+      ) => {
+        const decision = await next()
+        try {
+          return this.projectCommandResult(exec, result, decision)
+        } catch {
+          return decision
+        }
+      }))
     }
 
     const mountPrompt = (systemPrompt: SystemPromptServiceLike) => {
@@ -165,9 +297,10 @@ export class FastOpsController {
           const settings = this.getSettings()
           if (!settings.enabled || !settings.batchingGuidance) return ''
           return [
-            '## Fast Ops Token-Efficiency Tips',
+            '## nbfast Token-Efficiency Tips',
             '- Prefer `fast_read_files` to inspect multiple files/ranges in a single turn and obtain SHA-256 `revision` tokens.',
-            '- Prefer `fast_search` for workspace glob/grep and `fast_edit_batch` for multi-hunk atomic edits; call `fast_discover` only when specialized tools (`fast_stat`, `fast_diff`, `fast_replace`, `fast_read_table`, `fast_result`) are needed.',
+            '- Use `fast_search` for workspace glob/grep. For an unfamiliar symbol or call site, request `contextLines: 2` to get merged excerpts and their file revisions in one call. Reuse the revision for `fast_edit_batch` when the excerpt is sufficient. Read larger excerpts from `contextRef` via `fast_result`; call `fast_discover` when a specialized tool is needed.',
+            '- Use `fast_outline` for declaration signatures and `fast_ast_search` for source patterns. Run `fast_ast_rewrite` in preview mode before supplying its file revisions to apply a rewrite.',
           ].join('\n')
         },
       })
@@ -196,7 +329,7 @@ export class FastOpsController {
         name: string
         description: string
         parameters: unknown
-        execute: (args: Record<string, unknown> | undefined, exec?: { agent?: AgentLike }) => unknown
+        execute: ToolRegistrationSpec['execute']
       }) => {
         const stop = tools.register!({
           ...spec,
@@ -210,6 +343,13 @@ export class FastOpsController {
         })
         if (typeof stop === 'function') disposers.push(stop)
       }
+
+      const codeSelection = {
+        path: { type: 'string', description: 'Workspace path or glob, default ".".' },
+        include: { type: 'array', items: { type: 'string' }, maxItems: 32 },
+      }
+      const pattern = { type: 'string', minLength: 1, maxLength: 1000, description: 'ast-grep pattern such as ctx.on($EVENT, $HANDLER).' }
+      const noWorkspace = { ok: false, error: 'workspace-unavailable' }
 
       reg({
         name: 'fast_read_files',
@@ -240,7 +380,7 @@ export class FastOpsController {
           this.counters.filesReadInBatches += files.length
           const settings = this.getSettings()
           const result = await readFilesBatch(this.resolveWorkspaceRoot(exec?.agent), files, {
-            sessionId: sessionIdOf(exec?.agent),
+            ...this.cacheScope(exec?.agent),
             maxInlineBytes: settings.maxInlineBytes,
             ttlMs: settings.resultCacheTtlMs,
             cache: this.cache,
@@ -252,7 +392,7 @@ export class FastOpsController {
 
       reg({
         name: 'fast_search',
-        description: 'Unified workspace file glob and regex/literal grep skipping .git/node_modules/build outputs.',
+        description: 'Search workspace files by glob or grep. Opt into merged line context and exact file revisions when needed for explanation or a follow-up edit.',
         parameters: {
           type: 'object',
           additionalProperties: false,
@@ -267,6 +407,8 @@ export class FastOpsController {
             includeHidden: { type: 'boolean' },
             offset: { type: 'integer' },
             limit: { type: 'integer' },
+            contextLines: { type: 'integer', minimum: 0, maximum: 5,
+              description: 'Optional lines before and after each grep match. Returns merged excerpts for this match page, or contextRef for fast_result. Defaults to 0.' },
           },
         },
         execute: async (args, exec) => {
@@ -276,7 +418,7 @@ export class FastOpsController {
             this.resolveWorkspaceRoot(exec?.agent),
             args as unknown as Parameters<typeof searchWorkspace>[1],
             {
-              sessionId: sessionIdOf(exec?.agent),
+              ...this.cacheScope(exec?.agent),
               maxInlineBytes: settings.maxInlineBytes,
               ttlMs: settings.resultCacheTtlMs,
               cache: this.cache,
@@ -323,7 +465,7 @@ export class FastOpsController {
 
       reg({
         name: 'fast_discover',
-        description: 'Activate specialized Fast Ops tools (fast_stat, fast_diff, fast_replace, fast_read_table, fast_result) on demand by keyword or select:<tool>.',
+        description: 'Activate specialized nbfast file, AST, repository map, and result tools on demand by keyword or select:<tool>.',
         parameters: {
           type: 'object',
           additionalProperties: false,
@@ -427,7 +569,7 @@ export class FastOpsController {
             this.resolveWorkspaceRoot(exec?.agent),
             args as unknown as Parameters<typeof readTableFile>[1],
             {
-              sessionId: sessionIdOf(exec?.agent),
+              ...this.cacheScope(exec?.agent),
               maxInlineBytes: settings.maxInlineBytes,
               ttlMs: settings.resultCacheTtlMs,
               cache: this.cache,
@@ -435,6 +577,94 @@ export class FastOpsController {
           )
           if ('spilled' in res && res.spilled) this.counters.cacheSpills++
           return res
+        },
+      })
+
+      reg({
+        name: 'fast_outline',
+        description: SPECIALIZED_CATALOG.fast_outline,
+        parameters: {
+          type: 'object', additionalProperties: false,
+          properties: { ...codeSelection, maxSymbols: { type: 'integer', minimum: 1, maximum: 200 } },
+        },
+        execute: async (args, exec) => {
+          const root = await this.resolveCodeWorkspace(exec?.agent, exec?.signal)
+          if (!root) return noWorkspace
+          this.counters.astCalls++
+          return outlineWorkspace(root, (args ?? {}) as Parameters<typeof outlineWorkspace>[1], exec?.signal)
+        },
+      })
+
+      reg({
+        name: 'fast_ast_search',
+        description: SPECIALIZED_CATALOG.fast_ast_search,
+        parameters: {
+          type: 'object', additionalProperties: false, required: ['pattern'],
+          properties: {
+            ...codeSelection, pattern,
+            offset: { type: 'integer', minimum: 0 },
+            limit: { type: 'integer', minimum: 1, maximum: 100 },
+            contextLines: { type: 'integer', minimum: 0, maximum: 5 },
+          },
+        },
+        execute: async (args, exec) => {
+          const root = await this.resolveCodeWorkspace(exec?.agent, exec?.signal)
+          if (!root) return noWorkspace
+          this.counters.astCalls++
+          const result = await searchAst(root, (args ?? {}) as unknown as Parameters<typeof searchAst>[1], exec?.signal)
+          if (!result.context?.length) return result
+          const text = JSON.stringify(result.context)
+          if (Buffer.byteLength(text, 'utf8') <= this.getSettings().maxInlineBytes) return result
+          const contextRef = this.putText({ agent: exec?.agent, producerTool: 'fast_ast_search', text })
+          return contextRef ? { ...result, context: [], contextRef, contextEncoding: 'json-text' } : result
+        },
+      })
+
+      reg({
+        name: 'fast_ast_rewrite',
+        description: SPECIALIZED_CATALOG.fast_ast_rewrite,
+        parameters: {
+          type: 'object', additionalProperties: false, required: ['pattern', 'replacement'],
+          properties: {
+            ...codeSelection, pattern,
+            replacement: { type: 'string', maxLength: 8192 },
+            dryRun: { type: 'boolean', description: 'Preview changes by default.' },
+            expectedRevisions: {
+              type: 'object',
+              description: 'Required to apply changes. Use the exact path-to-revision pairs returned by the preview.',
+              additionalProperties: { type: 'string', pattern: '^[a-f0-9]{64}$' },
+            },
+          },
+        },
+        execute: async (args, exec) => {
+          const agent = exec?.agent
+          const root = await this.resolveCodeWorkspace(agent, exec?.signal)
+          if (!root || !agent) return noWorkspace
+          if (args?.dryRun === false && !this.canRewriteWorkspace(agent)) return { ok: false, error: 'workspace-read-only' }
+          this.counters.astCalls++
+          return rewriteAst(root, (args ?? {}) as unknown as Parameters<typeof rewriteAst>[1], {
+            signal: exec?.signal,
+            beforeWrite: async paths => {
+              if (!this.canRewriteWorkspace(agent)) throw new Error('workspace-read-only')
+              const checkpoints = getHostService<CheckpointsServiceLike>(this.ctx, 'workspaceCheckpoints')
+              await checkpoints?.beforeWorkspaceWrite({ agent, workspacePath: root, paths, tool: 'fast_ast_rewrite' })
+            },
+          })
+        },
+      })
+
+      reg({
+        name: 'fast_repo_map',
+        description: SPECIALIZED_CATALOG.fast_repo_map,
+        parameters: {
+          type: 'object', additionalProperties: false,
+          properties: { ...codeSelection, maxTokens: { type: 'integer', minimum: 40, maximum: 12_000 } },
+        },
+        execute: async (args, exec) => {
+          const root = await this.resolveCodeWorkspace(exec?.agent, exec?.signal)
+          if (!root) return noWorkspace
+          this.counters.astCalls++
+          return mapRepository(root, (args ?? {}) as Parameters<typeof mapRepository>[1], exec?.signal)
         },
       })
 
@@ -456,13 +686,14 @@ export class FastOpsController {
           },
         },
         execute: (args, exec) => {
-          const sessionId = sessionIdOf(exec?.agent)
+          const scope = this.cacheScope(exec?.agent)
           const refId = String(args?.refId ?? '')
+          if (!scope) return { ok: false, refId, error: 'reference-not-found' }
           if (args?.action === 'release') {
-            return { ok: true, released: this.cache.release(sessionId, refId) }
+            return { ok: true, released: this.cache.release(scope.sessionId, refId, scope.principalId) }
           }
           return this.cache.page({
-            sessionId,
+            ...scope,
             refId,
             offset: typeof args?.offset === 'number' ? args.offset : undefined,
             limit: typeof args?.limit === 'number' ? args.limit : undefined,

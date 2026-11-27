@@ -1210,6 +1210,65 @@
       }
     },
     {
+      "name": "@ningbainb/dsh-local-search",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-local-search"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-27T16:20:00.000Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-local-search"
+      },
+      "reason": "Provide local recall across memory, authorized conversation history and workspace documents.",
+      "desktopContracts": [
+        "Isolated principal indexes and explicit workspace authorization",
+        "Rebuild derived indexes and fall back when optional native vectors are unavailable"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-local-search/tests/engine.spec.ts",
+          "apps/dsh-desktop/scripts/verify-local-search.mjs"
+        ],
+        "desktopAcceptance": [
+          "Find a saved conversation turn by a mixed Chinese and code identifier query."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@ningbainb/dsh-checkpoints",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-checkpoints"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-27T17:22:24.308Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-checkpoints"
+      },
+      "reason": "Preserve independent workspace changes by turn and support a reviewed, undoable restore.",
+      "desktopContracts": [
+        "Private Git object store and index preserve project Git metadata",
+        "Native consent binds the exact preview to the workspace session and checkpoint"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-checkpoints/tests/shadow-git.spec.ts",
+          "packages/dsh-checkpoints/tests/host.spec.ts",
+          "apps/dsh-desktop/scripts/verify-workspace-checkpoints.mjs"
+        ],
+        "desktopAcceptance": [
+          "Review two real tool changes, decline one restore, then restore and undo the selected checkpoint."
+        ],
+        "results": []
+      }
+    },
+    {
       "name": "@ningbainb/dsh-memory",
       "selection": {
         "version": "0.1.0",
@@ -1338,10 +1397,11 @@
         "checkedAt": "2026-11-26T14:30:00.000Z",
         "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-fast-ops"
       },
-      "reason": "Ship the Community Desktop token-efficient batch file, search, and result-cache toolkit.",
+      "reason": "Ship nbfast for token-efficient batch file operations, search, and result caching.",
       "desktopContracts": [
         "Workspace-confined batch file ops with SHA-256 CAS multi-edit",
-        "Progressive tool disclosure via fast_discover and bounded ref:// cache"
+        "Progressive tool disclosure via fast_discover and bounded ref:// cache",
+        "Optional native AST and reversible terminal output reduction"
       ],
       "validation": {
         "automatedChecks": [
@@ -1351,7 +1411,37 @@
           "packages/dsh-fast-ops/tests/tool-registry.spec.ts"
         ],
         "desktopAcceptance": [
-          "Configure Fast Ops settings card and reclaim cached references."
+          "Configure nbfast and reclaim cached references."
+        ],
+        "results": []
+      }
+    },
+    {
+      "name": "@ningbainb/dsh-doc-ingest",
+      "selection": {
+        "version": "0.1.0",
+        "source": "workspace",
+        "path": "packages/dsh-doc-ingest"
+      },
+      "publicSnapshot": {
+        "status": "not-found",
+        "latest": null,
+        "checkedAt": "2026-11-27T15:30:00.000Z",
+        "url": "https://registry.npmjs.org/%40ningbainb%2Fdsh-doc-ingest"
+      },
+      "reason": "Read Office, PDF and approved public web content in Work Mode using a local parser.",
+      "desktopContracts": [
+        "Session-owned workspace authorization and bounded document extraction",
+        "Path-reference default and explicit excerpt mode for documents dropped into the composer"
+      ],
+      "validation": {
+        "automatedChecks": [
+          "packages/dsh-doc-ingest/tests/parser.spec.ts",
+          "packages/dsh-doc-ingest/tests/web.spec.ts",
+          "packages/dsh-aionui-panel/tests/attachment-upload.spec.ts"
+        ],
+        "desktopAcceptance": [
+          "Drop a document into a project conversation, opt in to a local excerpt, and switch back to its path."
         ],
         "results": []
       }

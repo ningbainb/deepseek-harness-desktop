@@ -1,5 +1,10 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
+// The Runtime main window installs the srcdoc navigation guard before load.
+if (process.isMainFrame && location.protocol === 'dsh-runtime:' && location.host === 'app') {
+  contextBridge.exposeInMainWorld('__dshArtifactSandboxGuarded', true)
+}
+
 // Sandboxed Electron preloads cannot require sibling files. Keep this entry
 // self-contained so the bridge is available before the first local page loads.
 function createSubscription(channel, label) {
@@ -104,6 +109,15 @@ const baseApi = {
 
 const api = Object.freeze({
   ...baseApi,
+  createAcpInteractionProof: (operation, bodyJson) => process.isMainFrame && navigator.userActivation?.isActive
+    ? ipcRenderer.invoke('desktop:acp-interaction-proof', operation, bodyJson)
+    : Promise.resolve(undefined),
+  confirmMcpAppTool: (challengeId) => process.isMainFrame && navigator.userActivation?.isActive
+    ? ipcRenderer.invoke('desktop:mcp-app-tool-confirm', challengeId)
+    : Promise.resolve(undefined),
+  confirmCheckpointRestore: (challengeId) => process.isMainFrame && navigator.userActivation?.isActive
+    ? ipcRenderer.invoke('desktop:checkpoint-restore-confirm', challengeId)
+    : Promise.resolve(undefined),
   // Resolves only a File the user supplied; exposes no arbitrary filesystem lookup.
   getDroppedFilePath: (file) => webUtils.getPathForFile(file),
   action: (action) => ipcRenderer.invoke('desktop:action', action),

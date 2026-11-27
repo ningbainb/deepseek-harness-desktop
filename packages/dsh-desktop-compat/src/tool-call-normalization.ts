@@ -45,6 +45,10 @@ interface BufferedToolCall {
   arguments: string
 }
 
+// Artifact previews need the canonical argument stream before the tool settles.
+// A confirmed top-level Artifact parameter rules out the one-key arguments envelope.
+const ARTIFACT_ARGUMENT_PREFIX = /^\s*\{\s*"(?:title|kind|mode|html|height|description)"\s*:/u
+
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return value !== null
     && typeof value === 'object'
@@ -301,8 +305,8 @@ function* flushRawBufferedToolCall(
 /**
  * Normalize model tool-call payloads before dsh-agent-loop parses raw JSON.
  * Complete `block-end` calls are transformed in place. Delta-only calls are
- * held until they close so the raw JSON can be assessed as a complete value;
- * non-recovered deltas are replayed byte-for-byte.
+ * held until they close for envelope recovery, while canonical Artifact
+ * arguments stream live. Non-recovered deltas are preserved byte-for-byte.
  */
 export async function* normalizeToolCallArgumentStream(
   options: GenerateOptions,
@@ -312,15 +316,27 @@ export async function* normalizeToolCallArgumentStream(
 ): AsyncGenerator<StreamChunk> {
   const lookup = buildToolSchemaLookup(options.tools)
   const buffered = new Map<number, BufferedToolCall>()
+  const liveArtifacts = new Set<number>()
+  const artifactAvailable = lookup.get('render_artifact')?.kind === 'found'
 
   try {
     for await (const chunk of source) {
       if (chunk.type === 'tool-call-delta') {
+        if (liveArtifacts.has(chunk.index)) {
+          yield chunk
+          continue
+        }
         bufferToolCallChunk(buffered, chunk)
+        const call = buffered.get(chunk.index)
+        if (artifactAvailable && call?.name === 'render_artifact' && ARTIFACT_ARGUMENT_PREFIX.test(call.arguments)) {
+          liveArtifacts.add(chunk.index)
+          yield* flushRawBufferedToolCall(chunk.index, buffered)
+        }
         continue
       }
 
       if (chunk.type === 'block-end') {
+        liveArtifacts.delete(chunk.index)
         if (chunk.block.type === 'tool-call') {
           // A terminal block wins in BlockAssembler. Preserve any preceding raw
           // delta chunks for replay before yielding its normalized final block.

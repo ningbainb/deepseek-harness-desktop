@@ -26,6 +26,16 @@ const PWSH_SCHEMA = {
   },
 } satisfies ToolSchema
 
+const ARTIFACT_SCHEMA = {
+  name: 'render_artifact',
+  description: 'Render an HTML artifact.',
+  parameters: {
+    type: 'object',
+    properties: { title: { type: 'string' }, kind: { type: 'string' }, html: { type: 'string' } },
+    required: ['title', 'kind', 'html'],
+  },
+} satisfies ToolSchema
+
 const VALID_PWSH_ARGUMENTS = {
   command: 'Get-ChildItem',
   description: 'List the working directory',
@@ -315,6 +325,52 @@ describe('schema-aware tool call argument recovery', () => {
       reason: 'schema-validated-envelope',
       source: 'stream-delta',
     })])
+  })
+
+  it('publishes canonical Artifact deltas while the provider awaits further output', async () => {
+    const id = ToolCallId('call-artifact')
+    const beforePause: StreamChunk = {
+      type: 'tool-call-delta', index: 0, id, name: 'render_artifact',
+      argumentsDelta: '{"title":"Example","kind":"flow","html":"<p>Partial',
+    }
+    const afterPause: StreamChunk = { type: 'tool-call-delta', index: 0, id, argumentsDelta: ' preview</p>"}' }
+    const upstreamWaiting = Promise.withResolvers<'buffered'>()
+    const release = Promise.withResolvers<void>()
+    async function* delayed(): AsyncGenerator<StreamChunk> {
+      yield { type: 'block-start', index: 0, blockType: 'tool-call' }
+      yield beforePause
+      upstreamWaiting.resolve('buffered')
+      await release.promise
+      yield afterPause
+      yield { type: 'finish', reason: { kind: 'tool-calls' } }
+    }
+
+    const output = normalizeToolCallArgumentStream(request([ARTIFACT_SCHEMA]), delayed())
+    await output.next()
+    const next = output.next()
+    try {
+      expect(await Promise.race([next.then(result => result.value), upstreamWaiting.promise])).toEqual(beforePause)
+      release.resolve()
+      expect((await output.next()).value).toEqual(afterPause)
+    } finally {
+      release.resolve()
+      await output.return(undefined)
+    }
+  })
+
+  it('still normalizes an Artifact arguments envelope from a delta-only provider', async () => {
+    const args = { title: 'Example', kind: 'flow', html: '<p>Preview</p>' }
+    const raw = wrapped(args)
+    const id = ToolCallId('call-wrapped-artifact')
+    const chunks = await collect(normalizeToolCallArgumentStream(request([ARTIFACT_SCHEMA]), stream([
+      { type: 'tool-call-delta', index: 0, id, name: 'render_artifact', argumentsDelta: raw.slice(0, 6) },
+      { type: 'tool-call-delta', index: 0, id, argumentsDelta: raw.slice(6) },
+      { type: 'finish', reason: { kind: 'tool-calls' } },
+    ])))
+
+    expect(chunks[0]).toEqual({
+      type: 'tool-call-delta', index: 0, id, name: 'render_artifact', argumentsDelta: JSON.stringify(args),
+    })
   })
 
   it('waits for a complete delta-only payload and refuses an unknown tool without exposing its arguments', async () => {

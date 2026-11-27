@@ -332,15 +332,6 @@
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
-.readyBanner {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-success-primary, #10a37f) 28%, transparent);
-  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #10a37f) 8%, var(--dsw-alias-bg-layer-1));
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-}
-
 .modelsHead {
   display: flex;
   align-items: center;
@@ -408,11 +399,6 @@
 }
 .fields :is(input, select):disabled { opacity: .5; cursor: not-allowed; }
 .fields .mono { font-family: var(--ds-font-family-code, ui-monospace, "Cascadia Code", Consolas, monospace); font-size: 12px; }
-
-.fieldHint {
-  font-size: 12px;
-  color: var(--dsw-alias-label-tertiary);
-}
 
 .advanced {
   border-top: 1px solid var(--dsw-alias-border-l2);

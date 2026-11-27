@@ -9,6 +9,11 @@ export interface RemoteAccessHintOptions {
 
 const ENHANCED_ATTR = 'data-dsh-remote-hint-enhanced'
 const ACTION_ATTR = 'data-dsh-remote-open-settings'
+export const REMOTE_ACCESS_ROW_IDS = ['remote-web-ui', 'web-ui-remote-web-ui'] as const
+const REMOTE_ROW = REMOTE_ACCESS_ROW_IDS
+  .flatMap(id => [`[data-plugin-row="${id}"]`, `[data-plugin-row="include:${id}"]`]).join(',')
+const REMOTE_DETAIL = REMOTE_ACCESS_ROW_IDS
+  .map(id => `[data-plugin-row-detail="@linxin666/dsh-web-all#${id}"]`).join(',')
 
 const ZH_REWRITTEN_HINT =
   '当前仅绑定在本机（127.0.0.1），手机或其他设备暂无法访问。你可以直接前往插件设置开启「局域网访问」，或配置公网隧道地址。'
@@ -28,29 +33,39 @@ function isStaleRemoteHintParagraph(text: string): boolean {
   )
 }
 
-function scrollToRemotePluginCard(doc: Document): void {
-  const scrollAttempt = () => {
-    const scope = doc.querySelector('[data-plugin-panel], .dsh-desktop-settings-window') ?? doc.body
-    if (!scope) return
-    const candidates = scope.querySelectorAll('h1, h2, h3, h4, strong, summary, [data-plugin-id], section, article')
-    for (const node of candidates) {
-      const text = node.textContent ?? ''
-      if (
-        text.includes('远程访问设置')
-        || text.includes('远程访问')
-        || text.includes('移动端远程控制')
-        || text.includes('remote-web-ui')
-      ) {
-        node.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
-        break
-      }
-    }
-  }
+function openRemotePluginRowWhenReady(doc: Document): () => void {
   const win = doc.defaultView
-  if (win !== null) {
-    win.setTimeout(scrollAttempt, 200)
-    win.setTimeout(scrollAttempt, 600)
+  if (!win) return () => {}
+  let panelSeen = false
+  let rowOpened = false
+  const stop = () => observer.disconnect()
+  const openRow = () => {
+    const panel = doc.querySelector('[data-plugin-panel]')
+    if (!panel) {
+      if (panelSeen) stop()
+      return
+    }
+    panelSeen = true
+    if (panel.getAttribute('aria-busy') === 'true') return
+    const detail = panel.querySelector(REMOTE_DETAIL)
+    if (detail) {
+      const expand = detail.querySelector<HTMLButtonElement>('[data-plugin-config] button[aria-expanded]')
+      if (!expand) return
+      stop()
+      if (expand.getAttribute('aria-expanded') === 'false') expand.click()
+      return
+    }
+    if (rowOpened) return
+    const configure = panel.querySelector(REMOTE_ROW)
+      ?.querySelector<HTMLButtonElement>('button[type="button"][aria-label]:not([role="switch"]):not(:disabled)')
+    if (!configure) return
+    rowOpened = true
+    configure.click()
   }
+  const observer = new win.MutationObserver(openRow)
+  observer.observe(doc.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-busy', 'disabled'] })
+  openRow()
+  return stop
 }
 
 export function installRemoteAccessHintEnhancer(
@@ -58,6 +73,7 @@ export function installRemoteAccessHintEnhancer(
   options: RemoteAccessHintOptions,
 ): () => void {
   let disposed = false
+  let stopNavigation: (() => void) | undefined
 
   const scan = () => {
     if (disposed) return
@@ -72,11 +88,11 @@ export function installRemoteAccessHintEnhancer(
           break
         }
       }
-      if (!matchedParagraph) continue
+      if (!matchedParagraph && !alert.hasAttribute('data-dsh-remote-lan-required')) continue
 
       const english = isEnglishDocument(doc)
       alert.setAttribute(ENHANCED_ATTR, 'true')
-      matchedParagraph.textContent = english ? EN_REWRITTEN_HINT : ZH_REWRITTEN_HINT
+      if (matchedParagraph) matchedParagraph.textContent = english ? EN_REWRITTEN_HINT : ZH_REWRITTEN_HINT
 
       if (alert.querySelector(`[${ACTION_ATTR}="true"]`) !== null) continue
 
@@ -108,8 +124,9 @@ export function installRemoteAccessHintEnhancer(
         closeButton?.click()
         const schedule = doc.defaultView?.setTimeout.bind(doc.defaultView) ?? globalThis.setTimeout
         schedule(() => {
-          options.openPluginSettings()
-          scrollToRemotePluginCard(doc)
+          if (disposed) return
+          stopNavigation?.()
+          if (options.openPluginSettings() !== false) stopNavigation = openRemotePluginRowWhenReady(doc)
         }, 0)
       })
 
@@ -130,5 +147,6 @@ export function installRemoteAccessHintEnhancer(
   return () => {
     disposed = true
     observer?.disconnect()
+    stopNavigation?.()
   }
 }

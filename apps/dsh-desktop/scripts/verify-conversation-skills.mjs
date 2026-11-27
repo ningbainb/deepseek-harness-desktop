@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { dismissFirstRunModelChooserWhenShown } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const screenshotArgument = process.argv.find((argument) => argument.toLowerCase().endsWith('.png'))
@@ -80,6 +81,7 @@ try {
     }, fixtureLocale)
   }
   page = await electronApp.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(page)
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
   } catch (error) {

@@ -66,7 +66,10 @@ function getDynamicService(ctx: Context, key: string): unknown {
  * sandboxes gated by one-shot prompts.
  */
 export function isFullAccessUnattendedSession(ctx: Context, exec: ToolExecution): boolean {
-  const session = exec.agent?.session
+  return isFullAccessUnattendedForSession(ctx, exec.agent?.session)
+}
+
+export function isFullAccessUnattendedForSession(ctx: Context, session: unknown): boolean {
   if (!session) return false
   const approval = getDynamicService(ctx, 'approval') as { effectivePolicy?: (s: unknown) => unknown } | undefined
   let policy: unknown

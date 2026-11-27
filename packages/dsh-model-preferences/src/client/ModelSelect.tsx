@@ -20,12 +20,19 @@ export type ModelSelectProps = PropsRuntime<'conversation.input.model'>
   & {
     modelSessionId: string
     sessionCwd?: string
+    getSessionCwd?: () => string | undefined
     settingsScope: import('@deepseek-ai/dsh-client-ui-settings/client').ConfigForm<ModelPreferencesConfig>
   }
 
 interface AcpCatalogModel {
   id: string
   name: string
+}
+
+interface AcpSelection {
+  conversationId: string
+  modelId?: string
+  thoughtOption?: { currentValue?: string; options?: Array<{ value: string; name?: string }> }
 }
 
 function sortAcpModels(models: AcpCatalogModel[]): AcpCatalogModel[] {
@@ -52,13 +59,13 @@ function errorText(reason: unknown, fallback: string): string {
  * model-selection seat so the desktop composer keeps its native appearance.
  */
 export function ModelSelect(props: ModelSelectProps) {
-  const { locked, available, directory, load, modelSessionId, sessionCwd, select, settingsScope, t } = props
+  const { locked, available, directory, load, modelSessionId, sessionCwd, getSessionCwd, select, settingsScope, t } = props
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
   const [selecting, setSelecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [acpModels, setAcpModels] = useState<AcpCatalogModel[]>([])
-  const [acpExpanded, setAcpExpanded] = useState(false)
+  const [acpSelection, setAcpSelection] = useState<AcpSelection | null>(null)
   const [relayAccessAvailable, setRelayAccessAvailable] = useState(
     () => typeof document !== 'undefined' && document.querySelector('[data-dsh-relay-access-root]') !== null,
   )
@@ -69,6 +76,7 @@ export function ModelSelect(props: ModelSelectProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const refreshBridgeRef = useRef<{ announce(): void; dispose(): void } | null>(null)
   const id = useId()
+  const activeAcp = acpSelection?.conversationId === modelSessionId ? acpSelection : null
   const state = useSyncExternalStore(
     listener => directory.subscribe(listener),
     () => directory.getSnapshot(),
@@ -98,14 +106,17 @@ export function ModelSelect(props: ModelSelectProps) {
     option => option.provider === PRIMARY_PROVIDER_ID && option.model.id !== '__bai_login_required__',
   )
   const currentOption = options.find(option => option.current)
-  const reasoning = currentOption?.model.reasoning
-  const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
-  const effortLabel = reasoning === undefined
+  const reasoning = activeAcp ? undefined : currentOption?.model.reasoning
+  const thoughtOptions = activeAcp?.thoughtOption?.options
+  const effectiveEffort = activeAcp?.thoughtOption?.currentValue ?? state.current?.reasoningEffort ?? reasoning?.defaultEffort
+  const effortLabel = thoughtOptions?.length ? thoughtOptions.find(level => level.value === effectiveEffort)?.name ?? effectiveEffort
+    : reasoning === undefined
     ? undefined
     : effectiveEffort === undefined
       ? t('effort.default')
       : reasoning.efforts.find(level => level.id === effectiveEffort)?.name ?? effectiveEffort
   const effortChoices = useMemo<EffortChoice[]>(() => {
+    if (thoughtOptions?.length) return thoughtOptions.map(option => ({ key: option.value, label: option.name ?? option.value, effort: option.value }))
     if (reasoning === undefined) return []
     return [
       ...(reasoning.defaultEffort === undefined
@@ -118,9 +129,10 @@ export function ModelSelect(props: ModelSelectProps) {
         ...(effort.description === undefined ? {} : { description: effort.description }),
       })),
     ]
-  }, [reasoning, t])
+  }, [reasoning, t, thoughtOptions])
   const busy = state.status === 'selecting' || selecting
-  const currentName = state.current?.provider === 'project-relay' && state.current.model === '__bai_login_required__'
+  const currentName = activeAcp ? acpModels.find(model => model.id === activeAcp.modelId)?.name ?? activeAcp.modelId
+    : state.current?.provider === 'project-relay' && state.current.model === '__bai_login_required__'
     ? t('trigger.baiPending') : modelDisplayName(currentOption, state.current)
   const modelLabel = currentName || t('trigger.fallback')
   const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
@@ -129,6 +141,31 @@ export function ModelSelect(props: ModelSelectProps) {
     lastActionRef.current = 'load'
     loadRef.current()
   }, [])
+
+  const openAcpModel = useCallback((modelId: string) => {
+    document.dispatchEvent(new CustomEvent('dsh-antigravity-acp-open', {
+      detail: { modelId, cwd: getSessionCwd?.() ?? sessionCwd, conversationId: modelSessionId },
+    }))
+  }, [getSessionCwd, modelSessionId, sessionCwd])
+
+  useEffect(() => {
+    if (!available) return
+    const sync = (event: Event) => setAcpSelection((event as CustomEvent<AcpSelection | null>).detail)
+    const pick = (event: Event) => {
+      const content = rootRef.current?.closest('[data-conversation-content]')
+      const modelId = (event as CustomEvent<string>).detail
+      if (typeof modelId === 'string' && content && content === content.closest('[data-slot="main.conversation"]')?.querySelector('[data-conversation-content]')) {
+        openAcpModel(modelId)
+      }
+    }
+    document.addEventListener('dsh-antigravity-acp-selection', sync)
+    document.addEventListener('dsh-antigravity-acp-pick', pick)
+    document.dispatchEvent(new Event('dsh-antigravity-acp-selection-request'))
+    return () => {
+      document.removeEventListener('dsh-antigravity-acp-selection', sync)
+      document.removeEventListener('dsh-antigravity-acp-pick', pick)
+    }
+  }, [available, openAcpModel])
 
   useEffect(() => {
     const update = () => setRelayAccessAvailable(
@@ -141,12 +178,13 @@ export function ModelSelect(props: ModelSelectProps) {
 
   useEffect(() => {
     if (!available || typeof fetch !== 'function') return
-    let disposed = false
+    let generation = 0
     const refreshAcp = () => {
+      const request = ++generation
       void fetch('/api/dsh-antigravity-cli', { headers: { 'x-dsh-antigravity': '1' } })
         .then(res => (res.ok ? res.json() : null))
         .then((diag: { state?: string; harnessLlmAllowed?: boolean; models?: Array<{ id?: string; name?: string }> } | null) => {
-          if (disposed) return
+          if (request !== generation) return
           if (diag?.state === 'ready' && !diag.harnessLlmAllowed && Array.isArray(diag.models) && diag.models.length > 0) {
             setAcpModels(sortAcpModels(diag.models.filter((m): m is AcpCatalogModel =>
               typeof m?.id === 'string' && typeof m?.name === 'string')))
@@ -159,7 +197,7 @@ export function ModelSelect(props: ModelSelectProps) {
     refreshAcp()
     window.addEventListener('dsh-antigravity-status-updated', refreshAcp)
     return () => {
-      disposed = true
+      generation += 1
       window.removeEventListener('dsh-antigravity-status-updated', refreshAcp)
     }
   }, [available])
@@ -219,6 +257,7 @@ export function ModelSelect(props: ModelSelectProps) {
     try {
       const accepted = await select(selection)
       if (accepted === undefined || !accepted.ok) throw new Error(t('error.select'))
+      if (activeAcp) document.dispatchEvent(new CustomEvent('dsh-antigravity-acp-deactivate', { detail: modelSessionId }))
       refreshBridgeRef.current?.announce()
       close()
       triggerRef.current?.focus()
@@ -235,6 +274,11 @@ export function ModelSelect(props: ModelSelectProps) {
   }
 
   const chooseEffort = (effort?: string): void => {
+    if (activeAcp) {
+      document.dispatchEvent(new CustomEvent('dsh-antigravity-acp-effort', { detail: { conversationId: modelSessionId, value: effort } }))
+      close()
+      return
+    }
     if (state.current === null || busy) return
     void chooseSelection({
       provider: state.current.provider,
@@ -247,9 +291,9 @@ export function ModelSelect(props: ModelSelectProps) {
     <button
       type="button"
       key={`${option.provider}\u0000${option.model.id}`}
-      className={`${styles.option} ${option.current ? styles.optionCurrent : ''}`}
+      className={`${styles.option} ${option.current && !activeAcp ? styles.optionCurrent : ''}`}
       role="menuitemradio"
-      aria-checked={option.current}
+      aria-checked={option.current && !activeAcp}
       title={option.model.name || option.model.id}
       data-dsh-relay-model-entry="true"
       data-dsh-relay-provider={option.provider}
@@ -260,7 +304,7 @@ export function ModelSelect(props: ModelSelectProps) {
         <span className={styles.modelName}>{option.model.name || option.model.id}</span>
         {option.providerDisabled && <span className={styles.description}>{t('status.providerDisabled')}</span>}
       </span>
-      <span className={styles.check} aria-hidden="true">{option.current && <span className={styles.checkmark} />}</span>
+      <span className={styles.check} aria-hidden="true">{option.current && !activeAcp && <span className={styles.checkmark} />}</span>
     </button>
   )
 
@@ -291,7 +335,7 @@ export function ModelSelect(props: ModelSelectProps) {
         aria-label={currentName ? t('trigger.aria', { model: triggerLabel }) : t('trigger.fallback')}
         title={triggerLabel}
         data-dsh-relay-model-entry="true"
-        data-dsh-relay-provider={state.current?.provider}
+        data-dsh-relay-provider={activeAcp ? 'antigravity-cli' : state.current?.provider}
         disabled={locked}
         onClick={() => {
           if (open) close()
@@ -326,7 +370,7 @@ export function ModelSelect(props: ModelSelectProps) {
                 <span className={styles.cellValue}>{modelLabel}</span>
                 <span aria-hidden="true" className={styles.cellChevron} />
               </button>
-              {reasoning !== undefined && (
+              {effortChoices.length > 0 && (
                 <button type="button" role="menuitem" className={styles.cell} onClick={() => setPane('effort')}>
                   <span className={styles.cellLabel}>{t('menu.effort')}</span>
                   <span className={styles.cellValue}>{effortLabel}</span>
@@ -362,41 +406,28 @@ export function ModelSelect(props: ModelSelectProps) {
                     className={styles.group}
                     data-dsh-antigravity-group="true"
                   >
-                    <div className={styles.groupTitle}>
-                      <span>{t('antigravity.group')}</span>
-                      <span className={styles.acpBadge}>{t('antigravity.badge')}</span>
-                    </div>
-                    {(acpExpanded ? acpModels : acpModels.slice(0, 6)).map(model => (
+                      <div className={styles.groupTitle}>{t('antigravity.group')}</div>
+                      {acpModels.map(model => (
                       <button
                         key={model.id}
                         type="button"
-                        role="menuitem"
+                          role="menuitemradio"
+                          aria-checked={activeAcp?.modelId === model.id}
                         className={styles.option}
-                        title={`${model.name} — ${t('antigravity.desc')}`}
+                          title={model.name}
                         data-dsh-antigravity-model={model.id}
                         onClick={() => {
                           close()
-                          document.dispatchEvent(new CustomEvent('dsh-antigravity-acp-open', {
-                            detail: { modelId: model.id, cwd: sessionCwd },
-                          }))
+                            openAcpModel(model.id)
+                            triggerRef.current?.focus()
                         }}
                       >
                         <span className={styles.optionCopy}>
                           <span className={styles.modelName}>{model.name}</span>
-                          <span className={styles.description}>{t('antigravity.desc')}</span>
                         </span>
-                        <span aria-hidden="true" className={styles.cellChevron} />
+                          <span className={styles.check} aria-hidden="true">{activeAcp?.modelId === model.id && <span className={styles.checkmark} />}</span>
                       </button>
                     ))}
-                    {acpModels.length > 6 && (
-                      <button
-                        type="button"
-                        className={styles.acpExpandBtn}
-                        onClick={() => setAcpExpanded(prev => !prev)}
-                      >
-                        {acpExpanded ? t('antigravity.collapse') : t('antigravity.expand', { count: acpModels.length })}
-                      </button>
-                    )}
                   </section>
                 )}
                 {relayAccessAvailable && !hasConfiguredRelay && (

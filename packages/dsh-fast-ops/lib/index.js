@@ -1,8 +1,13 @@
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { createRequire } from "node:module";
+import { access, chmod, lstat, mkdir, open, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { homedir, tmpdir } from "node:os";
+import { basename, delimiter, dirname, extname, isAbsolute, join, matchesGlob, normalize, relative, resolve, sep } from "node:path";
+import { execFile } from "node:child_process";
+import { constants, existsSync, realpathSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+import ignore from "ignore";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, realpathSync } from "node:fs";
+import { promisify, stripVTControlCharacters } from "node:util";
 //#region src/core/host-types.ts
 function getHostService(ctx, name) {
 	const candidate = ctx;
@@ -36,7 +41,13 @@ function defaultSettings() {
 		batchingGuidance: true,
 		maxInlineBytes: 16384,
 		resultCacheTtlMs: 36e5,
-		maxCachedRefs: 128
+		maxCachedRefs: 128,
+		denoise: {
+			enabled: true,
+			git: true,
+			test: true,
+			build: true
+		}
 	};
 }
 function clampInt(value, min, max) {
@@ -53,6 +64,17 @@ function normalizeSettings(input) {
 		problems
 	};
 	const raw = input;
+	if (raw.denoise !== void 0) if (raw.denoise === null || typeof raw.denoise !== "object" || Array.isArray(raw.denoise)) problems.push("denoise");
+	else {
+		const values = raw.denoise;
+		for (const key of [
+			"enabled",
+			"git",
+			"test",
+			"build"
+		]) if (typeof values[key] === "boolean") settings.denoise[key] = values[key];
+		else if (values[key] !== void 0) problems.push(`denoise.${key}`);
+	}
 	if (typeof raw.enabled === "boolean") settings.enabled = raw.enabled;
 	else if (raw.enabled !== void 0) problems.push("enabled");
 	if (typeof raw.lazySpecializedTools === "boolean") settings.lazySpecializedTools = raw.lazySpecializedTools;
@@ -186,6 +208,460 @@ function isLikelyBinary(buf) {
 	return false;
 }
 //#endregion
+//#region src/host/code-files.ts
+const OMIT_DIRECTORIES = /* @__PURE__ */ new Set([
+	".git",
+	".hg",
+	".svn",
+	".pnpm-store",
+	"node_modules",
+	".venv",
+	"dist",
+	"lib",
+	".next",
+	"target",
+	"coverage"
+]);
+const MAX_CODE_BYTES = 1024 * 1024;
+const MAX_SCAN_ENTRIES = 2e4;
+const MAX_SCAN_DEPTH = 32;
+function protectedPath(path) {
+	return path.split("/").some((segment) => {
+		const name = segment.toLowerCase();
+		return OMIT_DIRECTORIES.has(name) || process.platform === "win32" && name.includes(":") || /^(?:\.env(?:\.|$)|\.npmrc$|\.netrc$|\.pypirc$|\.git-credentials$|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.|$))/u.test(name) || /\.(?:pem|key|pfx|p12|jks|kdbx)$/u.test(name) || /^(?:credentials|secrets|service[-_]account)(?:[._-]|$)/u.test(name);
+	});
+}
+async function ignoreScope(root, path) {
+	const name = path === "." ? ".gitignore" : `${path}/.gitignore`;
+	const prefix = path === "." ? "" : `${path}/`;
+	const matcher = ignore({ ignorecase: process.platform === "win32" });
+	try {
+		if (!(await lstat(join(root, name))).isFile()) return void 0;
+		const file = await readWorkspaceCodeFile(root, name, 65536);
+		if (file) return {
+			prefix,
+			matcher: matcher.add(file.text)
+		};
+	} catch (error) {
+		if (error.code === "ENOENT") return void 0;
+	}
+	return {
+		prefix,
+		matcher: matcher.add("*")
+	};
+}
+function isIgnored(path, scopes) {
+	let ignored = false;
+	for (const { prefix, matcher } of scopes) {
+		if (!path.startsWith(prefix)) continue;
+		const status = matcher.test(path.slice(prefix.length));
+		if (status.ignored || status.unignored) ignored = status.ignored;
+	}
+	return ignored;
+}
+async function selectCodeFiles(root, selection, maxFiles, signal) {
+	const input = selection.path ?? ".";
+	const globs = selection.include ?? [];
+	const isGlob = /[*?[\]{}]/u.test(input);
+	const base = resolveSafeWorkspacePath(root, isGlob ? "." : input);
+	if (!base.ok) return {
+		paths: [],
+		bounded: false,
+		error: base.error
+	};
+	if (protectedPath(base.relativePath)) return {
+		paths: [],
+		bounded: false,
+		error: "protected-path"
+	};
+	if (globs.some((glob) => typeof glob !== "string" || glob.length > 200) || input.length > 512 || globs.length > 32) return {
+		paths: [],
+		bounded: false,
+		error: "invalid-glob"
+	};
+	const patterns = globs.map((glob) => glob.replaceAll("\\", "/").replace(/^\.\//u, ""));
+	const positives = patterns.filter((glob) => !glob.startsWith("!"));
+	const negatives = patterns.filter((glob) => glob.startsWith("!")).map((glob) => glob.slice(1));
+	const includes = (path) => (!isGlob || matchesGlob(path, input)) && (positives.length === 0 || positives.some((glob) => matchesGlob(path, glob))) && !negatives.some((glob) => matchesGlob(path, glob));
+	const paths = [];
+	const scopes = [];
+	let visited = 0;
+	let bounded = false;
+	async function walk(path, parents, depth) {
+		signal?.throwIfAborted();
+		if (depth > MAX_SCAN_DEPTH) {
+			bounded = true;
+			return;
+		}
+		const local = await ignoreScope(root, path);
+		const rules = local ? [...parents, local] : parents;
+		const children = await readdir(join(root, path), { withFileTypes: true }).catch(() => []);
+		children.sort((a, b) => a.name.localeCompare(b.name));
+		for (const child of children) {
+			if (++visited > MAX_SCAN_ENTRIES || paths.length >= maxFiles) {
+				bounded = true;
+				return;
+			}
+			const relative = path === "." ? child.name : `${path}/${child.name}`;
+			if (child.isSymbolicLink() || protectedPath(relative) || child.name === ".gitignore") continue;
+			const directory = child.isDirectory();
+			if (isIgnored(directory ? `${relative}/` : relative, rules)) continue;
+			if (directory) await walk(relative, rules, depth + 1);
+			else if (child.isFile() && includes(relative)) paths.push(relative);
+		}
+	}
+	const entry = await lstat(base.absolutePath).catch(() => void 0);
+	if (!entry || entry.isSymbolicLink()) return {
+		paths,
+		bounded,
+		error: "not-found"
+	};
+	const pieces = base.relativePath === "." ? [] : base.relativePath.split("/");
+	for (let i = 0; i < pieces.length; i++) {
+		const local = await ignoreScope(root, pieces.slice(0, i).join("/") || ".");
+		if (local) scopes.push(local);
+		const path = pieces.slice(0, i + 1).join("/");
+		if (isIgnored(i < pieces.length - 1 || entry.isDirectory() ? `${path}/` : path, scopes)) return {
+			paths,
+			bounded,
+			error: "ignored-path"
+		};
+	}
+	if (entry.isFile() && includes(base.relativePath)) paths.push(base.relativePath);
+	if (entry.isDirectory()) await walk(base.relativePath, scopes, pieces.length);
+	return {
+		paths,
+		bounded
+	};
+}
+async function readWorkspaceCodeFile(root, path, maxBytes = MAX_CODE_BYTES) {
+	const resolved = resolveSafeWorkspacePath(root, path);
+	if (!resolved.ok) return void 0;
+	const file = await lstat(resolved.absolutePath).catch(() => void 0);
+	if (!file?.isFile() || file.size > maxBytes) return void 0;
+	const handle = await open(resolved.absolutePath, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW)).catch(() => void 0);
+	if (!handle) return void 0;
+	try {
+		const current = await handle.stat();
+		if (!current.isFile() || current.dev !== file.dev || current.ino !== file.ino || current.size > maxBytes) return void 0;
+		const buf = Buffer.allocUnsafe(current.size + 1);
+		let length = 0;
+		while (length < buf.length) {
+			const { bytesRead } = await handle.read(buf, length, buf.length - length, length);
+			if (!bytesRead) break;
+			length += bytesRead;
+		}
+		if (length !== current.size) return void 0;
+		const bytes = buf.subarray(0, length);
+		if (isLikelyBinary(bytes)) return void 0;
+		return {
+			path: resolved.relativePath,
+			absolutePath: resolved.absolutePath,
+			revision: sha256Hex(bytes),
+			mode: current.mode & 511,
+			text: new TextDecoder("utf-8", {
+				fatal: true,
+				ignoreBOM: true
+			}).decode(bytes)
+		};
+	} catch {
+		return;
+	} finally {
+		await handle.close();
+	}
+}
+//#endregion
+//#region src/host/ast-outline.ts
+const LANGUAGES = {
+	".ts": "TypeScript",
+	".mts": "TypeScript",
+	".cts": "TypeScript",
+	".tsx": "Tsx",
+	".js": "JavaScript",
+	".mjs": "JavaScript",
+	".cjs": "JavaScript",
+	".jsx": "Tsx",
+	".html": "Html",
+	".htm": "Html",
+	".css": "Css",
+	".c": "c",
+	".h": "c",
+	".cc": "cpp",
+	".cxx": "cpp",
+	".cpp": "cpp",
+	".hpp": "cpp",
+	".hh": "cpp",
+	".cs": "csharp",
+	".go": "go",
+	".java": "java",
+	".json": "json",
+	".py": "python",
+	".rs": "rust"
+};
+function languageFor(path) {
+	return LANGUAGES[extname(path).toLowerCase()];
+}
+const BUILTIN_LANGUAGES = /* @__PURE__ */ new Set([
+	"TypeScript",
+	"Tsx",
+	"JavaScript",
+	"Html",
+	"Css"
+]);
+const GRAMMARS = {
+	c: "@ast-grep/lang-c",
+	cpp: "@ast-grep/lang-cpp",
+	csharp: "@ast-grep/lang-csharp",
+	go: "@ast-grep/lang-go",
+	java: "@ast-grep/lang-java",
+	json: "@ast-grep/lang-json",
+	python: "@ast-grep/lang-python",
+	rust: "@ast-grep/lang-rust"
+};
+let nativeCore;
+let nativeApi;
+function loadNativeCore() {
+	nativeCore ??= import("@ast-grep/napi").catch(() => void 0);
+	return nativeCore;
+}
+async function isNativeAstAvailable() {
+	return await loadNativeCore() !== void 0;
+}
+function preflightDynamicRegistration(registrations) {
+	const entry = pathToFileURL(createRequire(import.meta.url).resolve("@ast-grep/napi")).href;
+	const script = ["const napi = await import(process.argv[1])", "napi.registerDynamicLanguage(JSON.parse(process.argv[2]))"].join("\n");
+	const env = {
+		...process.env,
+		...process.versions.electron ? { ELECTRON_RUN_AS_NODE: "1" } : {}
+	};
+	delete env.NODE_OPTIONS;
+	return new Promise((resolve) => {
+		execFile(process.execPath, [
+			"--input-type=module",
+			"-e",
+			script,
+			entry,
+			JSON.stringify(registrations)
+		], {
+			cwd: tmpdir(),
+			env,
+			windowsHide: true,
+			timeout: 3e3,
+			maxBuffer: 32 * 1024
+		}, (error) => resolve(error === null));
+	});
+}
+function loadSyntaxApi() {
+	nativeApi ??= loadNativeCore().then(async (api) => {
+		if (!api) return void 0;
+		const results = await Promise.allSettled(Object.entries(GRAMMARS).map(async ([language, pkg]) => {
+			const { default: registration } = await import(pkg);
+			const libraryPath = registration.libraryPath.replace(/(^|[\\/])([^\\/]+\.asar)(?=[\\/])/u, "$1$2.unpacked");
+			if (!existsSync(libraryPath)) return void 0;
+			return [language, {
+				...registration,
+				libraryPath
+			}];
+		}));
+		const registrations = Object.fromEntries(results.flatMap((result) => result.status === "fulfilled" && result.value ? [result.value] : []));
+		let dynamicEnabled = false;
+		if (Object.keys(registrations).length > 0 && await preflightDynamicRegistration(registrations).catch(() => false)) try {
+			api.registerDynamicLanguage(registrations);
+			dynamicEnabled = true;
+		} catch {}
+		return {
+			parse: api.parse,
+			supports: (language) => BUILTIN_LANGUAGES.has(language) || dynamicEnabled && Object.hasOwn(registrations, language)
+		};
+	});
+	return nativeApi;
+}
+const DECLARATIONS = /* @__PURE__ */ new Map([
+	["abstract_class_declaration", "class"],
+	["class_declaration", "class"],
+	["interface_declaration", "interface"],
+	["type_alias_declaration", "type"],
+	["function_declaration", "function"],
+	["generator_function_declaration", "function"],
+	["function_signature", "function"],
+	["function_definition", "function"],
+	["function_item", "function"],
+	["method_declaration", "method"],
+	["method_definition", "method"],
+	["method_signature", "method"],
+	["abstract_method_signature", "method"],
+	["enum_declaration", "enum"],
+	["internal_module", "namespace"],
+	["namespace_definition", "namespace"],
+	["namespace_declaration", "namespace"],
+	["struct_item", "struct"],
+	["struct_specifier", "struct"],
+	["type_spec", "type"],
+	["record_declaration", "record"],
+	["class_specifier", "class"],
+	["trait_item", "interface"],
+	["variable_declarator", "variable"],
+	["const_item", "variable"],
+	["property_signature", "property"],
+	["public_field_definition", "property"],
+	["element", "element"],
+	["self_closing_tag", "element"],
+	["rule_set", "selector"],
+	["pair", "key"]
+]);
+function compactSignature(text) {
+	const concise = text.replace(/\s+/gu, " ").trim();
+	return concise.length <= 240 ? concise : concise.slice(0, 237).replace(/[\uD800-\uDBFF]$/u, "") + "...";
+}
+function getNativeSymbols(root, source, max) {
+	const symbols = [];
+	function visit(node, level) {
+		if (symbols.length >= max || level > 12) return;
+		const kind = DECLARATIONS.get(node.kind());
+		if (!kind) {
+			if ([
+				"program",
+				"document",
+				"module",
+				"source_file",
+				"translation_unit",
+				"compilation_unit",
+				"object",
+				"stylesheet",
+				"export_statement",
+				"lexical_declaration",
+				"variable_declaration",
+				"declaration_list",
+				"decorated_definition",
+				"type_declaration",
+				"const_declaration",
+				"impl_item"
+			].includes(node.kind())) for (const child of node.children()) visit(child, level);
+			return;
+		}
+		const tag = kind === "element" ? node.kind() === "self_closing_tag" ? node : node.children().find((child) => ["start_tag", "self_closing_tag"].includes(child.kind())) : void 0;
+		let name = node.field("name") ?? (kind === "key" ? node.field("key") : void 0) ?? tag?.children().find((child) => child.kind() === "tag_name") ?? (kind === "selector" ? node.children().find((child) => child.kind() === "selectors") : void 0);
+		let declarator = node.field("declarator");
+		for (let i = 0; !name && declarator && i < 8; i++) if ([
+			"identifier",
+			"field_identifier",
+			"qualified_identifier"
+		].includes(declarator.kind())) name = declarator;
+		else declarator = declarator.field("declarator");
+		if (!name) return;
+		const range = node.range();
+		const parent = node.parent();
+		const declaration = kind === "variable" && parent ? parent : node;
+		const exported = declaration.parent()?.kind() === "export_statement";
+		const body = node.field("body") ?? (kind === "selector" ? node.children().find((child) => child.kind() === "block") : void 0);
+		const value = [
+			"variable",
+			"property",
+			"type",
+			"key"
+		].includes(kind) ? node.field("value") : null;
+		const endIndex = body?.range().start.index ?? value?.range().start.index ?? range.end.index;
+		let header = kind === "key" ? name.text() : tag ? `<${name.text()}>` : source.slice(range.start.index, endIndex).replace(/\s*=\s*$/u, "");
+		if (value && ["arrow_function", "function_expression"].includes(value.kind())) {
+			const start = value.range().start.index;
+			const body = value.field("body");
+			if (body) header += ` = ${source.slice(start, body.range().start.index).trimEnd()}`;
+		}
+		if (node.kind() === "variable_declarator") {
+			const declarationKind = declaration.children()[0]?.text();
+			header = `${declarationKind === "let" || declarationKind === "var" ? declarationKind : "const"} ${header}`;
+		}
+		const visibility = /^\s*(private|protected|public)\s/u.exec(header)?.[1];
+		symbols.push({
+			name: name.text().slice(0, 120),
+			kind,
+			signature: compactSignature(exported ? `export ${header}` : header),
+			visibility: exported ? "exported" : name.text().startsWith("#") || visibility === "private" ? "private" : visibility === "protected" ? "protected" : visibility === "public" || level > 0 ? "public" : "local",
+			startLine: range.start.line + 1,
+			endLine: range.end.line + 1,
+			level
+		});
+		if (body && [
+			"class",
+			"interface",
+			"namespace",
+			"struct",
+			"record"
+		].includes(kind)) for (const child of body.children()) visit(child, level + 1);
+		if (kind === "element" && tag?.kind() === "start_tag") for (const child of node.children()) visit(child, level + 1);
+		if (kind === "key" && value?.kind() === "object") for (const child of value.children()) visit(child, level + 1);
+	}
+	visit(root, 0);
+	return symbols;
+}
+function getTextSymbols(text, max) {
+	const symbols = [];
+	const lines = text.split(/\r?\n/u);
+	const declaration = /^(\s*)(?:(export|public|private|protected)\s+)?(?:default\s+)?(?:abstract\s+|async\s+)?(class|interface|enum|struct|record|namespace|type|trait|impl|function|def|func|fn|const|let|var)\s+([$A-Za-z_][\w$]*)/u;
+	for (let line = 0; line < lines.length && symbols.length < max; line++) {
+		const match = declaration.exec(lines[line]);
+		if (!match) continue;
+		const [, indent, modifier, kind, name] = match;
+		let signature = lines[line].split("{", 1)[0];
+		if ([
+			"const",
+			"let",
+			"var"
+		].includes(kind)) signature = signature.split("=", 1)[0];
+		symbols.push({
+			name,
+			kind,
+			signature: compactSignature(signature),
+			visibility: modifier === "export" ? "exported" : modifier === "public" || modifier === "private" || modifier === "protected" ? modifier : "local",
+			startLine: line + 1,
+			endLine: line + 1,
+			level: Math.min(12, Math.floor(indent.replaceAll("	", "  ").length / 2))
+		});
+	}
+	return symbols;
+}
+function outlineSource(path, text, api, max) {
+	const language = languageFor(path);
+	if (api && language && api.supports(language)) try {
+		return {
+			parser: "ast",
+			symbols: getNativeSymbols(api.parse(language, text).root(), text, max)
+		};
+	} catch {}
+	return {
+		parser: "fallback",
+		symbols: getTextSymbols(text, max)
+	};
+}
+async function outlineWorkspace(root, params, signal) {
+	const { paths, bounded, error } = await selectCodeFiles(root, params, 40, signal);
+	if (error) return {
+		ok: false,
+		error
+	};
+	const api = await loadSyntaxApi();
+	let remaining = Math.max(1, Math.min(200, params.maxSymbols ?? 120));
+	const files = [];
+	for (const path of paths) {
+		signal?.throwIfAborted();
+		const file = await readWorkspaceCodeFile(root, path);
+		if (!file) continue;
+		const outline = outlineSource(path, file.text, api, remaining);
+		files.push({
+			path,
+			revision: file.revision,
+			...outline
+		});
+		remaining -= outline.symbols.length;
+		if (remaining <= 0) break;
+	}
+	return {
+		ok: true,
+		files,
+		bounded: bounded || remaining <= 0
+	};
+}
+//#endregion
 //#region src/host/file-ops.ts
 const DEFAULT_IGNORED_DIRS = /* @__PURE__ */ new Set([
 	".git",
@@ -236,6 +712,7 @@ async function readFilesBatch(rootDir, files, options = {}) {
 	if (serializedBytes > maxInlineBytes && options.cache && options.sessionId) {
 		const ref = options.cache.put({
 			sessionId: options.sessionId,
+			principalId: options.principalId,
 			producerTool: "fast_read_files",
 			items: results,
 			ttlMs: options.ttlMs ?? 36e5,
@@ -323,6 +800,46 @@ async function walkFiles(rootDir, baseRel, includeHidden, maxScanFiles, out) {
 		} else if (entry.isFile()) out.push(rel);
 	}
 }
+const MAX_CONTEXT_LINES_AROUND_MATCH = 5;
+const MAX_CONTEXT_BLOCK_LINES = 16;
+const MAX_CONTEXT_LINE_LENGTH = 240;
+function collectSearchContext(path, revision, lines, matchLines, radius) {
+	const ranges = [];
+	for (const line of matchLines) {
+		const start = Math.max(1, line - radius);
+		const end = Math.min(lines.length, line + radius);
+		const previous = ranges.at(-1);
+		if (previous && start <= previous.end + 1) {
+			previous.end = Math.max(previous.end, end);
+			previous.hits.push(line);
+		} else ranges.push({
+			start,
+			end,
+			hits: [line]
+		});
+	}
+	const context = [];
+	for (const range of ranges) for (let startLine = range.start; startLine <= range.end; startLine += MAX_CONTEXT_BLOCK_LINES) {
+		const endLine = Math.min(range.end, startLine + MAX_CONTEXT_BLOCK_LINES - 1);
+		const original = lines.slice(startLine - 1, endLine);
+		let truncated = false;
+		const excerpt = original.map((line) => {
+			if (line.length <= MAX_CONTEXT_LINE_LENGTH) return line;
+			truncated = true;
+			return line.slice(0, MAX_CONTEXT_LINE_LENGTH).replace(/[\uD800-\uDBFF]$/u, "") + "…";
+		});
+		context.push({
+			path,
+			revision,
+			startLine,
+			endLine,
+			matchLines: range.hits.filter((line) => line >= startLine && line <= endLine),
+			lines: excerpt,
+			truncated
+		});
+	}
+	return context;
+}
 async function searchWorkspace(rootDir, params, options = {}) {
 	const base = resolveSafeWorkspacePath(rootDir, params.path ?? ".");
 	if (!base.ok) return {
@@ -366,6 +883,9 @@ async function searchWorkspace(rootDir, params, options = {}) {
 		};
 	}
 	const matches = [];
+	const context = [];
+	const requestedContext = params.contextLines ?? 0;
+	const radius = Number.isFinite(requestedContext) ? Math.max(0, Math.min(MAX_CONTEXT_LINES_AROUND_MATCH, Math.floor(requestedContext))) : 0;
 	const matchedFiles = /* @__PURE__ */ new Set();
 	const maxCollected = 2e3;
 	for (const relPath of eligible) {
@@ -378,9 +898,11 @@ async function searchWorkspace(rootDir, params, options = {}) {
 		}
 		if (buf.byteLength > 2 * 1024 * 1024 || isLikelyBinary(buf)) continue;
 		const lines = Buffer.from(buf).toString("utf8").split(/\r?\n/u);
+		const pagedMatchLines = [];
 		for (let idx = 0; idx < lines.length; idx++) {
 			if (!regex.test(lines[idx])) continue;
 			matchedFiles.add(relPath);
+			if (radius > 0 && matches.length >= offset && matches.length < offset + limit) pagedMatchLines.push(idx + 1);
 			const snippet = lines[idx].length > 240 ? `${lines[idx].slice(0, 240)}...` : lines[idx];
 			matches.push({
 				path: relPath,
@@ -389,11 +911,24 @@ async function searchWorkspace(rootDir, params, options = {}) {
 			});
 			if (matches.length >= maxCollected) break;
 		}
+		if (pagedMatchLines.length > 0) context.push(...collectSearchContext(relPath, sha256Hex(buf), lines, pagedMatchLines, radius));
 	}
 	const paged = matches.slice(offset, offset + limit);
-	if (Buffer.byteLength(JSON.stringify(paged), "utf8") > (options.maxInlineBytes ?? 16384) && options.cache && options.sessionId) {
+	const serializedBytes = Buffer.byteLength(JSON.stringify(paged), "utf8");
+	const maxInlineBytes = options.maxInlineBytes ?? 16384;
+	const contextRef = context.length > 0 && options.cache && options.sessionId && serializedBytes + Buffer.byteLength(JSON.stringify(context), "utf8") > maxInlineBytes ? options.cache.put({
+		sessionId: options.sessionId,
+		principalId: options.principalId,
+		producerTool: "fast_search",
+		items: context,
+		ttlMs: options.ttlMs ?? 36e5,
+		preview: `fast_search: ${context.length} context excerpts for the requested match page`
+	}) : void 0;
+	const contextOutput = radius === 0 ? {} : contextRef ? { contextRef } : { context };
+	if (serializedBytes > maxInlineBytes && options.cache && options.sessionId) {
 		const ref = options.cache.put({
 			sessionId: options.sessionId,
+			principalId: options.principalId,
 			producerTool: "fast_search",
 			items: matches,
 			ttlMs: options.ttlMs ?? 36e5,
@@ -407,6 +942,7 @@ async function searchWorkspace(rootDir, params, options = {}) {
 			items: paged.slice(0, 15),
 			nextOffset: null,
 			ref,
+			...contextOutput,
 			spilled: true
 		};
 	}
@@ -417,7 +953,8 @@ async function searchWorkspace(rootDir, params, options = {}) {
 		filesMatched: matchedFiles.size,
 		items: paged,
 		nextOffset: offset + paged.length < matches.length ? offset + paged.length : null,
-		spilled: false
+		...contextOutput,
+		spilled: contextRef !== void 0
 	};
 }
 async function writeFileAtomicBytes(targetPath, content) {
@@ -759,6 +1296,7 @@ async function readTableFile(rootDir, params, options = {}) {
 	if (Buffer.byteLength(JSON.stringify(sliced), "utf8") > maxInlineBytes && options.cache && options.sessionId) {
 		const ref = options.cache.put({
 			sessionId: options.sessionId,
+			principalId: options.principalId,
 			producerTool: "fast_read_table",
 			items: dataRows,
 			ttlMs: options.ttlMs ?? 36e5,
@@ -785,8 +1323,589 @@ async function readTableFile(rootDir, params, options = {}) {
 	};
 }
 //#endregion
+//#region src/host/ast-tools.ts
+async function searchAst(root, params, signal) {
+	if (typeof params.pattern !== "string" || !params.pattern.trim() || params.pattern.length > 1e3) return {
+		ok: false,
+		error: "invalid-pattern"
+	};
+	const selected = await selectCodeFiles(root, params, 500, signal);
+	if (selected.error) return {
+		ok: false,
+		error: selected.error
+	};
+	const api = await loadSyntaxApi();
+	const nativePaths = selected.paths.filter((path) => {
+		const language = languageFor(path);
+		return language && api?.supports(language);
+	});
+	const native = api !== void 0 && nativePaths.length > 0;
+	const paths = native ? nativePaths : selected.paths;
+	const offset = Math.max(0, params.offset ?? 0);
+	const limit = Math.max(1, Math.min(100, params.limit ?? 30));
+	const radius = Math.min(5, Math.max(0, params.contextLines ?? 0));
+	const items = [];
+	const context = [];
+	let count = 0;
+	let bounded = selected.bounded;
+	let parsedFiles = 0;
+	let inputBytes = 0;
+	for (const path of paths) {
+		signal?.throwIfAborted();
+		const file = await readWorkspaceCodeFile(root, path);
+		if (!file) continue;
+		inputBytes += Buffer.byteLength(file.text, "utf8");
+		if (inputBytes > 24 * 1024 * 1024) {
+			bounded = true;
+			break;
+		}
+		const lines = file.text.split(/\r?\n/u);
+		let matches;
+		try {
+			matches = native ? api.parse(languageFor(path), file.text).root().findAll(params.pattern).map((node) => ({
+				...node.range(),
+				text: () => node.text()
+			})) : literalMatches(lines, params.pattern);
+		} catch {
+			continue;
+		}
+		parsedFiles++;
+		const indexedLines = /* @__PURE__ */ new Set();
+		for (const match of matches) {
+			if (++count <= offset || items.length >= limit) continue;
+			const { start, end } = match;
+			const endLine = Math.max(start.line + 1, end.line + (end.column ? 1 : 0));
+			items.push({
+				path,
+				line: start.line + 1,
+				endLine,
+				startColumn: start.column + 1,
+				endColumn: end.column + 1,
+				text: match.text().slice(0, 360).replace(/[\uD800-\uDBFF]$/u, ""),
+				revision: file.revision
+			});
+			indexedLines.add(start.line + 1);
+			indexedLines.add(endLine);
+		}
+		if (radius > 0 && indexedLines.size > 0) context.push(...collectSearchContext(path, file.revision, lines, [...indexedLines].sort((a, b) => a - b), radius));
+		if (count > 2e4) {
+			bounded = true;
+			break;
+		}
+	}
+	if (paths.length && !parsedFiles) return {
+		ok: false,
+		error: "invalid-pattern-or-unreadable-source"
+	};
+	return {
+		ok: true,
+		parser: native ? "ast" : "fallback",
+		items,
+		context,
+		totalMatches: count,
+		nextOffset: offset + items.length < count ? offset + items.length : null,
+		bounded,
+		skippedUnsupportedFiles: native ? selected.paths.length - nativePaths.length : 0
+	};
+}
+function* literalMatches(lines, query) {
+	for (let i = 0; i < lines.length; i++) {
+		const column = lines[i].indexOf(query);
+		if (column >= 0) yield {
+			start: {
+				line: i,
+				column
+			},
+			end: {
+				line: i,
+				column: column + query.length
+			},
+			text: () => query
+		};
+	}
+}
+const METAVARIABLE = /([$]{1,3})([A-Z_][A-Z0-9_]*)/gu;
+function expandReplacement(template, node, source, variables) {
+	return template.replace(METAVARIABLE, (token, dollars, name) => {
+		if (!variables.has(token)) throw new Error(`unbound-metavariable:${token}`);
+		if (dollars.length === 3) {
+			const nodes = node.getMultipleMatches(name);
+			if (!nodes.length) return "";
+			return source.slice(nodes[0].range().start.index, nodes.at(-1).range().end.index);
+		}
+		const captured = node.getMatch(name);
+		if (!captured) throw new Error(`unbound-metavariable:${token}`);
+		return captured.text();
+	});
+}
+const pendingWrites = /* @__PURE__ */ new Map();
+async function queueWrite(root, action) {
+	const absolute = resolve(root);
+	const key = process.platform === "win32" ? absolute.toLowerCase() : absolute;
+	const run = (pendingWrites.get(key) ?? Promise.resolve()).catch(() => {}).then(action);
+	pendingWrites.set(key, run);
+	try {
+		return await run;
+	} finally {
+		if (pendingWrites.get(key) === run) pendingWrites.delete(key);
+	}
+}
+function temporaryPath(file) {
+	return join(dirname(file.absolutePath), `.${basename(file.absolutePath)}.dsh-fast-ops-${randomUUID()}.tmp`);
+}
+async function stillCurrent(root, file, revision) {
+	return (await readWorkspaceCodeFile(root, file.path, 2 * 1024 * 1024))?.revision === revision;
+}
+async function rewriteAst(root, params, options = {}) {
+	if (typeof params.pattern !== "string" || !params.pattern.trim() || params.pattern.length > 1e3 || typeof params.replacement !== "string" || params.replacement.length > 8192) return {
+		ok: false,
+		error: "invalid-rewrite"
+	};
+	const selected = await selectCodeFiles(root, params, 160, options.signal);
+	if (selected.error) return {
+		ok: false,
+		error: selected.error
+	};
+	if (selected.bounded) return {
+		ok: false,
+		error: "rewrite-scan-limit-narrow-selection"
+	};
+	const api = await loadSyntaxApi();
+	if (!api) return {
+		ok: false,
+		error: "ast-unavailable"
+	};
+	const candidates = [];
+	const variables = new Set(Array.from(params.pattern.matchAll(METAVARIABLE), (match) => match[0]));
+	let changes = 0;
+	for (const path of selected.paths) {
+		options.signal?.throwIfAborted();
+		const language = languageFor(path);
+		if (!language || !api.supports(language)) continue;
+		const file = await readWorkspaceCodeFile(root, path);
+		if (!file) return {
+			ok: false,
+			path,
+			error: "unreadable-source"
+		};
+		if (params.dryRun === false && params.expectedRevisions?.[path] !== void 0 && params.expectedRevisions[path] !== file.revision) return {
+			ok: false,
+			path,
+			error: "revision-mismatch",
+			currentRevision: file.revision
+		};
+		try {
+			const syntax = api.parse(language, file.text).root();
+			const matches = syntax.findAll(params.pattern);
+			if (!matches.length) continue;
+			changes += matches.length;
+			if (changes > 200 || candidates.length >= 25) return {
+				ok: false,
+				error: "rewrite-match-limit-narrow-selection"
+			};
+			if (syntax.findAll({ rule: { kind: "ERROR" } }).length) return {
+				ok: false,
+				path,
+				error: "invalid-source-syntax"
+			};
+			const edits = matches.map((node) => node.replace(expandReplacement(params.replacement, node, file.text, variables))).sort((a, b) => a.startPos - b.startPos || a.endPos - b.endPos);
+			if (edits.some((edit, i) => i > 0 && edit.startPos < edits[i - 1].endPos)) return {
+				ok: false,
+				path,
+				error: "overlapping-ast-matches"
+			};
+			const output = syntax.commitEdits(edits);
+			if (output === file.text) continue;
+			if (Buffer.byteLength(output, "utf8") > 2 * 1024 * 1024 || api.parse(language, output).root().findAll({ rule: { kind: "ERROR" } }).length) return {
+				ok: false,
+				path,
+				error: "invalid-rewrite-output"
+			};
+			candidates.push({
+				...file,
+				output,
+				matches: matches.length
+			});
+		} catch (error) {
+			return {
+				ok: false,
+				path,
+				error: error instanceof Error && error.message.startsWith("unbound-metavariable:") ? error.message : "invalid-rewrite-pattern"
+			};
+		}
+	}
+	if (params.dryRun !== false) {
+		let available = 6e4;
+		const files = candidates.map((file) => {
+			const unified = buildCompactDiff(file.text, file.output, file.path).replace(/^([+-]) /gmu, "$1");
+			const diff = unified.slice(0, available).replace(/[\uD800-\uDBFF]$/u, "");
+			available -= diff.length;
+			return {
+				path: file.path,
+				revision: file.revision,
+				matches: file.matches,
+				diff,
+				truncated: diff.length < unified.length
+			};
+		});
+		return {
+			ok: true,
+			dryRun: true,
+			affectedFiles: candidates.length,
+			files
+		};
+	}
+	const expected = params.expectedRevisions ?? {};
+	for (const file of candidates) if (!Object.hasOwn(expected, file.path) || expected[file.path] !== file.revision) return {
+		ok: false,
+		error: "revision-mismatch",
+		path: file.path,
+		currentRevision: file.revision
+	};
+	if (Object.keys(expected).some((path) => !candidates.some((file) => file.path === path))) return {
+		ok: false,
+		error: "preview-file-set-changed"
+	};
+	if (!candidates.length) return {
+		ok: true,
+		dryRun: false,
+		written: []
+	};
+	return queueWrite(root, async () => {
+		const paths = candidates.map((file) => file.path);
+		const temps = /* @__PURE__ */ new Map();
+		const written = [];
+		let conflict;
+		try {
+			for (const file of candidates) {
+				options.signal?.throwIfAborted();
+				if (!await stillCurrent(root, file, file.revision)) return {
+					ok: false,
+					path: file.path,
+					error: "revision-mismatch"
+				};
+			}
+			await options.beforeWrite?.(paths);
+			for (const file of candidates) {
+				options.signal?.throwIfAborted();
+				const temp = temporaryPath(file);
+				temps.set(file, temp);
+				await writeFile(temp, file.output, {
+					mode: file.mode,
+					flag: "wx",
+					signal: options.signal
+				});
+				if (process.platform !== "win32") await chmod(temp, file.mode);
+			}
+			for (const file of candidates) {
+				options.signal?.throwIfAborted();
+				if (!await stillCurrent(root, file, file.revision)) {
+					conflict = file.path;
+					throw new Error("revision-mismatch");
+				}
+				await rename(temps.get(file), file.absolutePath);
+				written.push(file);
+			}
+			return {
+				ok: true,
+				dryRun: false,
+				written: paths
+			};
+		} catch {
+			const rollbackFailed = [];
+			for (const file of written.reverse()) {
+				const temp = temporaryPath(file);
+				try {
+					if (!await stillCurrent(root, file, sha256Hex(file.output))) throw new Error("changed-after-write");
+					await writeFile(temp, file.text, {
+						mode: file.mode,
+						flag: "wx"
+					});
+					if (process.platform !== "win32") await chmod(temp, file.mode);
+					if (!await stillCurrent(root, file, sha256Hex(file.output))) throw new Error("changed-after-write");
+					await rename(temp, file.absolutePath);
+				} catch {
+					rollbackFailed.push(file.path);
+				} finally {
+					await rm(temp, { force: true }).catch(() => {});
+				}
+			}
+			return conflict ? {
+				ok: false,
+				error: "revision-mismatch",
+				path: conflict,
+				rollbackFailed
+			} : {
+				ok: false,
+				error: options.signal?.aborted ? "cancelled" : "write-failed",
+				rollbackFailed
+			};
+		} finally {
+			await Promise.allSettled([...temps.values()].map((path) => rm(path, { force: true })));
+		}
+	});
+}
+//#endregion
+//#region src/host/command-output.ts
+const MIN_DENOISE_CHARS = 2500;
+/** Classify recognizable command invocations, never interpreting the output as a command. */
+function ruleFor(command) {
+	if (/[;&|\r\n]/u.test(command)) return void 0;
+	const text = command.trim().replace(/^(?:(?:pnpm|npm|npx|yarn|bun)(?:\.cmd)?\s+(?:run\s+|exec\s+(?:--\s+)?|dlx\s+)?)/iu, "");
+	const gitOperation = /^git(?:\.exe)?\s+(status|diff|log)(?:\s|$)/iu.exec(text)?.[1].toLowerCase();
+	if (gitOperation) return {
+		rule: "git",
+		gitOperation
+	};
+	if (/^(?:test(?:\s|$)|(?:vitest|jest|pytest)(?:\s|$)|node(?:\.exe)?\s+--test(?:\s|$)|cargo\s+test(?:\s|$))/iu.test(text)) return { rule: "test" };
+	if (/^(?:(?:tsc|eslint|build)(?:\s|$)|cargo\s+(?:build|check)(?:\s|$))/iu.test(text)) return { rule: "build" };
+}
+/** Produce a shorter projection only. The caller must retain original output before using it. */
+function denoiseCommandOutput(raw, command, settings) {
+	if (!settings.enabled || raw.length <= MIN_DENOISE_CHARS) return void 0;
+	const { rule, gitOperation } = ruleFor(command) ?? {};
+	if (rule && !settings[rule]) return void 0;
+	const lines = stripVTControlCharacters(raw).split(/\r?\n/u).map((line) => line.replace(/\r+$/u, "").split("\r").at(-1) ?? "");
+	const out = [];
+	let passing = 0;
+	let duplicateDiagnostics = 0;
+	let hiddenGitChanges = 0;
+	let hunkLines = 0;
+	let shortCommits = 0;
+	let insideHunk = false;
+	let stderr = false;
+	const seenDiagnostics = /* @__PURE__ */ new Set();
+	const statusCounts = /* @__PURE__ */ new Map();
+	const omittedStatuses = /* @__PURE__ */ new Map();
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (/^\[stderr\]\s*$/iu.test(line)) stderr = true;
+		if (!stderr && rule === "test" && /^(?:ok \d+ - |(?:PASS|PASSED)\s+\S|\s*[\u2713\u221a]\s+\S|.+::\w+\s+PASSED(?:\s+\[.*\])?$)/u.test(line)) {
+			passing++;
+			continue;
+		}
+		if (!stderr && rule === "build" && /^(?:.+\(\d+,\d+\):\s+(?:error|warning)\s+[A-Z]+\d+|.+:\d+:\d+:\s+(?:error|warning)|(?:error|warning)\[[A-Z]\d+\]:)/u.test(line)) {
+			if (seenDiagnostics.has(line)) {
+				duplicateDiagnostics++;
+				continue;
+			}
+			seenDiagnostics.add(line);
+		}
+		if (!stderr && rule === "git") {
+			if (gitOperation === "status") {
+				const kind = /^([ MADRCUT?!]{2})\s+\S/u.exec(line)?.[1].trim() || /^\t(modified|new file|deleted|renamed|copied|typechange):/u.exec(line)?.[1];
+				if (kind) {
+					const count = (statusCounts.get(kind) ?? 0) + 1;
+					statusCounts.set(kind, count);
+					if (count > 12) {
+						omittedStatuses.set(kind, count - 12);
+						continue;
+					}
+				}
+			}
+			if (gitOperation === "log" && /^[a-f0-9]{7,40} \S/u.test(line) && ++shortCommits > 30) continue;
+			if (/^(?:diff --git|commit )/u.test(line)) insideHunk = false;
+			if (/^@@ /u.test(line)) {
+				insideHunk = true;
+				hunkLines = 0;
+			} else if (insideHunk && /^[ +\-]/u.test(line) && ++hunkLines > 4) {
+				hiddenGitChanges++;
+				continue;
+			}
+		}
+		if (line.trim() === "" && out.at(-1)?.trim() === "") continue;
+		if (!stderr && /^(?:warn(?:ing)?\b|npm warn\b)/iu.test(line)) {
+			let repetitions = 1;
+			while (lines[i + repetitions] === line) repetitions++;
+			if (repetitions > 1) {
+				out.push(`${line} [repeated ${repetitions} times]`);
+				i += repetitions - 1;
+				continue;
+			}
+		}
+		out.push(line);
+	}
+	if (passing) out.push(`[${passing} successful test records omitted]`);
+	if (duplicateDiagnostics) out.push(`[${duplicateDiagnostics} duplicate build diagnostics omitted]`);
+	if (hiddenGitChanges) out.push(`[${hiddenGitChanges} Git hunk lines omitted]`);
+	if (shortCommits > 30) out.push(`[${shortCommits - 30} earlier Git commits omitted]`);
+	for (const [kind, omitted] of omittedStatuses) out.push(`[${omitted} more Git status entries of type ${kind}]`);
+	const text = out.join("\n").trimEnd();
+	return raw.length - text.length >= 220 ? text : void 0;
+}
+//#endregion
+//#region src/host/repo-map.ts
+const execFileAsync = promisify(execFile);
+async function resolveGitExecutable(workspace) {
+	const root = await realpath(workspace).catch(() => void 0);
+	if (!root) return void 0;
+	const path = Object.entries(process.env).find(([key]) => key.toLowerCase() === "path")?.[1];
+	const executable = process.platform === "win32" ? "git.exe" : "git";
+	for (const entry of (path ?? "").split(delimiter)) {
+		const directory = entry.replace(/^"(.*)"$/u, "$1");
+		if (!isAbsolute(directory)) continue;
+		const candidate = await realpath(join(directory, executable)).catch(() => void 0);
+		if (!candidate) continue;
+		const fromWorkspace = relative(root, candidate);
+		if (!isAbsolute(fromWorkspace) && fromWorkspace !== ".." && !fromWorkspace.startsWith(".." + sep)) continue;
+		try {
+			if (!(await stat(candidate)).isFile()) continue;
+			await access(candidate, constants.X_OK);
+			return candidate;
+		} catch {}
+	}
+}
+async function recentChanges(root, signal) {
+	const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/iu.test(key)));
+	env.GIT_CONFIG_NOSYSTEM = "1";
+	env.GIT_CONFIG_GLOBAL = process.platform === "win32" ? "NUL" : "/dev/null";
+	env.GIT_CEILING_DIRECTORIES = normalize(root);
+	env.GIT_TERMINAL_PROMPT = "0";
+	env.GIT_NO_LAZY_FETCH = "1";
+	env.GIT_OPTIONAL_LOCKS = "0";
+	try {
+		const git = await resolveGitExecutable(root);
+		if (!git) return /* @__PURE__ */ new Map();
+		const { stdout } = await execFileAsync(git, [
+			"--no-pager",
+			"-c",
+			"core.fsmonitor=false",
+			"-c",
+			`core.hooksPath=${env.GIT_CONFIG_GLOBAL}`,
+			"log",
+			"-80",
+			"--name-only",
+			"--format=",
+			"-z",
+			"--no-ext-diff",
+			"--no-textconv",
+			"--",
+			"."
+		], {
+			cwd: root,
+			env,
+			timeout: 800,
+			maxBuffer: 1024 * 1024,
+			windowsHide: true,
+			signal
+		});
+		const counts = /* @__PURE__ */ new Map();
+		for (const value of stdout.split("\0")) {
+			const path = value.replace(/^\n+/u, "");
+			if (path) counts.set(path, (counts.get(path) ?? 0) + 1);
+		}
+		return counts;
+	} catch {
+		return /* @__PURE__ */ new Map();
+	}
+}
+const KNOWN_CREDENTIAL = /(?:-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:gh[pousr]_|github_pat_|glpat-|xox[baprs]-|sk-(?:proj-)?|AIza)[0-9A-Za-z_-]{12,}|\b(?:AKIA|ASIA)[A-Z0-9]{16}\b|\bBearer\s+[A-Za-z0-9._-]{12,})/gu;
+const QUOTED_VALUE = /(["'\x60])(?:\\.|(?!\1).)*\1/gu;
+function safeMapText(text) {
+	return text.replace(KNOWN_CREDENTIAL, "[redacted]").replace(QUOTED_VALUE, "[…]").replace(/[\u0000-\u0020\u007f]+/gu, " ").trim();
+}
+function estimateTokens(text) {
+	return Math.ceil(Buffer.byteLength(text, "utf8") / 2);
+}
+const SOURCE_EXTENSIONS = /* @__PURE__ */ new Set([
+	".ts",
+	".tsx",
+	".mts",
+	".cts",
+	".js",
+	".jsx",
+	".mjs",
+	".cjs",
+	".py",
+	".go",
+	".rs",
+	".java",
+	".c",
+	".h",
+	".cpp",
+	".cc",
+	".hpp",
+	".cs",
+	".rb",
+	".php",
+	".swift",
+	".kt",
+	".vue",
+	".svelte"
+]);
+async function mapRepository(root, params, signal) {
+	const selected = await selectCodeFiles(root, params, 700, signal);
+	if (selected.error) return {
+		ok: false,
+		error: selected.error
+	};
+	const maxTokens = Math.max(40, Math.min(12e3, params.maxTokens ?? 4e3));
+	const [api, churn] = await Promise.all([loadSyntaxApi(), recentChanges(root, signal)]);
+	const score = (path) => 3 * Math.log2(1 + (churn.get(path) ?? 0)) + (SOURCE_EXTENSIONS.has(extname(path).toLowerCase()) ? 2 : 0) - Math.min(5, path.split("/").length) * .5;
+	const ordered = selected.paths.sort((a, b) => score(b) - score(a) || a.localeCompare(b)).slice(0, 200);
+	const names = /* @__PURE__ */ new Map();
+	const previews = [];
+	for (const path of ordered) {
+		signal?.throwIfAborted();
+		if (!SOURCE_EXTENSIONS.has(extname(path).toLowerCase())) {
+			previews.push({
+				path,
+				symbols: []
+			});
+			continue;
+		}
+		const file = await readWorkspaceCodeFile(root, path, 256 * 1024);
+		if (!file) continue;
+		const { symbols } = outlineSource(path, file.text, api, 18);
+		for (const match of file.text.matchAll(/\b(?:import|from|require)\s*\(?\s*(?:[{*][^'\x22\r\n]{0,256}\bfrom\s*)?['\x22]([^'\x22]{1,168})['\x22]/gu)) {
+			const name = match[1].split("/").at(-1)?.replace(/\.(?:[cm]?[jt]sx?)$/u, "");
+			if (name) names.set(name, (names.get(name) ?? 0) + 1);
+		}
+		previews.push({
+			path,
+			symbols: symbols.filter((symbol) => symbol.level === 0).sort((a, b) => Number(b.visibility === "exported") - Number(a.visibility === "exported"))
+		});
+	}
+	const ranked = previews.sort((a, b) => {
+		const rank = (path) => score(path) + Math.log2(1 + (names.get(path.split("/").at(-1)?.replace(/\.[^.]+$/u, "") ?? "") ?? 0));
+		return rank(b.path) - rank(a.path) || a.path.localeCompare(b.path);
+	});
+	const lines = [];
+	let charBudget = maxTokens * 2;
+	let files = 0;
+	let bounded = selected.bounded || previews.length < selected.paths.length;
+	const append = (line) => {
+		const bytes = Buffer.byteLength(line, "utf8") + (lines.length ? 1 : 0);
+		if (bytes > charBudget) return false;
+		charBudget -= bytes;
+		lines.push(line);
+		return true;
+	};
+	for (const { path, symbols } of ranked) {
+		if (!append(safeMapText(path))) {
+			bounded = true;
+			break;
+		}
+		files++;
+		for (const symbol of symbols.slice(0, 8)) {
+			if (append(`  ${safeMapText(symbol.signature)}`)) continue;
+			bounded = true;
+			break;
+		}
+	}
+	const map = lines.join("\n");
+	return {
+		ok: true,
+		map,
+		files,
+		estimatedTokens: estimateTokens(map),
+		bounded
+	};
+}
+//#endregion
 //#region src/host/result-cache.ts
 const MAX_TOTAL_BYTES = 16 * 1024 * 1024;
+const MAX_TEXT_ROW_BYTES = 480;
 var ResultCache = class {
 	entries = /* @__PURE__ */ new Map();
 	totalBytes = 0;
@@ -819,8 +1938,8 @@ var ResultCache = class {
 	put(params) {
 		const now = this.now();
 		const totalBytes = Buffer.byteLength(JSON.stringify(params.items), "utf8");
-		const id = randomUUID().slice(0, 12);
-		const refId = `ref://${params.sessionId}/${params.producerTool}/${id}`;
+		const id = randomUUID();
+		const refId = `ref://${encodeURIComponent(params.sessionId)}/${encodeURIComponent(params.producerTool)}/${id}`;
 		const ref = {
 			refId,
 			createdAt: now,
@@ -833,6 +1952,7 @@ var ResultCache = class {
 		this.entries.set(refId, {
 			ref,
 			sessionId: params.sessionId,
+			principalId: params.principalId,
 			items: params.items,
 			lastAccessedAt: now
 		});
@@ -840,11 +1960,42 @@ var ResultCache = class {
 		this.prune(now);
 		return ref;
 	}
+	/** Preserve exact content while keeping every row within the smallest supported page. */
+	putText(params) {
+		if (Buffer.byteLength(params.text, "utf8") > MAX_TOTAL_BYTES) return void 0;
+		const items = [];
+		const rowOverhead = Buffer.byteLength("{\"text\":\"\"}", "utf8");
+		let accounted = 2;
+		let rowStart = 0;
+		let rowBytes = rowOverhead;
+		const append = (end) => {
+			accounted += rowBytes + (items.length ? 1 : 0);
+			if (accounted > MAX_TOTAL_BYTES) return false;
+			items.push({ text: params.text.slice(rowStart, end) });
+			rowStart = end;
+			rowBytes = rowOverhead;
+			return true;
+		};
+		for (let i = 0; i < params.text.length;) {
+			const codePoint = params.text.codePointAt(i);
+			const width = codePoint > 65535 ? 2 : 1;
+			const bytes = jsonCodePointBytes(codePoint);
+			if (rowBytes + bytes > MAX_TEXT_ROW_BYTES && !append(i)) return void 0;
+			rowBytes += bytes;
+			i += width;
+		}
+		if (!append(params.text.length)) return void 0;
+		const ref = this.put({
+			...params,
+			items
+		});
+		return this.entries.has(ref.refId) ? ref : void 0;
+	}
 	page(params) {
 		const now = this.now();
 		this.prune(now);
 		const entry = this.entries.get(params.refId);
-		if (!entry || entry.sessionId !== params.sessionId) return {
+		if (!entry || entry.sessionId !== params.sessionId || entry.principalId !== params.principalId) return {
 			ok: false,
 			refId: params.refId,
 			error: "reference-not-found"
@@ -889,9 +2040,9 @@ var ResultCache = class {
 			complete
 		};
 	}
-	release(sessionId, refId) {
+	release(sessionId, refId, principalId) {
 		const entry = this.entries.get(refId);
-		if (!entry || entry.sessionId !== sessionId) return false;
+		if (!entry || entry.sessionId !== sessionId || entry.principalId !== principalId) return false;
 		return this.deleteEntry(refId);
 	}
 	clearSession(sessionId) {
@@ -916,6 +2067,13 @@ var ResultCache = class {
 		};
 	}
 };
+function jsonCodePointBytes(value) {
+	if (value === 34 || value === 92 || value === 8 || value === 9 || value === 10 || value === 12 || value === 13) return 2;
+	if (value < 32 || value >= 55296 && value <= 57343) return 6;
+	if (value < 128) return 1;
+	if (value < 2048) return 2;
+	return value <= 65535 ? 3 : 4;
+}
 //#endregion
 //#region src/host/tool-registry.ts
 const RESIDENT_TOOLS = [
@@ -929,7 +2087,11 @@ const SPECIALIZED_TOOLS = [
 	"fast_diff",
 	"fast_replace",
 	"fast_read_table",
-	"fast_result"
+	"fast_result",
+	"fast_outline",
+	"fast_ast_search",
+	"fast_ast_rewrite",
+	"fast_repo_map"
 ];
 const ALL_FAST_OPS_TOOLS = [...RESIDENT_TOOLS, ...SPECIALIZED_TOOLS];
 const SPECIALIZED_CATALOG = {
@@ -937,18 +2099,22 @@ const SPECIALIZED_CATALOG = {
 	fast_diff: "Preview unified line diff between current file and proposed content without writing.",
 	fast_replace: "Batch literal replacement across glob-matched files (dryRun defaults to true).",
 	fast_read_table: "Parse RFC-4180 CSV/TSV files with quoted fields, column projection, and row paging.",
-	fast_result: "Page, filter (equals), project (fields), or release cached ref:// overflow results."
+	fast_result: "Page, filter (equals), project (fields), or release cached ref:// overflow results.",
+	fast_outline: "Read declaration names, signatures and exact line ranges without loading function bodies.",
+	fast_ast_search: "Find syntax patterns with ast-grep metavariables. Returns exact revisions and optional line context.",
+	fast_ast_rewrite: "Preview a syntax-pattern rewrite, or apply it using the exact file revisions from that preview.",
+	fast_repo_map: "Return a credential-filtered repository map of paths and signatures within a token budget."
 };
-function sessionIdOf(agent) {
-	return agent?.session?.id || agent?.id || "default";
-}
+const FAST_OPS_RESULTS_SERVICE = "fastOpsResults";
 var FastOpsController = class {
 	cache;
 	counters = {
 		batchCalls: 0,
 		filesReadInBatches: 0,
 		cacheSpills: 0,
-		toolsActivated: 0
+		toolsActivated: 0,
+		astCalls: 0,
+		denoiseTokensSaved: 0
 	};
 	activated = /* @__PURE__ */ new WeakMap();
 	applied = /* @__PURE__ */ new WeakMap();
@@ -961,6 +2127,77 @@ var FastOpsController = class {
 		this.getSettings = options.getSettings;
 		this.cache = new ResultCache({ getMaxRefs: () => this.getSettings().maxCachedRefs });
 	}
+	cacheScope(agent, requireSession = false) {
+		const sessionId = agent?.session?.id || (requireSession ? void 0 : agent?.id || "default");
+		if (!sessionId) return void 0;
+		const userScope = getHostService(this.ctx, "userScope");
+		const scope = userScope?.currentScope?.() ?? userScope?.desktopScope?.();
+		if (userScope && !scope?.principalId) return void 0;
+		if (scope && userScope?.canAccess && (requireSession || scope.source === "remote")) {
+			if (!userScope.canAccess(scope, {
+				kind: "session",
+				sessionId
+			}).allowed) return void 0;
+		}
+		return {
+			sessionId,
+			principalId: scope?.principalId
+		};
+	}
+	async isAstAvailable() {
+		return isNativeAstAvailable();
+	}
+	putText(input) {
+		const settings = this.getSettings();
+		if (!settings.enabled || !input.agent) return void 0;
+		const scope = this.cacheScope(input.agent, true);
+		if (!scope) return void 0;
+		const ref = this.cache.putText({
+			...scope,
+			producerTool: input.producerTool,
+			text: input.text,
+			preview: input.preview,
+			ttlMs: settings.resultCacheTtlMs
+		});
+		if (!ref) return void 0;
+		this.counters.cacheSpills++;
+		const activated = this.activatedSetFor(input.agent);
+		if (!activated.has("fast_result")) {
+			activated.add("fast_result");
+			this.counters.toolsActivated++;
+			try {
+				this.reapply(input.agent);
+			} catch {}
+		}
+		return ref;
+	}
+	projectCommandResult(exec, result, decision) {
+		if (!["bash", "pwsh"].includes(exec.name) || result.isError || decision.kind !== "accept" || decision.content !== void 0 || decision.value !== void 0) return decision;
+		const args = exec.arguments;
+		const original = result.content[0];
+		if (typeof args?.command !== "string" || result.content.length !== 1 || original?.type !== "text") return decision;
+		const shell = result.value;
+		if (shell?.kind !== void 0 && shell.kind !== "foreground" || shell?.stdout?.truncated || shell?.stderr?.truncated || /(?:^|\n)\[output truncated; full output:/u.test(original.text)) return decision;
+		const compact = denoiseCommandOutput(original.text, args.command, this.getSettings().denoise);
+		if (compact === void 0) return decision;
+		const ref = this.putText({
+			agent: exec.agent,
+			producerTool: exec.name,
+			text: original.text
+		});
+		if (!ref) return decision;
+		const rawBytes = Buffer.byteLength(original.text, "utf8");
+		const projectedBytes = Buffer.byteLength(compact, "utf8");
+		const text = `${compact}\n[compressed ${rawBytes} B -> ${projectedBytes} B, saved ~${Math.round((1 - projectedBytes / rawBytes) * 100)}%; full raw output: ${ref.refId} via fast_result]`;
+		this.counters.denoiseTokensSaved += Math.max(0, Math.floor((original.text.length - text.length) / 4));
+		return {
+			...decision,
+			content: [{
+				...original,
+				text
+			}]
+		};
+	}
 	resolveWorkspaceRoot(agent) {
 		if (agent?.workspace?.path) return agent.workspace.path;
 		if (agent?.cwd) return agent.cwd;
@@ -970,6 +2207,27 @@ var FastOpsController = class {
 			if (first?.path) return first.path;
 		} catch {}
 		return process.cwd();
+	}
+	async resolveCodeWorkspace(agent, signal) {
+		if (!agent) return void 0;
+		const directory = getHostService(this.ctx, "workingDirectory");
+		try {
+			signal?.throwIfAborted();
+			const root = directory ? await directory.ensure(agent, signal) : agent.workspace?.path || agent.cwd || agent.session?.header?.cwd;
+			return typeof root === "string" && isAbsolute(root) ? root : void 0;
+		} catch {
+			signal?.throwIfAborted();
+			return;
+		}
+	}
+	canRewriteWorkspace(agent) {
+		const permissions = getHostService(this.ctx, "permissionPresets");
+		const shell = getHostService(this.ctx, "shell");
+		try {
+			return ((agent.session ? permissions?.permissionState?.(agent.session)?.sandbox : void 0) ?? shell?.sandboxMode) !== "read-only";
+		} catch {
+			return false;
+		}
 	}
 	activatedSetFor(agent) {
 		if (!agent || typeof agent !== "object") return /* @__PURE__ */ new Set();
@@ -1048,6 +2306,14 @@ var FastOpsController = class {
 			disposers.push(ctxAny.on("tools/change", () => {
 				this.reapply();
 			}));
+			disposers.push(ctxAny.on("tools/post-execute", async (exec, result, next) => {
+				const decision = await next();
+				try {
+					return this.projectCommandResult(exec, result, decision);
+				} catch {
+					return decision;
+				}
+			}));
 		}
 		const mountPrompt = (systemPrompt) => {
 			if (!systemPrompt.section) return;
@@ -1058,9 +2324,10 @@ var FastOpsController = class {
 					const settings = this.getSettings();
 					if (!settings.enabled || !settings.batchingGuidance) return "";
 					return [
-						"## Fast Ops Token-Efficiency Tips",
+						"## nbfast Token-Efficiency Tips",
 						"- Prefer `fast_read_files` to inspect multiple files/ranges in a single turn and obtain SHA-256 `revision` tokens.",
-						"- Prefer `fast_search` for workspace glob/grep and `fast_edit_batch` for multi-hunk atomic edits; call `fast_discover` only when specialized tools (`fast_stat`, `fast_diff`, `fast_replace`, `fast_read_table`, `fast_result`) are needed."
+						"- Use `fast_search` for workspace glob/grep. For an unfamiliar symbol or call site, request `contextLines: 2` to get merged excerpts and their file revisions in one call. Reuse the revision for `fast_edit_batch` when the excerpt is sufficient. Read larger excerpts from `contextRef` via `fast_result`; call `fast_discover` when a specialized tool is needed.",
+						"- Use `fast_outline` for declaration signatures and `fast_ast_search` for source patterns. Run `fast_ast_rewrite` in preview mode before supplying its file revisions to apply a rewrite."
 					].join("\n");
 				}
 			});
@@ -1092,6 +2359,27 @@ var FastOpsController = class {
 					}
 				});
 				if (typeof stop === "function") disposers.push(stop);
+			};
+			const codeSelection = {
+				path: {
+					type: "string",
+					description: "Workspace path or glob, default \".\"."
+				},
+				include: {
+					type: "array",
+					items: { type: "string" },
+					maxItems: 32
+				}
+			};
+			const pattern = {
+				type: "string",
+				minLength: 1,
+				maxLength: 1e3,
+				description: "ast-grep pattern such as ctx.on($EVENT, $HANDLER)."
+			};
+			const noWorkspace = {
+				ok: false,
+				error: "workspace-unavailable"
 			};
 			reg({
 				name: "fast_read_files",
@@ -1126,7 +2414,7 @@ var FastOpsController = class {
 					this.counters.filesReadInBatches += files.length;
 					const settings = this.getSettings();
 					const result = await readFilesBatch(this.resolveWorkspaceRoot(exec?.agent), files, {
-						sessionId: sessionIdOf(exec?.agent),
+						...this.cacheScope(exec?.agent),
 						maxInlineBytes: settings.maxInlineBytes,
 						ttlMs: settings.resultCacheTtlMs,
 						cache: this.cache
@@ -1137,7 +2425,7 @@ var FastOpsController = class {
 			});
 			reg({
 				name: "fast_search",
-				description: "Unified workspace file glob and regex/literal grep skipping .git/node_modules/build outputs.",
+				description: "Search workspace files by glob or grep. Opt into merged line context and exact file revisions when needed for explanation or a follow-up edit.",
 				parameters: {
 					type: "object",
 					additionalProperties: false,
@@ -1163,14 +2451,20 @@ var FastOpsController = class {
 						caseSensitive: { type: "boolean" },
 						includeHidden: { type: "boolean" },
 						offset: { type: "integer" },
-						limit: { type: "integer" }
+						limit: { type: "integer" },
+						contextLines: {
+							type: "integer",
+							minimum: 0,
+							maximum: 5,
+							description: "Optional lines before and after each grep match. Returns merged excerpts for this match page, or contextRef for fast_result. Defaults to 0."
+						}
 					}
 				},
 				execute: async (args, exec) => {
 					this.counters.batchCalls++;
 					const settings = this.getSettings();
 					const res = await searchWorkspace(this.resolveWorkspaceRoot(exec?.agent), args, {
-						sessionId: sessionIdOf(exec?.agent),
+						...this.cacheScope(exec?.agent),
 						maxInlineBytes: settings.maxInlineBytes,
 						ttlMs: settings.resultCacheTtlMs,
 						cache: this.cache
@@ -1221,7 +2515,7 @@ var FastOpsController = class {
 			});
 			reg({
 				name: "fast_discover",
-				description: "Activate specialized Fast Ops tools (fast_stat, fast_diff, fast_replace, fast_read_table, fast_result) on demand by keyword or select:<tool>.",
+				description: "Activate specialized nbfast file, AST, repository map, and result tools on demand by keyword or select:<tool>.",
 				parameters: {
 					type: "object",
 					additionalProperties: false,
@@ -1328,13 +2622,155 @@ var FastOpsController = class {
 				execute: async (args, exec) => {
 					const settings = this.getSettings();
 					const res = await readTableFile(this.resolveWorkspaceRoot(exec?.agent), args, {
-						sessionId: sessionIdOf(exec?.agent),
+						...this.cacheScope(exec?.agent),
 						maxInlineBytes: settings.maxInlineBytes,
 						ttlMs: settings.resultCacheTtlMs,
 						cache: this.cache
 					});
 					if ("spilled" in res && res.spilled) this.counters.cacheSpills++;
 					return res;
+				}
+			});
+			reg({
+				name: "fast_outline",
+				description: SPECIALIZED_CATALOG.fast_outline,
+				parameters: {
+					type: "object",
+					additionalProperties: false,
+					properties: {
+						...codeSelection,
+						maxSymbols: {
+							type: "integer",
+							minimum: 1,
+							maximum: 200
+						}
+					}
+				},
+				execute: async (args, exec) => {
+					const root = await this.resolveCodeWorkspace(exec?.agent, exec?.signal);
+					if (!root) return noWorkspace;
+					this.counters.astCalls++;
+					return outlineWorkspace(root, args ?? {}, exec?.signal);
+				}
+			});
+			reg({
+				name: "fast_ast_search",
+				description: SPECIALIZED_CATALOG.fast_ast_search,
+				parameters: {
+					type: "object",
+					additionalProperties: false,
+					required: ["pattern"],
+					properties: {
+						...codeSelection,
+						pattern,
+						offset: {
+							type: "integer",
+							minimum: 0
+						},
+						limit: {
+							type: "integer",
+							minimum: 1,
+							maximum: 100
+						},
+						contextLines: {
+							type: "integer",
+							minimum: 0,
+							maximum: 5
+						}
+					}
+				},
+				execute: async (args, exec) => {
+					const root = await this.resolveCodeWorkspace(exec?.agent, exec?.signal);
+					if (!root) return noWorkspace;
+					this.counters.astCalls++;
+					const result = await searchAst(root, args ?? {}, exec?.signal);
+					if (!result.context?.length) return result;
+					const text = JSON.stringify(result.context);
+					if (Buffer.byteLength(text, "utf8") <= this.getSettings().maxInlineBytes) return result;
+					const contextRef = this.putText({
+						agent: exec?.agent,
+						producerTool: "fast_ast_search",
+						text
+					});
+					return contextRef ? {
+						...result,
+						context: [],
+						contextRef,
+						contextEncoding: "json-text"
+					} : result;
+				}
+			});
+			reg({
+				name: "fast_ast_rewrite",
+				description: SPECIALIZED_CATALOG.fast_ast_rewrite,
+				parameters: {
+					type: "object",
+					additionalProperties: false,
+					required: ["pattern", "replacement"],
+					properties: {
+						...codeSelection,
+						pattern,
+						replacement: {
+							type: "string",
+							maxLength: 8192
+						},
+						dryRun: {
+							type: "boolean",
+							description: "Preview changes by default."
+						},
+						expectedRevisions: {
+							type: "object",
+							description: "Required to apply changes. Use the exact path-to-revision pairs returned by the preview.",
+							additionalProperties: {
+								type: "string",
+								pattern: "^[a-f0-9]{64}$"
+							}
+						}
+					}
+				},
+				execute: async (args, exec) => {
+					const agent = exec?.agent;
+					const root = await this.resolveCodeWorkspace(agent, exec?.signal);
+					if (!root || !agent) return noWorkspace;
+					if (args?.dryRun === false && !this.canRewriteWorkspace(agent)) return {
+						ok: false,
+						error: "workspace-read-only"
+					};
+					this.counters.astCalls++;
+					return rewriteAst(root, args ?? {}, {
+						signal: exec?.signal,
+						beforeWrite: async (paths) => {
+							if (!this.canRewriteWorkspace(agent)) throw new Error("workspace-read-only");
+							await getHostService(this.ctx, "workspaceCheckpoints")?.beforeWorkspaceWrite({
+								agent,
+								workspacePath: root,
+								paths,
+								tool: "fast_ast_rewrite"
+							});
+						}
+					});
+				}
+			});
+			reg({
+				name: "fast_repo_map",
+				description: SPECIALIZED_CATALOG.fast_repo_map,
+				parameters: {
+					type: "object",
+					additionalProperties: false,
+					properties: {
+						...codeSelection,
+						maxTokens: {
+							type: "integer",
+							minimum: 40,
+							maximum: 12e3
+						}
+					}
+				},
+				execute: async (args, exec) => {
+					const root = await this.resolveCodeWorkspace(exec?.agent, exec?.signal);
+					if (!root) return noWorkspace;
+					this.counters.astCalls++;
+					return mapRepository(root, args ?? {}, exec?.signal);
 				}
 			});
 			reg({
@@ -1361,14 +2797,19 @@ var FastOpsController = class {
 					}
 				},
 				execute: (args, exec) => {
-					const sessionId = sessionIdOf(exec?.agent);
+					const scope = this.cacheScope(exec?.agent);
 					const refId = String(args?.refId ?? "");
+					if (!scope) return {
+						ok: false,
+						refId,
+						error: "reference-not-found"
+					};
 					if (args?.action === "release") return {
 						ok: true,
-						released: this.cache.release(sessionId, refId)
+						released: this.cache.release(scope.sessionId, refId, scope.principalId)
 					};
 					return this.cache.page({
-						sessionId,
+						...scope,
 						refId,
 						offset: typeof args?.offset === "number" ? args.offset : void 0,
 						limit: typeof args?.limit === "number" ? args.limit : void 0,
@@ -1445,6 +2886,7 @@ function apply(ctx) {
 		ctx,
 		getSettings: () => cachedSettings
 	});
+	ctx.provide(FAST_OPS_RESULTS_SERVICE, { putText: (input) => controller.putText(input) });
 	readSettings(home).then((loaded) => {
 		cachedSettings = loaded;
 		controller.reapply();
@@ -1461,6 +2903,7 @@ function apply(ctx) {
 				sendJson(response, 200, {
 					settings: cachedSettings,
 					counters: controller.counters,
+					astAvailable: await controller.isAstAvailable(),
 					cache: controller.cache.stats()
 				});
 				return;
@@ -1515,4 +2958,4 @@ function apply(ctx) {
 	});
 }
 //#endregion
-export { ALL_FAST_OPS_TOOLS, FastOpsController, INLINE_BYTE_OPTIONS, PACKAGE_ID, RESIDENT_TOOLS, ROUTE_PREFIX, ResultCache, SETTINGS_FILE, SPECIALIZED_TOOLS, TTL_MS_OPTIONS, apply, buildCompactDiff, defaultSettings, diffPreview, editFilesBatch, normalizeSettings, parseDelimitedTable, readFilesBatch, readSettings, readTableFile, replaceAcrossFiles, resolveDshHome, resolveSafeWorkspacePath, searchWorkspace, sha256Hex, statFile, writeSettingsAtomic };
+export { ALL_FAST_OPS_TOOLS, FAST_OPS_RESULTS_SERVICE, FastOpsController, INLINE_BYTE_OPTIONS, PACKAGE_ID, RESIDENT_TOOLS, ROUTE_PREFIX, ResultCache, SETTINGS_FILE, SPECIALIZED_TOOLS, TTL_MS_OPTIONS, apply, buildCompactDiff, defaultSettings, diffPreview, editFilesBatch, normalizeSettings, parseDelimitedTable, readFilesBatch, readSettings, readTableFile, replaceAcrossFiles, resolveDshHome, resolveSafeWorkspacePath, searchWorkspace, sha256Hex, statFile, writeSettingsAtomic };

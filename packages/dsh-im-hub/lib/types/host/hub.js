@@ -168,7 +168,7 @@ export class ImHubManager {
                     const wsPath = this.harnessBridge.resolveWorkspacePath(key);
                     const pending = this.approvalBridge.pendingForConversation(key);
                     await sendReply([
-                        `📊 IM Hub 状态 (${message.channel})`,
+                        `IM Hub 状态 (${message.channel})`,
                         `- 会话绑定: ${binding ? `已连接 (${binding.sessionId})` : '未启动（发送消息后自动创建）'}`,
                         `- 当前工作区: \`${wsPath}\``,
                         `- 队列忙碌: ${this.queue.isBusy(key) ? '是' : '否'} (深度 ${this.queue.depth(key)})`,
@@ -178,22 +178,22 @@ export class ImHubManager {
                 }
                 case 'stop': {
                     const stopped = await this.harnessBridge.stopConversation(key);
-                    await sendReply(stopped ? '⏹️ 已请求中止当前回复。' : 'ℹ️ 当前没有正在执行的回复。');
+                    await sendReply(stopped ? '已请求中止当前回复。' : '当前没有正在执行的回复。');
                     return;
                 }
                 case 'new': {
                     this.approvalBridge.cancelConversation(key);
                     await this.harnessBridge.resetConversation(key);
-                    await sendReply('🆕 已开启新对话上下文。');
+                    await sendReply('已开启新对话上下文。');
                     return;
                 }
                 case 'workspace': {
                     if (!cmd.path) {
-                        await sendReply(`📁 当前绑定工作区: \`${this.harnessBridge.resolveWorkspacePath(key)}\``);
+                        await sendReply(`当前绑定工作区: \`${this.harnessBridge.resolveWorkspacePath(key)}\``);
                         return;
                     }
                     const updated = await this.harnessBridge.setWorkspace(key, cmd.path);
-                    await sendReply(`📁 已切换工作区为 \`${updated}\` 并重置会话上下文。`);
+                    await sendReply(`已切换工作区为 \`${updated}\` 并重置会话上下文。`);
                     return;
                 }
                 case 'approve': {
@@ -218,7 +218,7 @@ export class ImHubManager {
             catch (error) {
                 const msg = error instanceof Error ? error.message : String(error);
                 this.pushEvent(message.channel, 'error', `turn failed: ${msg}`);
-                await sendReply(`⚠️ 处理消息时出现异常: ${msg}`).catch(() => { });
+                await sendReply(`处理消息时出现异常: ${msg}`).catch(() => { });
             }
         });
     }

@@ -8,6 +8,7 @@ export interface ToolSchemaLike {
 
 export interface AgentSessionLike {
   id: string
+  header?: { cwd?: string }
 }
 
 export interface AgentLike {
@@ -17,7 +18,7 @@ export interface AgentLike {
   workspace?: { path?: string } | null
   ctx?: {
     get?: (name: string) => unknown
-    tools?: ScopedToolsLike
+    tools?: unknown
   }
 }
 
@@ -38,7 +39,7 @@ export interface ToolRegistrationSpec {
   parameters: unknown
   output: ToolOutputSpec
   returns?: unknown
-  execute: (args: Record<string, unknown> | undefined, exec?: { agent?: AgentLike }) => unknown
+  execute: (args: Record<string, unknown> | undefined, exec?: { agent?: AgentLike; signal?: AbortSignal }) => unknown
 }
 
 export interface ToolsServiceLike {
@@ -66,10 +67,17 @@ export interface WorkspacesServiceLike {
   list?: () => ReadonlyArray<WorkspaceEntryLike>
 }
 
-export interface UserScopeServiceLike {
-  desktopScope?: () => { principalId: string } | undefined
-  currentScope?: () => { source?: string; principalId: string } | undefined
+export interface WorkingDirectoryServiceLike {
+  ensure: (agent: AgentLike, signal?: AbortSignal) => Promise<string>
 }
+
+export interface UserScopeServiceLike {
+  desktopScope?: () => ScopeIdentity | undefined
+  currentScope?: () => ScopeIdentity | undefined
+  canAccess?: (scope: ScopeIdentity, resource: { kind: 'session'; sessionId: string }) => { allowed: boolean }
+}
+
+interface ScopeIdentity { source?: string; principalId: string }
 
 export interface WebRouteRequestLike {
   url?: string

@@ -1,10 +1,10 @@
 # Desktop 2.5 DSH coupling audit
 
-Authoritative Desktop version: 5.6.0.
+Authoritative Desktop version: 5.7.0-test.1.
 
 Stable DSH package version: 0.2.3-alpha.2.
 
-Lockfile SHA-256: `b8e412cef131c345d77874f1cb538e4185a36655caf7a3a3f40f50f750b3255b`.
+Lockfile SHA-256: `567c63ec7cb23456f5cc18d1bc4159201d0ddb9436f8ee9409dc12d1c066a48f`.
 
 Capability discovery is compatibility evidence only. Renderer surface identity, channel allowlists, and argument validation remain the authorization boundary.
 
@@ -12,9 +12,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 
 | Classification | Count |
 | --- | ---: |
-| public-stable | 386 |
-| public-experimental | 205 |
-| compatibility-patch | 51 |
+| public-stable | 440 |
+| public-experimental | 216 |
+| compatibility-patch | 52 |
 | private-high-risk | 0 |
 
 ## Direct imports, dynamic imports, and requires
@@ -112,23 +112,61 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-aionui-panel/src/index.ts | 20 | static-import | @deepseek-ai/dsh-workspace | yes | public-stable | no |
 | packages/dsh-aionui-panel/src/index.ts | 21 | static-import | @deepseek-ai/dsh-system-prompt | yes | public-stable | no |
 | packages/dsh-chat-artifacts/src/client/ArtifactCard.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
-| packages/dsh-chat-artifacts/src/client/ArtifactCard.tsx | 10 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactCard.tsx | 6 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactFenceEnhancer.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-chat/client | yes | public-experimental | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactFenceEnhancer.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactFullscreenModal.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactFullscreenModal.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactLiveNode.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-chat/client | yes | public-experimental | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactLiveNode.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactLiveNode.tsx | 4 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
-| packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx | 7 | static-import | @deepseek-ai/dsh-client-ui-tool/client | yes | public-experimental | no |
-| packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx | 8 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
-| packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx | 9 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx | 5 | static-import | @deepseek-ai/dsh-client-ui-tool/client | yes | public-experimental | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx | 6 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactToolRow.tsx | 7 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactTurnTail.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-chat/client | yes | public-experimental | no |
+| packages/dsh-chat-artifacts/src/client/ArtifactTurnTail.tsx | 2 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/McpAppFrame.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/client/artifact-transcript.ts | 1 | static-import | @deepseek-ai/dsh-client-ui-chat/client | yes | public-experimental | no |
 | packages/dsh-chat-artifacts/src/client/index.ts | 10 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
 | packages/dsh-chat-artifacts/src/client/index.ts | 12 | static-import | @deepseek-ai/dsh-client-ui-tool/client | yes | public-experimental | no |
 | packages/dsh-chat-artifacts/src/client/index.ts | 13 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-chat-artifacts/src/client/index.ts | 14 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
-| packages/dsh-chat-artifacts/src/index.ts | 12 | static-import | @deepseek-ai/dsh-system-prompt | yes | public-stable | no |
-| packages/dsh-chat-artifacts/src/index.ts | 15 | static-import | @deepseek-ai/dsh-tools | no | public-stable | no |
-| packages/dsh-chat-artifacts/src/index.ts | 16 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
-| packages/dsh-chat-artifacts/tests/tool.spec.ts | 1 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
-| packages/dsh-chat-artifacts/tests/tool.spec.ts | 5 | static-import | @deepseek-ai/dsh-session-projection | no | public-stable | no |
-| packages/dsh-chat-artifacts/tests/tool.spec.ts | 6 | static-import | @deepseek-ai/dsh-system-prompt | no | public-stable | no |
-| packages/dsh-chat-artifacts/tests/tool.spec.ts | 7 | static-import | @deepseek-ai/dsh-tools | no | public-stable | no |
-| packages/dsh-chat-artifacts/tests/tool.spec.ts | 8 | static-import | @deepseek-ai/dsh-tool-executor-native | no | public-stable | no |
+| packages/dsh-chat-artifacts/src/core/artifact-index.ts | 1 | static-import | @deepseek-ai/dsh-llm | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/core/artifact-index.ts | 2 | static-import | @deepseek-ai/dsh-session | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/core/artifact-index.ts | 3 | static-import | @deepseek-ai/dsh-session-projection | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/host/diagram-runtime.ts | 1 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/host/mcp-app-bridge.ts | 1 | static-import | @deepseek-ai/dsh-user-approval | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/host/mcp-app-bridge.ts | 4 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/host/mcp-app-routes.ts | 1 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/host/mcp-app-servers.ts | 1 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/host/mcp-app-servers.ts | 4 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/index.ts | 12 | static-import | @deepseek-ai/dsh-session | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/index.ts | 17 | static-import | @deepseek-ai/dsh-system-prompt | yes | public-stable | no |
+| packages/dsh-chat-artifacts/src/index.ts | 18 | static-import | @deepseek-ai/dsh-tools | no | public-stable | no |
+| packages/dsh-chat-artifacts/src/index.ts | 19 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-chat-artifacts/tests/mcp-app-host.spec.ts | 1 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-chat-artifacts/tests/tool.spec.ts | 1 | static-import | @deepseek-ai/dsh-agent | yes | public-stable | no |
+| packages/dsh-chat-artifacts/tests/tool.spec.ts | 5 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
+| packages/dsh-chat-artifacts/tests/tool.spec.ts | 6 | static-import | @deepseek-ai/dsh-session | no | public-stable | no |
+| packages/dsh-chat-artifacts/tests/tool.spec.ts | 7 | static-import | @deepseek-ai/dsh-session-projection | no | public-stable | no |
+| packages/dsh-chat-artifacts/tests/tool.spec.ts | 8 | static-import | @deepseek-ai/dsh-system-prompt | no | public-stable | no |
+| packages/dsh-chat-artifacts/tests/tool.spec.ts | 9 | static-import | @deepseek-ai/dsh-tools | no | public-stable | no |
+| packages/dsh-chat-artifacts/tests/tool.spec.ts | 10 | static-import | @deepseek-ai/dsh-tool-executor-native | no | public-stable | no |
+| packages/dsh-checkpoints/src/client/CheckpointDialog.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-checkpoints/src/client/CheckpointTurnTail.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-checkpoints/src/client/index.ts | 1 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
+| packages/dsh-checkpoints/src/client/index.ts | 3 | static-import | @deepseek-ai/dsh-client-ui-chat/client | yes | public-experimental | no |
+| packages/dsh-checkpoints/src/client/index.ts | 4 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
+| packages/dsh-checkpoints/src/client/index.ts | 5 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-checkpoints/src/core/sdk-adapter.ts | 1 | static-export | @deepseek-ai/dsh-atomic-write | no | public-stable | yes |
+| packages/dsh-checkpoints/src/host/routes.ts | 1 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-checkpoints/src/host/sdk-adapter.ts | 1 | static-export | @deepseek-ai/dsh-home-paths | no | public-stable | yes |
+| packages/dsh-checkpoints/src/index.ts | 1 | static-import | @deepseek-ai/dsh-agent | yes | public-stable | no |
+| packages/dsh-checkpoints/src/index.ts | 3 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-checkpoints/src/index.ts | 4 | static-import | @deepseek-ai/dsh-session | yes | public-stable | no |
+| packages/dsh-checkpoints/src/index.ts | 5 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-checkpoints/src/index.ts | 6 | static-import | @deepseek-ai/dsh-workspace | yes | public-stable | no |
 | packages/dsh-data-location/src/client/Panel.tsx | 1 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
 | packages/dsh-data-location/src/client/Panel.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
 | packages/dsh-data-location/src/client/Panel.tsx | 4 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
@@ -138,6 +176,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-desktop-client-hmr/src/index.ts | 6 | static-import | @deepseek-ai/dsh-client-modules | yes | public-stable | no |
 | packages/dsh-desktop-client-hmr/src/index.ts | 7 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
 | packages/dsh-desktop-compat/src/acp/acp-routes.ts | 1 | static-import | @deepseek-ai/dsh-host-webserver | yes | compatibility-patch | yes |
+| packages/dsh-desktop-compat/src/acp/acp-routes.ts | 8 | static-import | @deepseek-ai/dsh-session | no | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/agent-wsl-tool.ts | 1 | static-import | @deepseek-ai/dsh-agent | yes | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/agent-wsl-tool.ts | 6 | static-import | @deepseek-ai/dsh-tools | no | compatibility-patch | yes |
 | packages/dsh-desktop-compat/src/background-scheduler-runner.ts | 11 | static-import | @deepseek-ai/dsh-agent | no | compatibility-patch | yes |
@@ -196,6 +235,11 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-desktop-repair/src/index.ts | 9 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | yes |
 | packages/dsh-desktop-repair/src/model-runner.ts | 1 | static-import | @deepseek-ai/dsh-agent | yes | public-stable | yes |
 | packages/dsh-desktop-repair/src/tools.ts | 1 | static-import | @deepseek-ai/dsh-tools | no | public-stable | yes |
+| packages/dsh-doc-ingest/src/index.ts | 1 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-doc-ingest/src/index.ts | 3 | static-import | @deepseek-ai/dsh-user-approval | yes | public-stable | no |
+| packages/dsh-doc-ingest/src/index.ts | 4 | static-import | @deepseek-ai/dsh-workspace | yes | public-stable | no |
+| packages/dsh-doc-ingest/tests/registration.spec.ts | 1 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-fast-ops/src/host/tool-registry.ts | 1 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
 | packages/dsh-git-graph/src/client/chips/BranchChip.tsx | 16 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
 | packages/dsh-git-graph/src/client/chips/BranchChip.tsx | 18 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-git-graph/src/client/chips/BranchPopover.tsx | 8 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
@@ -266,6 +310,11 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-live-stats/tests/projection.spec.ts | 12 | static-import | @deepseek-ai/dsh-session-projection | no | public-stable | no |
 | packages/dsh-live-stats/tests/routes.spec.ts | 1 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
 | packages/dsh-live-stats/tests/tps-line.spec.tsx | 3 | static-import | @deepseek-ai/dsh-api-session-controller/client | yes | public-experimental | no |
+| packages/dsh-llm-antigravity/src/client/AcpChatView.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
+| packages/dsh-llm-antigravity/src/client/AcpChatView.tsx | 4 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-llm-antigravity/src/client/AcpComposerControl.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
+| packages/dsh-llm-antigravity/src/client/AcpComposerControl.tsx | 4 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-llm-antigravity/src/client/AcpEnginePicker.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 4 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
 | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 5 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
@@ -278,6 +327,19 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-llm-antigravity/src/provider.ts | 2 | static-import | @deepseek-ai/dsh-llm/types | yes | public-stable | no |
 | packages/dsh-llm-antigravity/tests/provider.spec.ts | 1 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
 | packages/dsh-llm-antigravity/tests/provider.spec.ts | 6 | static-import | @deepseek-ai/dsh-llm/types | yes | public-stable | no |
+| packages/dsh-local-search/src/host/routes.ts | 1 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-local-search/src/host/sdk-adapter.ts | 1 | static-export | @deepseek-ai/dsh-atomic-write | no | public-stable | yes |
+| packages/dsh-local-search/src/host/sdk-adapter.ts | 2 | static-export | @deepseek-ai/dsh-home-paths | no | public-stable | yes |
+| packages/dsh-local-search/src/host/service.ts | 1 | static-import | @deepseek-ai/dsh-session | yes | public-stable | no |
+| packages/dsh-local-search/src/host/service.ts | 2 | static-import | @deepseek-ai/dsh-session-query | yes | public-stable | no |
+| packages/dsh-local-search/src/host/service.ts | 3 | static-import | @deepseek-ai/dsh-workspace | yes | public-stable | no |
+| packages/dsh-local-search/src/host/service.ts | 4 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-local-search/src/host/session-content.ts | 1 | static-import | @deepseek-ai/dsh-session | yes | public-stable | no |
+| packages/dsh-local-search/src/index.ts | 1 | static-import | @deepseek-ai/dsh-session | yes | public-stable | no |
+| packages/dsh-local-search/src/index.ts | 3 | static-import | @deepseek-ai/dsh-session-query | yes | public-stable | no |
+| packages/dsh-local-search/src/index.ts | 4 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-local-search/src/index.ts | 5 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
+| packages/dsh-local-search/src/index.ts | 6 | static-import | @deepseek-ai/dsh-workspace | yes | public-stable | no |
 | packages/dsh-memory/src/client/MemoryActivityPanel.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-memory/src/client/MemorySettingsCard.tsx | 1 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-memory/src/client/MemorySettingsCard.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
@@ -306,6 +368,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-memory/src/tools.ts | 2 | static-import | @deepseek-ai/dsh-llm | yes | public-stable | no |
 | packages/dsh-memory/src/tools.ts | 3 | static-import | @deepseek-ai/dsh-tools | no | public-stable | no |
 | packages/dsh-memory/tests/lock-acquisition.spec.ts | 1 | static-import | @deepseek-ai/dsh-atomic-write | no | public-stable | no |
+| packages/dsh-memory/tests/turn-suggestion.spec.ts | 1 | static-import | @deepseek-ai/dsh-session | yes | public-stable | no |
 | packages/dsh-mode-switcher/src/client/index.ts | 1 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
 | packages/dsh-mode-switcher/src/client/index.ts | 3 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
 | packages/dsh-mode-switcher/src/client/index.ts | 4 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
@@ -322,7 +385,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-model-preferences/src/client/ModelSelect.tsx | 1 | static-import | @deepseek-ai/dsh-api-remotes/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/ModelSelect.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-model-selection/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/ModelSelect.tsx | 4 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
-| packages/dsh-model-preferences/src/client/ModelSelect.tsx | 23 | dynamic-import | @deepseek-ai/dsh-client-ui-settings/client | no | public-experimental | no |
+| packages/dsh-model-preferences/src/client/ModelSelect.tsx | 24 | dynamic-import | @deepseek-ai/dsh-client-ui-settings/client | no | public-experimental | no |
 | packages/dsh-model-preferences/src/client/index.ts | 7 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/index.ts | 10 | static-import | @deepseek-ai/dsh-client-ui-commands/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/index.ts | 11 | static-import | @deepseek-ai/dsh-client-ui-model-selection/client | yes | public-experimental | no |
@@ -612,11 +675,14 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-web-ui-settings/src/client/relay-send-guard.ts | 1 | static-import | @deepseek-ai/dsh-api-session-controller/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/relay-send-guard.ts | 2 | static-import | @deepseek-ai/dsh-api-session-controller/types | yes | public-stable | no |
 | packages/dsh-web-ui-settings/src/client/relay-send-guard.ts | 3 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
+| packages/dsh-web-ui-settings/src/client/remote-access-plugin-row.ts | 1 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
+| packages/dsh-web-ui-settings/src/client/remote-access-plugin-row.ts | 3 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 1 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | yes |
 | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 5 | static-import | @deepseek-ai/dsh-client-ui-workspace/client | yes | public-experimental | yes |
 | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 6 | static-export | @deepseek-ai/dsh-client-store | yes | public-stable | yes |
 | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 7 | static-export | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | yes |
 | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 8 | static-export | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | yes |
+| packages/dsh-web-ui-settings/src/client/work-mode/OfficeAppsComposerBar.tsx | 1 | static-import | @deepseek-ai/dsh-api-session-controller/client | yes | public-experimental | no |
 | packages/dsh-web-ui-settings/src/custom-provider-key-sdk-adapter.ts | 1 | static-import | @deepseek-ai/dsh-credentials | yes | public-stable | yes |
 | packages/dsh-web-ui-settings/src/custom-provider-key-sdk-adapter.ts | 3 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | yes |
 | packages/dsh-web-ui-settings/src/index.ts | 13 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
@@ -682,8 +748,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-agent-inbox/src/index.ts | 16 | sessions |
 | host-service | packages/dsh-aionui-panel/src/client/index.ts | 47 | locale |
 | host-service | packages/dsh-aionui-panel/src/index.ts | 29 | subprocess |
-| host-service | packages/dsh-chat-artifacts/src/client/index.ts | 28 | locale |
-| host-service | packages/dsh-chat-artifacts/src/index.ts | 51 | tools |
+| host-service | packages/dsh-chat-artifacts/src/client/index.ts | 32 | locale |
+| host-service | packages/dsh-chat-artifacts/src/index.ts | 65 | object |
+| host-service | packages/dsh-checkpoints/src/client/index.ts | 16 | locale |
+| host-service | packages/dsh-checkpoints/src/index.ts | 15 | sessions |
 | host-service | packages/dsh-data-location/src/client/Panel.tsx | 240 | data-location |
 | host-service | packages/dsh-desktop-client-hmr/src/client/index.ts | 6 | modules |
 | host-service | packages/dsh-desktop-client-hmr/src/index.ts | 13 | connection.authentication |
@@ -697,10 +765,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-live-stats/src/client/index.ts | 69 | remote |
 | host-service | packages/dsh-live-stats/src/index.ts | 17 | live-stats |
 | host-service | packages/dsh-live-stats/src/invariant.ts | 14 | invariants |
-| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 374 | web-ui.plugin.item |
+| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 353 | web-ui.plugin.item |
 | host-service | packages/dsh-llm-antigravity/src/index.ts | 33 | stream-json |
 | host-service | packages/dsh-memory/src/client/index.ts | 34 | locale |
-| host-service | packages/dsh-memory/src/index.ts | 31 | tools |
+| host-service | packages/dsh-memory/src/index.ts | 32 | tools |
 | host-service | packages/dsh-mode-switcher/src/client/index.ts | 11 | conversation |
 | host-service | packages/dsh-model-preferences/src/client/index.ts | 65 | sessions |
 | host-service | packages/dsh-model-preferences/src/index.ts | 7 | settings |
@@ -720,7 +788,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-tool-describe-image/src/index.ts | 28 | tools |
 | host-service | packages/dsh-value-mode/src/client/index.ts | 60 | remote.session |
 | host-service | packages/dsh-value-mode/src/index.ts | 47 | llm |
-| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 109 | remote |
+| host-service | packages/dsh-web-ui-settings/src/client/index.ts | 110 | remote |
 | host-service | packages/dsh-win-control/src/client/index.ts | 11 | win-control |
 | host-service | packages/skins/skin-center/src/client/index.ts | 66 | remote |
 | profile-home | apps/dsh-desktop/scripts/bai-host-probe.mjs | 15 | DSH_HOME |
@@ -765,7 +833,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/sidebar-ledger-diagnostic-fixture.mjs | 83 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/skill-market-probe-fixture.mjs | 3 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/skill-market-probe-fixture.mjs | 6 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/scripts/verify-account-skin-chrome.mjs | 54 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-account-skin-chrome.mjs | 55 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-agent-wsl-real.mjs | 20 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-agent-wsl-real.mjs | 21 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-agent-wsl-real.mjs | 75 | DSH_HOME |
@@ -773,13 +841,14 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-background-residency.mjs | 94 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-bai-onboarding.mjs | 35 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-beta-usability.mjs | 110 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-chat-artifacts.mjs | 211 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-context-prompt-customizer.mjs | 53 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-control-approval.mjs | 93 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 30 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 136 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 427 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 432 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/verify-conversation-skills.mjs | 68 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 439 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 444 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/verify-conversation-skills.mjs | 69 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-describe-image-adaptation.mjs | 10 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-describe-image-adaptation.mjs | 48 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-describe-image-adaptation.mjs | 158 | DSH_HOME |
@@ -788,6 +857,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-dock-clarity.mjs | 31 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-dock-model-catalog.mjs | 41 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-dock-settings.mjs | 155 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-gemini-remote-settings.mjs | 82 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 9 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 9 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/scripts/verify-history-host-performance.mjs | 9 | resolveRuntimePackages |
@@ -798,6 +868,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-large-legacy-history.mjs | 14 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/verify-large-legacy-history.mjs | 41 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/scripts/verify-large-legacy-history.mjs | 221 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-local-search.mjs | 155 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-mcp-apps.mjs | 337 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-native-plugin-pages.mjs | 32 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-native-settings-interactions.mjs | 47 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-agent-work.mjs | 317 | DSH_HOME |
@@ -864,7 +936,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 221 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 321 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-selected-balance.mjs | 45 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-settings-window.mjs | 70 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-settings-window.mjs | 71 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-sidebar-footer.mjs | 211 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-sidebar-installed-profile.mjs | 7 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/verify-sidebar-installed-profile.mjs | 13 | ensureDesktopProfile |
@@ -886,6 +958,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 143 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 67 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workshop-lifecycle.mjs | 79 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-workspace-checkpoints.mjs | 143 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 35 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 72 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 165 | profileDir |
@@ -906,34 +979,34 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/desktop-data-migration.mjs | 126 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/desktop-data-migration.mjs | 146 | DSH_HOME |
 | profile-home | apps/dsh-desktop/src/desktop-data-migration.mjs | 181 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 114 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 116 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 118 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 222 | runtimeHome |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 223 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 750 | runtimeHome |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 778 | DSH_HOME |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1351 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1380 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1413 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1415 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1418 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1461 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1512 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1600 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1635 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1636 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1642 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1690 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1695 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1909 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1917 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1920 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2641 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2695 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2727 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2791 | profileDir |
-| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2797 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 115 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 117 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 119 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 223 | runtimeHome |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 224 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 751 | runtimeHome |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 779 | DSH_HOME |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1356 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1385 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1418 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1420 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1423 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1466 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1522 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1610 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1645 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1646 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1652 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1700 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1705 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1919 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1927 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 1930 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2698 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2752 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2784 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2848 | profileDir |
+| profile-home | apps/dsh-desktop/src/electron-app.mjs | 2854 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 86 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 87 | profileDir |
 | profile-home | apps/dsh-desktop/src/extension-ipc.mjs | 88 | profileDir |
@@ -987,87 +1060,87 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/extensions/plugin-staging.mjs | 657 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-staging.mjs | 732 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugin-staging.mjs | 732 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 314 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 315 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 327 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 330 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 342 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 343 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 459 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 460 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 463 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 316 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 317 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 329 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 332 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 344 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 345 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 461 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 462 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 465 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 466 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 541 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 556 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 604 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 617 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 617 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 652 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 652 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 655 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 665 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 467 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 468 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 543 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 558 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 606 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 619 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 619 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 654 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 654 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 657 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 667 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 744 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 763 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 778 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 808 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 815 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 669 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 746 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 765 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 780 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 810 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 817 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 831 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 852 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 819 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 833 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 854 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 868 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 884 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 888 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 923 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1009 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1055 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1056 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1093 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1093 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1097 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1098 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1101 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1108 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1113 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1187 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1187 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1191 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1192 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1195 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1201 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1210 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1218 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1273 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1340 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1340 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1360 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1365 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1387 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1398 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1404 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1410 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1414 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1421 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1480 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1524 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1524 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1567 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1568 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1577 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1586 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1603 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1656 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1659 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1669 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1716 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1723 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1741 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1751 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1779 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1802 | profileDir |
-| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1808 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 856 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 870 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 886 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 890 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 925 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1011 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1057 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1058 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1095 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1095 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1099 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1100 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1103 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1110 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1115 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1189 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1189 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1193 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1194 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1197 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1203 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1212 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1220 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1275 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1342 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1342 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1362 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1367 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1389 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1400 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1406 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1412 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1416 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1423 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1482 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1526 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1526 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1569 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1570 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1579 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1588 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1605 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1658 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1661 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1671 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1718 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1725 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1743 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1753 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1781 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1804 | profileDir |
+| profile-home | apps/dsh-desktop/src/extensions/plugins.mjs | 1810 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/qqbot.mjs | 168 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/qqbot.mjs | 169 | profileDir |
 | profile-home | apps/dsh-desktop/src/extensions/qqbot.mjs | 169 | profileDir |
@@ -1105,40 +1178,40 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/src/profile-baseline-quarantine.mjs | 360 | profileDir |
 | profile-home | apps/dsh-desktop/src/profile-migration.mjs | 68 | profileDir |
 | profile-home | apps/dsh-desktop/src/profile-migration.mjs | 80 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 730 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 748 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 772 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 773 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 773 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 774 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 776 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 780 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 781 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 781 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 782 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 785 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1122 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1153 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1394 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1400 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1462 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1464 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1489 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1514 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1515 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1516 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1517 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1526 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1528 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1550 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1551 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1571 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1614 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1632 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1645 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1660 | profileDir |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1712 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/src/profile.mjs | 1786 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 747 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 765 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 789 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 790 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 790 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 791 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 793 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 797 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 798 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 798 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 799 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 802 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1139 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1170 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1411 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1417 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1479 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1481 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1506 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1531 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1532 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1533 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1534 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1543 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1545 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1567 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1568 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1588 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1631 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1649 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1662 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1677 | profileDir |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1729 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/src/profile.mjs | 1803 | resolveDshCliPath |
 | profile-home | apps/dsh-desktop/src/prompt-customizer-feature.mjs | 88 | profileDir |
 | profile-home | apps/dsh-desktop/src/prompt-customizer-feature.mjs | 89 | profileDir |
 | profile-home | apps/dsh-desktop/src/prompt-customizer-feature.mjs | 90 | profileDir |
@@ -1595,150 +1668,150 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 81 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 95 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 99 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 145 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 148 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 157 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 158 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 161 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 175 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 228 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 230 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 236 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 240 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 244 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 170 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 174 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 188 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 241 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 243 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 249 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 252 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 270 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 288 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 298 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 303 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 312 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 319 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 362 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 367 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 369 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 370 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 371 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 403 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 426 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 431 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 433 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 434 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 455 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 469 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 474 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 478 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 485 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 528 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 533 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 536 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 545 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 578 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 583 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 584 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 585 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 603 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 619 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 630 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 662 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 667 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 668 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 669 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 687 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 701 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 712 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 717 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 719 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 720 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 740 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 750 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 755 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 757 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 758 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 777 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 791 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 796 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 800 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 821 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 825 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 829 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 835 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 840 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 843 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 852 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 253 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 257 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 262 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 265 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 283 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 301 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 311 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 316 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 325 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 332 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 375 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 380 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 382 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 383 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 384 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 416 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 439 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 444 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 446 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 447 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 468 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 482 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 487 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 491 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 498 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 541 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 546 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 549 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 558 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 591 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 596 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 597 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 598 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 616 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 632 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 643 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 675 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 680 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 681 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 682 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 700 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 714 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 725 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 730 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 732 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 733 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 753 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 763 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 768 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 770 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 771 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 790 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 804 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 809 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 813 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 834 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 838 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 842 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 848 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 853 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 856 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 865 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 866 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 874 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 879 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 881 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 890 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 904 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 934 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 939 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 943 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 950 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 961 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 970 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 979 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 982 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 987 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 989 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 887 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 892 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 894 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 903 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 917 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 947 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 952 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 956 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 963 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 974 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 983 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 992 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 995 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1009 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1014 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1019 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1030 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1039 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1046 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1058 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1063 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1065 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1073 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1000 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1002 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1008 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1022 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1027 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1032 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1043 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1052 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1059 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1071 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1076 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1078 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1082 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1088 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1092 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1097 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1086 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1091 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1095 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1101 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1112 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1119 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1121 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1124 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1131 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1135 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1141 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1105 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1110 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1114 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1125 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1132 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1134 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1137 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1144 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1145 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1148 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1154 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1170 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1184 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1223 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1224 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1225 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1231 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1240 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1263 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1288 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1292 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1293 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1299 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1157 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1158 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1167 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1183 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1197 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1236 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1237 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1238 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1244 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1253 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1276 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1301 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1326 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1329 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1330 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1305 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1306 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1312 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1314 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1339 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1349 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1373 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1374 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1375 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1342 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1343 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1352 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1362 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1386 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1390 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1387 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1388 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1399 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1427 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1428 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1432 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1439 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1403 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1412 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1440 | profileDir |
 | profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1441 | profileDir |
-| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1449 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1445 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1452 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1454 | profileDir |
+| profile-home | apps/dsh-desktop/test/plugins.test.mjs | 1462 | profileDir |
 | profile-home | apps/dsh-desktop/test/preset-service.test.mjs | 11 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/preset-service.test.mjs | 166 | profileDir |
 | profile-home | apps/dsh-desktop/test/preset-service.test.mjs | 166 | ensureDesktopProfile |
@@ -1760,159 +1833,159 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 54 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 63 | resolveRuntimePackages |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 73 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 237 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 244 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 414 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 415 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 419 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 431 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 432 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 240 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 247 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 417 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 418 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 422 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 434 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 435 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 437 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 551 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 555 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 564 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 565 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 566 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 571 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 573 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 614 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 616 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 438 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 440 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 554 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 558 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 567 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 568 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 569 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 574 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 576 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 617 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 624 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 625 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 626 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 619 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 620 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 627 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 632 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 633 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 634 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 684 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 686 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 686 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 690 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 700 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 760 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 766 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 770 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 628 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 629 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 630 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 635 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 636 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 637 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 687 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 689 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 689 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 693 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 703 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 763 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 769 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 773 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 782 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 788 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 790 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 795 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 799 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 776 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 785 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 791 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 793 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 798 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 802 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 812 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 815 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 819 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 837 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 858 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 859 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 860 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 805 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 815 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 818 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 822 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 840 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 861 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 862 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 862 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 863 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 863 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 867 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 869 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 873 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 890 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 894 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 897 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 903 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 913 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 917 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 925 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 932 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 939 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 949 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 951 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 960 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 972 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 973 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 982 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 988 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 999 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1000 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1005 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1013 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1019 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1029 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1030 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1039 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1051 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1083 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1084 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1088 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1091 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1092 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1094 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1108 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1118 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1124 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1124 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1137 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1150 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1166 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1167 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1171 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1173 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1175 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1190 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1192 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 864 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 865 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 866 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 866 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 870 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 872 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 876 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 893 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 897 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 900 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 906 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 916 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 920 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 928 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 935 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 942 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 952 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 954 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 963 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 975 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 976 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 985 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 991 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1002 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1003 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1008 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1016 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1022 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1032 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1033 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1042 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1054 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1086 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1087 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1091 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1094 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1095 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1097 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1111 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1121 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1127 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1127 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1140 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1153 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1169 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1170 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1174 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1176 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1178 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 1193 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1194 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1195 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 1196 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 1197 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1207 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1208 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1211 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1211 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1213 | DSH_HOME |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1240 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1242 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1251 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1252 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1252 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1255 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1260 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1260 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1263 | DSH_HOME |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1270 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1270 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1280 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1280 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1287 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1287 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1290 | DSH_HOME |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1302 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1304 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1199 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1200 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1210 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1211 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1214 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1214 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1216 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1243 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1245 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1254 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1255 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1255 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1258 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1263 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1263 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1266 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1273 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1273 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1283 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1283 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1290 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1290 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1293 | DSH_HOME |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 1305 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1307 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1311 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1313 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1316 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1329 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1331 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1342 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1307 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1308 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1310 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1314 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1316 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1319 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1332 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1334 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 1345 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1349 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1348 | profileDir |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 1352 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1354 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/profile.test.mjs | 1355 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1356 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1357 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1369 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1377 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1444 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1519 | resolveDshCliPath |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1537 | resolveRuntimePackages |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1550 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1557 | DSH_HOME |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1591 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1592 | profileDir |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1593 | ensureDesktopProfile |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1599 | DSH_HOME |
-| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1607 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1357 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1358 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1359 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1360 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1372 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1380 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1450 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1525 | resolveDshCliPath |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1543 | resolveRuntimePackages |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1556 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1563 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1597 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1598 | profileDir |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1599 | ensureDesktopProfile |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1605 | DSH_HOME |
+| profile-home | apps/dsh-desktop/test/profile.test.mjs | 1613 | profileDir |
 | profile-home | apps/dsh-desktop/test/prompt-customizer-feature.test.mjs | 6 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/test/prompt-customizer-feature.test.mjs | 15 | profileDir |
 | profile-home | apps/dsh-desktop/test/prompt-customizer-feature.test.mjs | 16 | profileDir |
@@ -2133,7 +2206,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 340 | profileDir |
 | profile-home | packages/dsh-data-location/src/client/Panel.tsx | 22 | DSH_HOME |
 | profile-home | packages/dsh-data-location/src/client/Panel.tsx | 37 | DSH_HOME |
-| profile-home | packages/dsh-desktop-compat/src/acp/acp-agent-manager.ts | 54 | DSH_HOME |
+| profile-home | packages/dsh-desktop-compat/src/acp/acp-agent-manager.ts | 90 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/agent-wsl-permission.ts | 21 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/agent-wsl-permission.ts | 21 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/agent-wsl-permission.ts | 23 | DSH_HOME |
@@ -2144,7 +2217,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | packages/dsh-desktop-compat/src/skin-state.ts | 142 | profileDir |
 | profile-home | packages/dsh-desktop-compat/src/skin-state.ts | 146 | profileDir |
 | profile-home | packages/dsh-desktop-compat/src/skin-state.ts | 166 | profileDir |
-| profile-home | packages/dsh-desktop-compat/tests/connector-registry.spec.ts | 228 | DSH_HOME |
+| profile-home | packages/dsh-desktop-compat/tests/connector-registry.spec.ts | 231 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/tests/skin-state.spec.ts | 20 | profileDir |
 | profile-home | packages/dsh-desktop-compat/tests/skin-state.spec.ts | 21 | profileDir |
 | profile-home | packages/dsh-desktop-compat/tests/skin-state.spec.ts | 22 | profileDir |
@@ -2301,16 +2374,16 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-pipe.mjs | 77 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 233 | start |
 | runtime-lifecycle | apps/dsh-desktop/scripts/verify-runtime-settings-reload.mjs | 292 | restart |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 733 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 738 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1326 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1911 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2290 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2625 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2627 | start |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2642 | recover |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3150 | stop |
-| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3156 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 734 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 739 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1331 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 1921 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2347 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2682 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2684 | start |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 2699 | recover |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3207 | stop |
+| runtime-lifecycle | apps/dsh-desktop/src/electron-app.mjs | 3213 | start |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 425 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 444 | stop |
 | runtime-lifecycle | apps/dsh-desktop/src/extension-ipc.mjs | 1132 | stop |
@@ -2455,6 +2528,16 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | session | apps/dsh-desktop/test/primary-control-approval.test.mjs | 28 | create |
 | session | packages/dsh-agent-inbox/src/index.ts | 32 | list |
 | session | packages/dsh-aionui-panel/src/index.ts | 50 | get |
+| session | packages/dsh-chat-artifacts/src/host/mcp-app-bridge.ts | 159 | get |
+| session | packages/dsh-chat-artifacts/src/index.ts | 235 | get |
+| session | packages/dsh-chat-artifacts/src/index.ts | 261 | get |
+| session | packages/dsh-chat-artifacts/tests/tool.spec.ts | 94 | create |
+| session | packages/dsh-chat-artifacts/tests/tool.spec.ts | 95 | create |
+| session | packages/dsh-chat-artifacts/tests/tool.spec.ts | 115 | create |
+| session | packages/dsh-chat-artifacts/tests/tool.spec.ts | 137 | create |
+| session | packages/dsh-chat-artifacts/tests/tool.spec.ts | 158 | create |
+| session | packages/dsh-chat-artifacts/tests/tool.spec.ts | 159 | create |
+| session | packages/dsh-chat-artifacts/tests/tool.spec.ts | 176 | create |
 | session | packages/dsh-desktop-compat/src/conversation-import-route.ts | 99 | create |
 | session | packages/dsh-desktop-compat/src/conversation-import-route.ts | 285 | get |
 | session | packages/dsh-desktop-compat/src/session-checkpoint-recovery.ts | 55 | get |
@@ -2463,11 +2546,11 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | session | packages/dsh-desktop-compat/src/session-title-checkpoint.ts | 18 | get |
 | session | packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts | 82 | get |
 | session | packages/dsh-desktop-compat/tests/conversation-import-route.spec.ts | 155 | get |
-| session | packages/dsh-desktop-compat/tests/fixtures/mock-acp-server.mjs | 117 | get |
-| session | packages/dsh-desktop-compat/tests/fixtures/mock-acp-server.mjs | 134 | get |
-| session | packages/dsh-desktop-compat/tests/fixtures/mock-acp-server.mjs | 143 | get |
+| session | packages/dsh-desktop-compat/tests/fixtures/mock-acp-server.mjs | 129 | get |
+| session | packages/dsh-desktop-compat/tests/fixtures/mock-acp-server.mjs | 146 | get |
+| session | packages/dsh-desktop-compat/tests/fixtures/mock-acp-server.mjs | 155 | get |
 | session | packages/dsh-live-stats/tests/projection.spec.ts | 33 | create |
-| session | packages/dsh-memory/src/index.ts | 192 | list |
+| session | packages/dsh-memory/src/index.ts | 217 | list |
 | session | packages/dsh-mode-switcher/src/client/mode-controller.ts | 114 | create |
 | session | packages/dsh-mode-switcher/src/client/runtime-adapter.ts | 26 | create |
 | session | packages/dsh-personal-prompt/src/index.ts | 117 | get |
@@ -2489,11 +2572,15 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | session | scripts/dsh-candidate-execution.mjs | 161 | prompt |
 | slot | packages/dsh-agent-inbox/src/client/Panel.tsx | 442 | sidebar.footer.action |
 | slot | packages/dsh-agent-inbox/src/client/Panel.tsx | 449 | web-ui.plugin.item |
-| slot | packages/dsh-aionui-panel/src/client/index.ts | 153 | conversation.input.dock |
+| slot | packages/dsh-aionui-panel/src/client/index.ts | 161 | conversation.input.dock |
 | slot | packages/dsh-aionui-panel/src/client/native-browser.tsx | 49 | sidebar.right.pane.tab |
 | slot | packages/dsh-aionui-panel/src/client/native-browser.tsx | 123 | conversation.input.left |
 | slot | packages/dsh-aionui-panel/src/client/native-panels.tsx | 72 | sidebar.right.pane.tab |
-| slot | packages/dsh-chat-artifacts/src/client/index.ts | 33 | tool.call.toolview |
+| slot | packages/dsh-chat-artifacts/src/client/index.ts | 38 | conversation.chat.node |
+| slot | packages/dsh-chat-artifacts/src/client/index.ts | 41 | tool.call.toolview |
+| slot | packages/dsh-chat-artifacts/src/client/index.ts | 46 | conversation.chat.turnTail |
+| slot | packages/dsh-chat-artifacts/src/client/index.ts | 49 | conversation.chat.markdown.fence |
+| slot | packages/dsh-checkpoints/src/client/index.ts | 20 | conversation.chat.turnTail |
 | slot | packages/dsh-data-location/src/client/Panel.tsx | 243 | web-ui.plugin.item |
 | slot | packages/dsh-fast-ops/src/client/index.ts | 25 | web-ui.plugin.item |
 | slot | packages/dsh-git-graph/src/client/index.ts | 204 | conversation.input.selector.context |
@@ -2501,9 +2588,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-im-hub/src/client/index.ts | 25 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 85 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 95 | conversation.composer.dock |
-| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 378 | web-ui.plugin.item |
-| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 382 | conversation.hero.frame |
-| slot | packages/dsh-memory/src/client/index.ts | 53 | web-ui.plugin.item |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 357 | web-ui.plugin.item |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 361 | conversation.hero.frame |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 364 | conversation.input.right |
+| slot | packages/dsh-memory/src/client/index.ts | 57 | web-ui.plugin.item |
 | slot | packages/dsh-mode-switcher/src/client/index.ts | 34 | conversation.session.header.actions |
 | slot | packages/dsh-model-preferences/src/client/index.ts | 124 | settings.models.footer |
 | slot | packages/dsh-model-preferences/src/client/index.ts | 184 | conversation.input.model |
@@ -2523,15 +2611,16 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 260 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx | 267 | settings.section |
 | slot | packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts | 11 | conversation.input.right |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 238 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 243 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 251 | settings.section |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 261 | web-ui.plugin.item |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 271 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 286 | settings.models.footer |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 292 | sidebar.footer.action |
-| slot | packages/dsh-web-ui-settings/src/client/index.ts | 307 | root |
-| slot | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 102 | conversation.input.left |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 239 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 244 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 252 | settings.section |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 261 | plugins.row.config |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 264 | web-ui.plugin.item |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 274 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 289 | settings.models.footer |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 295 | sidebar.footer.action |
+| slot | packages/dsh-web-ui-settings/src/client/index.ts | 310 | root |
+| slot | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 99 | conversation.input.left |
 | slot | packages/dsh-win-control/src/client/index.ts | 27 | conversation.input.left |
 | slot | packages/dsh-win-control/src/client/index.ts | 35 | web-ui.plugin.item |
 | slot | packages/skins/skin-center/src/client/index.ts | 104 | web-ui.plugin.item |
@@ -2542,6 +2631,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | workspace | apps/dsh-desktop/src/conversation-import/session-bridge.mjs | 316 | create |
 | workspace | gallery/bundles.js | 7 | list |
 | workspace | gallery/bundles.js | 13 | list |
+| workspace | packages/dsh-checkpoints/src/host/service.ts | 100 | list |
+| workspace | packages/dsh-local-search/src/host/service.ts | 99 | list |
+| workspace | packages/dsh-local-search/src/host/service.ts | 108 | list |
+| workspace | packages/dsh-local-search/src/host/service.ts | 282 | list |
 | workspace | packages/dsh-remote-web-ui/src/mobile-api-secure.ts | 321 | list |
 | workspace | packages/dsh-remote-web-ui/src/mobile/views/WorkspaceView.tsx | 4 | list |
 | workspace | packages/dsh-remote-web-ui/tests/mobile-gateway-peer.spec.ts | 22 | list |

@@ -11,6 +11,7 @@ import { normalizeMemoryConfig, type MemoryConfig } from '../core/config.ts'
 import type { MemoryLocaleKey } from './locales.ts'
 import styles from './memory.module.css'
 import { MemoryActivityPanel } from './MemoryActivityPanel.tsx'
+import { LocalSearchPanel } from './LocalSearchPanel.tsx'
 import { filterMemoryItems, isMemoryItem, memoryRequestErrorCode, postMemoryJson, readMemoryCatalog, type MemoryCatalog, type PendingMemoryItem } from './settings-data.ts'
 
 type CatalogState = { status: 'loading' | 'error' } | { status: 'ready'; value: MemoryCatalog }
@@ -34,6 +35,7 @@ export type MemorySettingsCardProps = PropsRuntime<'web-ui.plugin.item'>
   & {
     config: MemoryConfig
     settingsScope: SettingsScope<MemoryConfig>
+    onOpenSession?: (sessionId: string) => void
   }
 
 function emptyDraft(scope: MemoryScope = 'global'): Draft {
@@ -225,14 +227,14 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
     setFocusRequest(current => current + 1)
   }
 
-  const saveConfig = (next: boolean): void => {
+  const saveConfig = (next: boolean, key: 'enabled' | 'suggestAfterTurns' = 'enabled'): void => {
     if (saving || !settingsSnapshot.writable) return
     setSaving(true)
     setSaved(false)
     setError(null)
     void (async () => {
       try {
-        if (!await settingsScope.set('enabled', next)) throw new Error('memory setting not accepted')
+        if (!await settingsScope.set(key, next)) throw new Error('memory setting not accepted')
         if (mounted.current) setSaved(true)
       } catch {
         if (mounted.current) setError(t('settings.errorSave'))
@@ -242,7 +244,8 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
     })()
   }
 
-  const mutate = (path: string, body: unknown, onSuccess: (value: Record<string, unknown>) => void, notice?: MemoryLocaleKey): void => {
+  const mutate = (path: string, body: unknown, onSuccess: (value: Record<string, unknown>) => void,
+    notice?: MemoryLocaleKey | ((value: Record<string, unknown>) => MemoryLocaleKey)): void => {
     if (!mayWrite) return
     setSaving(true)
     setSaved(false)
@@ -252,7 +255,7 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         const value = await postMemoryJson(path, body)
         if (!mounted.current) return
         onSuccess(value)
-        load(notice)
+        load(typeof notice === 'function' ? notice(value) : notice)
       } catch (reason) {
         if (mounted.current) setError(errorMessage(memoryRequestErrorCode(reason), t))
       } finally {
@@ -331,6 +334,12 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         <input type="checkbox" checked={liveConfig.enabled} disabled={!settingsSnapshot.writable || saving} onChange={event => saveConfig(event.target.checked)} />
         {t('settings.enabled')}
       </label><p className={styles.muted}>{t('settings.ownerNotice')}</p></div>
+      <label className={styles.toggle}>
+        <input type="checkbox" checked={liveConfig.suggestAfterTurns === true}
+          disabled={!liveConfig.enabled || !settingsSnapshot.writable || saving}
+          onChange={event => saveConfig(event.target.checked, 'suggestAfterTurns')} />
+        {t('search.passiveSuggestions')}
+      </label>
 
       {dock && <div className={styles.tabs} role="tablist" aria-label={t('settings.title')} onKeyDown={event => {
         if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
@@ -414,6 +423,11 @@ export function MemorySettingsCard(props: MemorySettingsCardProps) {
         </footer>
       </section>
       <MemoryActivityPanel t={t} enabled={liveConfig.enabled} onEdit={select} />
+      <LocalSearchPanel t={t} onOpenSession={props.onOpenSession} onSuggest={sessionId => {
+        mutate('/api/dsh-memory/pending?sessionId=' + encodeURIComponent(sessionId), { operation: 'suggest-turn' }, () => {
+          setMemoryTab('pending')
+        }, value => value.suggested === true ? 'search.suggestionReady' : 'search.suggestionEmpty')
+      }} />
     </section>
   )
 }

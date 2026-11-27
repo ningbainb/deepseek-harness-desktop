@@ -21,10 +21,11 @@ export interface AcpClientLaunchOptions {
 export declare class AcpClient {
     private readonly options;
     private child?;
+    private shutdown?;
     private nextId;
     private pending;
     private sessionListeners;
-    private stderrTail;
+    private fileSystem;
     private closed;
     private closePromise?;
     private negotiated?;
@@ -46,12 +47,13 @@ export declare class AcpClient {
             writeTextFile?: boolean;
         };
         terminal?: boolean;
-    }): Promise<AcpNegotiatedCapabilities>;
+    }, timeoutMs?: number): Promise<AcpNegotiatedCapabilities>;
     authenticate(methodId: string): Promise<void>;
     private parseSessionPayload;
-    newSession({ cwd, mcpServers }: {
+    newSession({ cwd, mcpServers, timeoutMs }: {
         cwd: string;
         mcpServers?: AcpMcpServerParam[];
+        timeoutMs?: number;
     }): Promise<{
         acpSessionId: string;
         currentModelId?: string;
@@ -70,6 +72,7 @@ export declare class AcpClient {
     }>;
     setModel(sessionId: string, modelId: string): Promise<void>;
     setConfigOption(sessionId: string, configId: string, value: string): Promise<void>;
+    updateConfigOption(sessionId: string, configId: string, value: string): Promise<AcpConfigOption[] | undefined>;
     prompt({ sessionId, text, signal, onEvent, timeoutMs, }: {
         sessionId: string;
         text: string;
@@ -81,4 +84,5 @@ export declare class AcpClient {
     }>;
     cancel(sessionId: string): void;
     close(): Promise<void>;
+    private closeProcess;
 }

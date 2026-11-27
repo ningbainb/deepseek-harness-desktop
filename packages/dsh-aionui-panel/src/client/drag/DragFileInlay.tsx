@@ -31,10 +31,12 @@ import { t } from '../locales.ts'
 import dragCss from '../styles/drag.module.css'
 import type { FileAttachmentQueue } from './attachments.ts'
 import { FileAttachmentRail } from './FileAttachmentRail.tsx'
+import { isIngestibleDocument } from '../../core/document-attachment.ts'
 
 /** Injected business face of the drag inlay (session-routed). */
 export interface DragFileInjected {
   fileQueue?: FileAttachmentQueue
+  documentDrop?: boolean
   /** Splice a workspace-relative path reference or plain-text content into the active draft. */
   insertPath: (path: string) => boolean
   /** Add image files into the active session's draft image attachments. */
@@ -196,6 +198,22 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
         (f) => f.size > MAX_SAFE_IMAGE_BYTES || f.size > 2 * 1024 * 1024
       )
 
+      if (props.documentDrop && props.fileQueue && props.addFiles) {
+        const documents = nonImageFiles.filter(file => isIngestibleDocument(file.name))
+        if (documents.length) {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+          reset()
+          window.dispatchEvent(new Event('dragend'))
+          props.fileQueue.add(documents)
+          const documentSet = new Set(documents)
+          const nativeBatch = files.filter(file => !documentSet.has(file))
+          if (anyImageNeedsCompression) processImages(imageFiles, nativeBatch)
+          else if (nativeBatch.length && !props.addFiles(nativeBatch)) setPhase('failed')
+          return
+        }
+      }
+
       // Native DSH owns all ordinary picks, including mixed image/document drops.
       if (!anyImageNeedsCompression && (props.addFiles || imageFiles.length > 0 && nonImageFiles.length === 0)) {
         reset()
@@ -290,7 +308,7 @@ export function DragFileInlay(props: DragFileInlayProps): ReactElement {
       window.removeEventListener('paste', onPaste, true)
       window.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [props.insertPath, props.addImages, props.addFiles, props.fileQueue])
+  }, [props.insertPath, props.addImages, props.addFiles, props.fileQueue, props.documentDrop])
 
   const statusText = phase === 'idle'
     ? t('explorer.drag.dropHint')

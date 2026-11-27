@@ -12,7 +12,7 @@
       "status": "supported",
       "upstreamVersion": "0.2.3-alpha.2",
       "providerId": "dsh-cli-provider-v1",
-      "desktopRange": "=5.6.0",
+      "desktopRange": "=5.7.0-test.1",
       "capabilities": [
         {
           "id": "host-service.register",
@@ -75,16 +75,21 @@
         "peers": {},
         "lockfile": {
           "path": "pnpm-lock.yaml",
-          "sha256": "b8e412cef131c345d77874f1cb538e4185a36655caf7a3a3f40f50f750b3255b"
+          "sha256": "567c63ec7cb23456f5cc18d1bc4159201d0ddb9436f8ee9409dc12d1c066a48f"
         },
         "slots": [
+          "conversation.chat.markdown.fence",
+          "conversation.chat.node",
+          "conversation.chat.turnTail",
           "conversation.composer.dock",
+          "conversation.hero.frame",
           "conversation.input.dock",
           "conversation.input.left",
           "conversation.input.model",
           "conversation.input.right",
           "conversation.input.selector.context",
           "conversation.session.header.actions",
+          "plugins.row.config",
           "root",
           "settings.models.footer",
           "settings.section",

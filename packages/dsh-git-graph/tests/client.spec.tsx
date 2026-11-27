@@ -344,6 +344,22 @@ describe('BranchChip', () => {
     expect(await screen.findByText('分支已存在，请换一个名称。')).toBeTruthy()
   })
 
+  it('opens the graph from the checkpoint modal only in the current session and workspace', async () => {
+    const { calls } = bench()
+    await screen.findByRole('button', { name: '分支' })
+    const navigate = (sessionId: string, cwd: string) => act(() => {
+      window.dispatchEvent(new CustomEvent('dsh:open-project-git-graph', { detail: { sessionId, cwd } }))
+    })
+    navigate('different-session', '/ws/proj')
+    navigate('sess-1', '/ws/other')
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(calls.graph).toEqual([])
+    navigate('sess-1', '/ws/proj')
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(calls.graph).toEqual([['sess-1', 200]])
+    expect(calls.switchBranch).toEqual([])
+  })
+
   it('renders the Git graph with lanes, refs, and load-more', async () => {
     const graphView: GraphView = {
       root: '/ws/proj', branch: 'main',

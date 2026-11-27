@@ -1,5 +1,6 @@
 import { carrierKeyOf } from "@deepseek-ai/dsh-scope";
 import z from "@deepseek-ai/schemastery";
+import { createHash } from "node:crypto";
 import { chmod, mkdir, readFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { dshHomePath } from "@deepseek-ai/dsh-home-paths";
@@ -14,14 +15,15 @@ function isRecord$1(value) {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function assertMemoryConfig(value) {
-	if (!isRecord$1(value) || value.version !== 1 || typeof value.enabled !== "boolean") throw new Error("invalid memory settings");
+	if (!isRecord$1(value) || value.version !== 1 || typeof value.enabled !== "boolean" || value.suggestAfterTurns !== void 0 && typeof value.suggestAfterTurns !== "boolean") throw new Error("invalid memory settings");
 }
 function normalizeMemoryConfig(value) {
 	if (value === void 0) return { ...DEFAULT_MEMORY_CONFIG };
 	assertMemoryConfig(value);
 	return {
 		version: 1,
-		enabled: value.enabled
+		enabled: value.enabled,
+		...value.suggestAfterTurns === void 0 ? {} : { suggestAfterTurns: value.suggestAfterTurns }
 	};
 }
 //#endregion
@@ -198,16 +200,18 @@ function toPublicMemoryItem(item) {
 //#region src/core/rank.ts
 function tokens(value) {
 	const result = /* @__PURE__ */ new Set();
-	const matches = value.normalize("NFKC").toLowerCase().slice(0, 4e3).match(/[\p{Script=Han}]+|[\p{L}\p{N}_]+/gu) ?? [];
-	for (const token of matches) if (/^\p{Script=Han}+$/u.test(token)) for (let index = 0; index < token.length - 1; index++) result.add(token.slice(index, index + 2));
-	else if (token.length > 1) result.add(token);
+	const matches = value.normalize("NFKC").slice(0, 4e3).match(/[\p{Script=Han}]+|[\p{L}\p{N}_]+/gu) ?? [];
+	for (const token of matches) if (/^\p{Script=Han}+$/u.test(token)) {
+		const characters = [...token];
+		for (let index = 0; index < characters.length - 1; index++) {
+			result.add(characters.slice(index, index + 2).join(""));
+			if (index + 2 < characters.length) result.add(characters.slice(index, index + 3).join(""));
+		}
+	} else if (token.length > 1) {
+		result.add(token.toLowerCase());
+		for (const word of token.replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2").replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, "$1 $2").toLowerCase().split(/[_ ]/u)) if (word.length > 1) result.add(word);
+	}
 	return result;
-}
-function overlap(query, content) {
-	if (query.size === 0) return 0;
-	let count = 0;
-	for (const token of tokens(content)) if (query.has(token)) count += 1;
-	return count;
 }
 function memoryScopeMatches(item, query) {
 	if (item.principalId !== query.principalId) return false;
@@ -225,14 +229,42 @@ function scopeRank(item, query) {
 /** Rank only the current principal's live memories with deterministic tie breaks. */
 function rankMemories(items, query) {
 	const queryTokens = tokens(query.query ?? "");
-	const ranked = [];
+	const corpus = [];
 	for (const item of items) {
 		const rank = scopeRank(item, query);
 		if (rank === void 0) continue;
-		const contentOverlap = overlap(queryTokens, item.content);
-		const tagOverlap = overlap(queryTokens, item.tags.join(" "));
+		corpus.push({
+			item,
+			rank,
+			content: tokens(item.content),
+			tags: tokens(item.tags.join(" "))
+		});
+	}
+	const frequency = /* @__PURE__ */ new Map();
+	for (const { content, tags } of corpus) for (const term of queryTokens) if (content.has(term) || tags.has(term)) frequency.set(term, (frequency.get(term) ?? 0) + 1);
+	const averageLength = corpus.reduce((sum, row) => sum + row.content.size, 0) / corpus.length || 1;
+	const ranked = [];
+	for (const { item, rank, content, tags } of corpus) {
+		let contentOverlap = 0;
+		let tagOverlap = 0;
+		let score = 0;
+		for (const term of queryTokens) {
+			const contentMatch = Number(content.has(term));
+			const tagMatch = Number(tags.has(term));
+			contentOverlap += contentMatch;
+			tagOverlap += tagMatch;
+			const termWeight = contentMatch + 2 * tagMatch;
+			if (termWeight === 0) continue;
+			const df = frequency.get(term) ?? 0;
+			score += Math.log(1 + (corpus.length - df + .5) / (df + .5)) * (termWeight * 2.2) / (termWeight + 1.2 * (.25 + .75 * content.size / averageLength));
+		}
 		const itemOverlap = contentOverlap + tagOverlap * 2;
 		if ((query.query ?? "").trim() !== "" && itemOverlap === 0) continue;
+		const reasons = contentOverlap ? ["keyword"] : [];
+		if (tagOverlap) reasons.push("tags");
+		if (item.pinned) reasons.push("pinned");
+		const age = Math.max(0, query.now - item.updatedAt);
+		score *= 1 + .15 * Math.exp(-age / (30 * 864e5));
 		ranked.push({
 			item: {
 				...item,
@@ -240,13 +272,16 @@ function rankMemories(items, query) {
 			},
 			scopeRank: rank,
 			overlap: itemOverlap,
-			reason: contentOverlap && tagOverlap ? "content-and-tag" : tagOverlap ? "tag" : "content"
+			reason: contentOverlap && tagOverlap ? "content-and-tag" : tagOverlap ? "tag" : "content",
+			score,
+			reasons
 		});
 	}
 	ranked.sort((a, b) => {
 		if (a.overlap !== b.overlap) return b.overlap - a.overlap;
 		if (a.scopeRank !== b.scopeRank) return b.scopeRank - a.scopeRank;
 		if (a.item.pinned !== b.item.pinned) return a.item.pinned ? -1 : 1;
+		if (a.score !== b.score) return (b.score ?? 0) - (a.score ?? 0);
 		if (a.item.updatedAt !== b.item.updatedAt) return b.item.updatedAt - a.item.updatedAt;
 		return a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0;
 	});
@@ -494,6 +529,8 @@ var MemoryService = class {
 	userScope;
 	resolveWorkspaceForSession;
 	warningSink;
+	searchBridge;
+	indexGenerations = /* @__PURE__ */ new WeakMap();
 	cache = /* @__PURE__ */ new Map();
 	loading = /* @__PURE__ */ new Map();
 	loadedAt = /* @__PURE__ */ new Map();
@@ -507,6 +544,77 @@ var MemoryService = class {
 		this.userScope = options.userScope;
 		this.resolveWorkspaceForSession = options.resolveWorkspaceForSession;
 		this.warningSink = options.warningSink;
+		this.searchBridge = options.search;
+	}
+	indexGeneration(snapshot) {
+		const cached = this.indexGenerations.get(snapshot);
+		if (cached) return cached;
+		const docs = snapshot.items.map(({ id, scope, workspaceId, sessionId, content, tags, updatedAt, expiresAt, pinned }) => ({
+			id,
+			scope,
+			workspaceId,
+			sessionId,
+			title: "",
+			text: content,
+			tags,
+			updatedAt,
+			expiresAt,
+			pinned
+		}));
+		const generation = {
+			docs,
+			revision: createHash("sha256").update(JSON.stringify(docs)).digest("hex")
+		};
+		this.indexGenerations.set(snapshot, generation);
+		return generation;
+	}
+	async memoryIndexSource(scope) {
+		if (!this.authorizedContext({ scope })) throw new MemoryAccessError();
+		const snapshot = await this.loadPrincipal(scope.principalId);
+		if (!snapshot || !this.authorizedContext({ scope })) throw new MemoryAccessError();
+		return this.indexGeneration(snapshot);
+	}
+	primeIndex(context, snapshot) {
+		try {
+			const bridge = this.searchBridge?.();
+			if (!bridge || !this.authorizedContext(context)) return;
+			const generation = this.indexGeneration(snapshot);
+			bridge.syncMemory(context.scope, generation.revision, generation.docs).catch(() => {});
+		} catch {}
+	}
+	primeQuery(context, query) {
+		if (!query.trim() || !this.authorizedContext(context)) return;
+		try {
+			this.searchBridge?.()?.warmMemoryQuery(context.scope, query).catch(() => {});
+		} catch {}
+	}
+	rankSnapshot(snapshot, context, query) {
+		const ignored = this.ignored.get(this.activityKey(context));
+		const request = this.queryFor(context, query);
+		try {
+			const hits = (this.searchBridge?.())?.searchMemory(context.scope, this.indexGeneration(snapshot).revision, query, {
+				...request,
+				limit: 5,
+				exclude: ignored
+			});
+			if (hits !== void 0) return hits.flatMap((hit) => {
+				const item = snapshot.items.find((row) => row.id === hit.id && row.updatedAt === hit.updatedAt);
+				if (!item || ignored?.has(item.id) || !memoryScopeMatches(item, request) || isExpired(item, request.now) || !this.targetContext(context, item)) return [];
+				const tag = hit.reasons.includes("tags");
+				return [{
+					item: {
+						...item,
+						tags: [...item.tags]
+					},
+					scopeRank: item.scope === "session" ? 3 : item.scope === "workspace" ? 2 : 1,
+					overlap: 0,
+					reason: tag && hit.reasons.includes("keyword") ? "content-and-tag" : tag ? "tag" : "content",
+					score: hit.score,
+					reasons: hit.reasons
+				}];
+			});
+		} catch {}
+		return rankMemories(snapshot.items.filter((item) => !ignored?.has(item.id)), request);
 	}
 	desktopScope() {
 		try {
@@ -593,6 +701,7 @@ var MemoryService = class {
 	async preload(context) {
 		if (!this.authorizedContext(context)) return this.denied("access-denied");
 		const snapshot = await this.loadPrincipal(context.scope.principalId);
+		if (snapshot) this.primeIndex(context, snapshot);
 		return snapshot === void 0 ? this.denied("store-unavailable") : {
 			ok: true,
 			value: snapshot
@@ -614,6 +723,8 @@ var MemoryService = class {
 				id: match.item.id,
 				updatedAt: match.item.updatedAt,
 				reason: match.reason ?? "content",
+				score: match.score,
+				reasons: match.reasons,
 				truncated: length + separator > remaining || match.item.content.length + 2 > 2e3
 			});
 			remaining -= length + separator;
@@ -656,7 +767,9 @@ var MemoryService = class {
 			if (item && !isExpired(item, this.now()) && this.targetContext(context, item) && !this.ignored.get(key)?.has(item.id)) base.items.push({
 				item: toPublicMemoryItem(item),
 				reason: match.reason,
-				truncated: match.truncated
+				truncated: match.truncated,
+				score: match.score,
+				reasons: match.reasons
 			});
 		}
 		return base;
@@ -685,7 +798,7 @@ var MemoryService = class {
 			this.preload(context);
 			return;
 		}
-		return rankMemories(snapshot.items.filter((item) => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query));
+		return this.rankSnapshot(snapshot, context, query);
 	}
 	async list(context) {
 		if (!this.authorizedContext(context)) return this.denied("access-denied");
@@ -716,9 +829,12 @@ var MemoryService = class {
 		};
 		const snapshot = await this.loadPrincipal(context.scope.principalId);
 		if (snapshot === void 0) return this.denied("store-unavailable");
+		if (!this.authorizedContext(context)) return this.denied("access-denied");
+		this.primeIndex(context, snapshot);
+		this.primeQuery(context, query);
 		return {
 			ok: true,
-			value: rankMemories(snapshot.items.filter((item) => !this.ignored.get(this.activityKey(context))?.has(item.id)), this.queryFor(context, query))
+			value: this.rankSnapshot(snapshot, context, query)
 		};
 	}
 	async save(context, draft, source = "explicit") {
@@ -955,6 +1071,8 @@ var MemoryService = class {
 		this.generations.set(principalId, (this.generations.get(principalId) ?? 0) + 1);
 		this.cache.set(principalId, snapshot);
 		this.loadedAt.set(principalId, this.now());
+		const scope = this.currentScope();
+		if (scope?.principalId === principalId) this.primeIndex({ scope }, snapshot);
 	}
 	denied(code) {
 		this.report(code);
@@ -1003,6 +1121,20 @@ function extractCurrentUserQuery(session) {
 		if (text.length > 0) messages.push(text);
 	}
 	return messages.join("\n").slice(0, MAX_MEMORY_QUERY_LENGTH);
+}
+/** Propose one short, user-authored observation from the latest ended turn. */
+function proposeTurnMemory(snapshot, passive) {
+	if (snapshot.header.origin === "subagent") return void 0;
+	const end = snapshot.events.findLastIndex((event) => event.type === "turn/end");
+	if (end === -1) return void 0;
+	const text = extractCurrentUserQuery({
+		...snapshot,
+		events: snapshot.events.slice(0, end + 1)
+	});
+	if (!text) return void 0;
+	const lines = text.split(/[\r\n]+/u).map((line) => line.trim()).filter(Boolean);
+	const proposed = lines.find((line) => /(?:\b(?:prefer|remember|always use|default to)\b|记住|偏好|默认|以后(?:请|用)|始终)/iu.test(line)) ?? (passive ? void 0 : lines[0]);
+	return proposed ? [...proposed].slice(0, 320).join("") : void 0;
 }
 //#endregion
 //#region src/tools.ts
@@ -1486,6 +1618,21 @@ function makeMemoryRoutes(options) {
 			}
 			return;
 		}
+		if (pathname === "/api/dsh-memory/pending" && body.operation === "suggest-turn") {
+			try {
+				if (!context.sessionId || !options.suggestTurn) throw new MemoryAccessError("invalid-target");
+				writeJson(response, 200, {
+					ok: true,
+					suggested: await options.suggestTurn(context)
+				});
+			} catch (error) {
+				writeJson(response, 400, {
+					ok: false,
+					code: genericErrorCode(error)
+				});
+			}
+			return;
+		}
 		if (pathname.startsWith("/api/dsh-memory/pending/")) {
 			let id;
 			try {
@@ -1552,7 +1699,8 @@ const inject = [
 ];
 const Config = z.object({
 	version: z.number().step(1).default(1).volatile(),
-	enabled: z.boolean().default(false).volatile()
+	enabled: z.boolean().default(false).volatile(),
+	suggestAfterTurns: z.boolean().default(false).volatile()
 });
 function workspaceForSession(registry, sessionId) {
 	try {
@@ -1569,6 +1717,7 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	const source = () => normalizeMemoryConfig(Object.fromEntries(Object.entries(initialConfig).map(([key, field]) => [key, typeof field === "object" && field !== null && "get" in field && typeof field.get === "function" ? field.get() : field])));
 	let workspaceRegistry;
 	const userScope = ctx.userScope;
+	let searchBridge;
 	const sessionScopes = /* @__PURE__ */ new Map();
 	const sessionsById = /* @__PURE__ */ new Map();
 	const currentConfig = () => {
@@ -1580,10 +1729,19 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	};
 	const service = new MemoryService({
 		userScope,
+		search: () => searchBridge,
 		resolveWorkspaceForSession: (sessionId) => workspaceForSession(workspaceRegistry, sessionId),
 		warningSink: (warning) => {
 			console.warn("memory: operation unavailable", warning);
 		}
+	});
+	ctx.inject(["localSearch"], (child) => {
+		searchBridge = child.get("localSearch", false);
+		const stop = searchBridge?.registerMemorySource((scope) => service.memoryIndexSource(scope));
+		return () => {
+			stop?.();
+			searchBridge = void 0;
+		};
 	});
 	ctx.inject(["workspaceRegistry"], (workspaceCtx) => {
 		workspaceRegistry = workspaceCtx.workspaceRegistry;
@@ -1641,6 +1799,22 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 			}
 			entry.events = [...entry.events, event];
 			hydrate(entry);
+			if (event.type === "turn/end" && currentConfig().enabled && currentConfig().suggestAfterTurns) {
+				const memoryContext = service.contextFor(entry.scope, { sessionId: String(session.id) });
+				if (memoryContext !== void 0) {
+					const content = proposeTurnMemory({
+						header: session.header,
+						events: entry.events
+					}, true);
+					if (content) try {
+						service.suggest(memoryContext, {
+							scope: "session",
+							sessionId: String(session.id),
+							content
+						});
+					} catch {}
+				}
+			}
 		}
 	});
 	ctx.on("agent/created", async ({ agent }) => {
@@ -1656,7 +1830,16 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	});
 	ctx.on("system-prompt/assemble", async (assembly, context, next) => {
 		const entry = context.scope === void 0 ? void 0 : sessionScopes.get(context.scope);
-		if (entry !== void 0 && currentConfig().enabled && contextForSession(entry.session) !== void 0) await hydrate(entry);
+		if (entry !== void 0 && currentConfig().enabled) {
+			const memoryContext = contextForSession(entry.session);
+			if (memoryContext !== void 0) {
+				await hydrate(entry);
+				service.primeQuery(memoryContext, entry.pendingQuery ?? extractCurrentUserQuery({
+					header: entry.session.header,
+					events: entry.events
+				}));
+			}
+		}
 		const value = resolvedMemoryVariable(context.scope);
 		for (const section of assembly.sections) if (section.name === "dsh:memory") section.text = value === "" ? "" : MEMORY_PROMPT_SECTION_TEMPLATE;
 		assembly.variables.dsh_memory = value;
@@ -1683,7 +1866,22 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	ctx.inject(["webServer"], (webCtx) => {
 		const disposers = makeMemoryRoutes({
 			service,
-			enabled: () => currentConfig().enabled
+			enabled: () => currentConfig().enabled,
+			suggestTurn: async (context) => {
+				if (!context.sessionId) return false;
+				const snapshot = await ctx.sessionQuery.readSession(context.sessionId);
+				const content = proposeTurnMemory({
+					header: snapshot.session,
+					events: snapshot.events
+				}, false);
+				if (!content) return false;
+				service.suggest(context, {
+					scope: "session",
+					sessionId: context.sessionId,
+					content
+				});
+				return true;
+			}
 		}).map((route) => webCtx.webServer.register(route));
 		return () => {
 			for (const dispose of disposers) dispose();
@@ -1709,4 +1907,4 @@ function apply(ctx, initialConfig = { ...DEFAULT_MEMORY_CONFIG }) {
 	}
 }
 //#endregion
-export { Config, DEFAULT_MEMORY_CONFIG, MAX_MEMORY_CONTENT_LENGTH, MAX_MEMORY_ID_LENGTH, MAX_MEMORY_INJECTION_ITEMS, MAX_MEMORY_INJECTION_LENGTH, MAX_MEMORY_ITEMS, MAX_MEMORY_QUERY_LENGTH, MAX_MEMORY_TAGS, MAX_MEMORY_TAG_LENGTH, MAX_PENDING_MEMORY_SUGGESTIONS, MEMORY_API_PREFIX, MEMORY_PROMPT_SECTION_TEMPLATE, MEMORY_SCHEMA_VERSION, MEMORY_SENSITIVE_MESSAGE, MEMORY_SETTINGS_NAMESPACE, MemoryAccessError, MemoryNotFoundError, MemoryService, MemoryStore, MemoryStoreError, MemoryValidationError, apply, assertMemoryConfig, assertMemoryItem, assertMemorySnapshot, containsSensitiveMemoryContent, createMemoryItem, createMemoryTool, emptyMemorySnapshot, extractCurrentUserQuery, extractPendingUserQuery, inject, isMemoryScope, isMemorySource, isSafeMemoryId, makeMemoryRoutes, memoryScopeMatches, name, normalizeMemoryConfig, normalizeMemorySnapshot, rankMemories, renderMemoryItems, toPublicMemoryItem };
+export { Config, DEFAULT_MEMORY_CONFIG, MAX_MEMORY_CONTENT_LENGTH, MAX_MEMORY_ID_LENGTH, MAX_MEMORY_INJECTION_ITEMS, MAX_MEMORY_INJECTION_LENGTH, MAX_MEMORY_ITEMS, MAX_MEMORY_QUERY_LENGTH, MAX_MEMORY_TAGS, MAX_MEMORY_TAG_LENGTH, MAX_PENDING_MEMORY_SUGGESTIONS, MEMORY_API_PREFIX, MEMORY_PROMPT_SECTION_TEMPLATE, MEMORY_SCHEMA_VERSION, MEMORY_SENSITIVE_MESSAGE, MEMORY_SETTINGS_NAMESPACE, MemoryAccessError, MemoryNotFoundError, MemoryService, MemoryStore, MemoryStoreError, MemoryValidationError, apply, assertMemoryConfig, assertMemoryItem, assertMemorySnapshot, containsSensitiveMemoryContent, createMemoryItem, createMemoryTool, emptyMemorySnapshot, extractCurrentUserQuery, extractPendingUserQuery, inject, isMemoryScope, isMemorySource, isSafeMemoryId, makeMemoryRoutes, memoryScopeMatches, name, normalizeMemoryConfig, normalizeMemorySnapshot, proposeTurnMemory, rankMemories, renderMemoryItems, toPublicMemoryItem };

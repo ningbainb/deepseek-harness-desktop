@@ -10,7 +10,7 @@ import { _electron as electron } from 'playwright'
 
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { verifyLocalPanelControls, waitForNativeSidebarCollapsed } from './panel-layout-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -81,6 +81,7 @@ try {
     console.error(`startup surface:\n${(await startupPage.locator('body').innerText().catch(() => '')).slice(-2_000) || '(unavailable)'}`)
     throw error
   }
+  await dismissFirstRunModelChooserWhenShown(page)
   const rendererEvents = []
   if (process.argv.includes('--native-layout')) {
     await electronApp.evaluate(({ BrowserWindow }) => {

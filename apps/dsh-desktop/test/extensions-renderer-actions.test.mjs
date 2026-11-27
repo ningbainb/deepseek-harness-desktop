@@ -502,6 +502,12 @@ test('feature search hides every navigation and restores only the primary plus s
   await vm.runInContext("activateTab(document.getElementById('models-tab'))", context)
   vm.runInContext(section('const searchEntries =', "nativePluginGrid?.addEventListener('click'"), context)
   const search = document.querySelector('#dock-search')
+  for (const query of ['nbfast', 'fastops', 'fast-ops', 'Fast Ops']) {
+    search.value = query
+    search.dispatchEvent(new dom.window.Event('input'))
+    const results = [...document.querySelectorAll('#dock-search-results button')]
+    assert.ok(results.some(result => result.textContent.includes('nbfast')), `${query} must find nbfast`)
+  }
   search.value = '记忆'
   search.dispatchEvent(new dom.window.Event('input'))
   assert.equal([...document.querySelectorAll('.settings-sidebar > nav')].filter(nav => !nav.hidden).length, 0)

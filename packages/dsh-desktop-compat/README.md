@@ -60,6 +60,10 @@ The bundle has no user configuration. Queue-first sending remains the default, a
 
 The recovery targets the DSH rc.6 cancellation wake gap for ordinary next-turn messages. It should be removed when the official runtime fulfills the same documented contract.
 
+## Local ACP sessions
+
+The desktop compatibility layer connects to locally installed ACP v1 adapters over stdio. The built-in catalog covers Antigravity, Claude Code, Codex, and OpenCode. Quick discovery and interactive-only diagnostics check executable metadata. Other on-demand diagnostics include executable lookup and negotiation in the same three-second budget. Supported Windows package shims resolve to the direct executable entry. Session transcripts use separate redacted, bounded files for each local desktop principal. See the [ACP attribution](NOTICE.md) and the [workbench guide](../dsh-llm-antigravity/README.md).
+
 ## Development
 
 ```bash

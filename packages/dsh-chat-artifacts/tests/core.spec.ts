@@ -42,6 +42,27 @@ describe('artifact HTML boundary', () => {
     })).toThrow(String(ARTIFACT_MAX_BYTES))
   })
 
+  it('allows opt-in local interactions while keeping the static default', () => {
+    const html = '<form onsubmit="event.preventDefault()"><button>Save</button></form><script>document.querySelector("button").textContent = "Ready"</script>'
+    expect(validateArtifactHtml(html)).not.toEqual([])
+    expect(validateArtifactHtml(html, 'interactive')).toEqual([])
+  })
+
+  it.each([
+    '<form action="/checkout"></form>',
+    '<img srcset="/one.png 1x">',
+    '<img src="&#x68;ttps://example.com/a.png">',
+    '<img src=" ../asset.png">',
+    '<script>document.location = "https://example.com"</script>',
+    '<script>window.parent.document</script>',
+    '<script>new WebSocket("wss://example.com")</script>',
+    '<svg><set attributeName="href" to="javascript:alert(1)"/></svg>',
+  ])('rejects interactive fragment outside its local sandbox policy %s', html => {
+    expect(validateArtifactHtml('<p>Start</p>\n' + html, 'interactive')).toEqual(expect.arrayContaining([
+      expect.stringMatching(/html \(line 2\)/),
+    ]))
+  })
+
   it('normalizes defaults and rejects an out-of-range height', () => {
     expect(normalizeArtifactArgs({
       title: '  Roadmap  ',
@@ -86,5 +107,57 @@ describe('durable artifact metadata', () => {
     expect(isArtifactRecord({ ...record, description: {} })).toBe(false)
     expect(artifactSourceFromMeta({ html: '<script>x</script>' })).toBe('<script>x</script>')
     expect(artifactSourceFromMeta({ html: 'x'.repeat(ARTIFACT_MAX_BYTES + 1) })).toBeUndefined()
+  })
+
+  it('replays static shells containing old relative media while enforcing interactive URL limits', () => {
+    const html = '<p>Report</p><img src="./plot.png"><svg><image href="/plot.svg"/></svg>'
+    const legacy = { ...record, html, bytes: utf8ByteLength(html) }
+    expect(isArtifactRecord(legacy)).toBe(true)
+    expect(validateArtifactHtml(html, 'interactive')).not.toEqual([])
+    expect(isArtifactRecord({ ...legacy, mode: 'interactive' })).toBe(false)
+    expect(validateArtifactHtml('<img src="//example.com/plot.png">')).not.toEqual([])
+    expect(validateArtifactHtml('<a href="./report">Open</a>')).not.toEqual([])
+  })
+
+  it('honors interactive or versioned metadata and rejects invalid optional fields', () => {
+    const html = '<script>document.body.classList.add("ready")</script>'
+    const interactive = { ...record, html, bytes: utf8ByteLength(html), mode: 'interactive', version: 2 }
+    expect(isArtifactRecord(interactive)).toBe(true)
+    expect(isArtifactRecord({ ...interactive, mode: undefined })).toBe(false)
+    expect(isArtifactRecord({ ...interactive, mode: 'dynamic' })).toBe(false)
+    expect(isArtifactRecord({ ...interactive, version: 0 })).toBe(false)
+    expect(isArtifactRecord({ ...interactive, parentArtifactId: '../../other' })).toBe(false)
+  })
+})
+
+describe('artifact edits', () => {
+  it('applies exact replacements in order, including literal dollar sequences', async () => {
+    const { applyArtifactEdits } = await import('../src/core/patch.ts')
+    expect(applyArtifactEdits('<p>Start</p>', [
+      { oldString: 'Start', newString: 'Next' },
+      { oldString: 'Next', newString: 'Cost $&' },
+    ])).toBe('<p>Cost $&</p>')
+  })
+
+  it('rejects missing, ambiguous (including overlaps), and empty matches', async () => {
+    const { applyArtifactEdits } = await import('../src/core/patch.ts')
+    expect(() => applyArtifactEdits('aaa', [{ oldString: 'aa', newString: 'b' }])).toThrow(/edits\[0\].oldString.*unique/)
+    expect(() => applyArtifactEdits('aaa', [{ oldString: '', newString: 'b' }])).toThrow(/edits\[0\].oldString.*empty/)
+    expect(() => applyArtifactEdits('aaa', [{ oldString: 'b', newString: 'c' }])).toThrow(/edits\[0\].oldString.*not found/)
+  })
+})
+
+describe('streaming artifact markup', () => {
+  it('shows markup and complete styles while dropping scripts, handlers and partial tags', async () => {
+    const { sanitizeStreamingHtml } = await import('../src/core/streaming.ts')
+    expect(sanitizeStreamingHtml('<div><style>p{color:red}</style><script>alert(1)</script><p onclick="go()">Ready<img alt="partial')).toBe('<div><style>p{color:red}</style><p>Ready</p></div>')
+    expect(sanitizeStreamingHtml('<p>Ready</p><script>document.body.')).toBe('<p>Ready</p>')
+    expect(sanitizeStreamingHtml('<p>Ready</p><style>@import "https://example.com')).toBe('<p>Ready</p>')
+  })
+
+  it('drops active markup and URLs and guards the original byte cap', async () => {
+    const { sanitizeStreamingHtml } = await import('../src/core/streaming.ts')
+    expect(sanitizeStreamingHtml('<svg onload="x()"><path d="M0 0"/><animate to="x"/></svg><img src="&#x68;ttps://example.com/a"><iframe srcdoc="bad"></iframe>')).toBe('<svg><path d="M0 0"/></svg><img>')
+    expect(sanitizeStreamingHtml('é'.repeat(ARTIFACT_MAX_BYTES / 2 + 1))).toBeUndefined()
   })
 })

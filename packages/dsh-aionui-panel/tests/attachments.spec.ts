@@ -4,7 +4,12 @@ import { FileAttachmentQueue, attachmentReference } from '../src/client/drag/att
 function draft() {
   let text = 'keep my draft'
   const listeners = new Set<() => void>()
-  return { read: () => text, insert: (reference: string) => { text += '\n' + reference; for (const fn of listeners) fn(); return true }, remove: (reference: string) => { text = text.replace(reference, ''); for (const fn of listeners) fn() }, subscribe: (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn) } } }
+  return { read: () => text, insert: (reference: string) => { text += '\n' + reference; for (const fn of listeners) fn(); return true }, remove: (reference: string) => { text = text.replace(reference, ''); for (const fn of listeners) fn() }, replace: (from: string, to: string) => {
+    if (!text.includes(from)) return false
+    text = text.replace(from, () => to)
+    for (const fn of listeners) fn()
+    return true
+  }, subscribe: (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn) } } }
 }
 it('serializes mixed files, retains failed items and does not erase the draft', async () => {
   const telemetry = vi.fn()
@@ -73,4 +78,27 @@ it('detects references restored after mount and releases guards when the referen
   input.remove(reference)
   expect(queue.snapshot()).toHaveLength(0)
   queue.dispose()
+})
+
+it('includes a local excerpt only after explicit selection and restores path mode across remounts', async () => {
+  const input = draft()
+  const path = './.dsh-attachments/owner/file/report.docx'
+  const upload = vi.fn(async () => ({ path }))
+  const extract = vi.fn(async () => '预算\nScope total')
+  const queue = new FileAttachmentQueue(input, upload, undefined, extract)
+  queue.add([new File(['docx'], 'report.docx')])
+  await vi.waitFor(() => expect(queue.snapshot()[0]?.state).toBe('ready'))
+  expect(input.read()).toContain(path)
+  expect(extract).not.toHaveBeenCalled()
+  await queue.useSummary(queue.snapshot()[0]!.id)
+  expect(input.read()).toContain('> 预算\n> Scope total')
+  queue.dispose()
+
+  const remounted = new FileAttachmentQueue(input, upload, undefined, extract)
+  const entry = remounted.snapshot()[0]!
+  expect(entry.summaryState).toBe('ready')
+  remounted.useReference(entry.id)
+  expect(input.read()).toContain(path)
+  expect(input.read()).not.toContain('Scope total')
+  remounted.dispose()
 })

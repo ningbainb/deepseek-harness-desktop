@@ -60,6 +60,7 @@ import { installRelayAuthFailures } from './relay-auth-failures.ts'
 import { installRelayErrorFallback } from './relay-error-fallback.tsx'
 import { installFirstRunChooser } from './FirstRunChooser.tsx'
 import { installRemoteAccessHintEnhancer } from './remote-access-hint.ts'
+import { registerRemoteAccessPluginRows } from './remote-access-plugin-row.ts'
 import { installSettingsOnboardingPriority, supportsDesktopSettingsPriority } from './settings-onboarding-priority.tsx'
 import { ensureOfficeWorkSession, registerOfficeAppsIntegration } from './settings-sdk-adapter.ts'
 import { OfficeAppsComposerTrigger, OfficeStarterDock } from './work-mode/OfficeAppsComposerBar.tsx'
@@ -201,10 +202,10 @@ export function apply(ctx: ClientContext): void {
         }
         if (navigation?.openList) {
           navigation.openList()
-          return true
+          return false
         }
         void openDesktopSurface('extensions', { tab: 'plugins' })
-        return true
+        return false
       },
     }), 'web-ui-settings: remote access hint enhancer')
   }
@@ -256,6 +257,8 @@ export function apply(ctx: ClientContext): void {
     locale: 'web-ui-plugins',
     children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
   }, WebUIPluginsSection))
+
+  if (!dockSetting) ctx.slots.inject('plugins.row.config', () => registerRemoteAccessPluginRows(ctx.slots))
 
   if (dockSetting) {
     ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({

@@ -17,12 +17,13 @@ import {
 } from './core/config.ts'
 import {
   MemoryService,
+  type MemorySearchBridge,
   type MemoryRequestContext,
 } from './core/service.ts'
 import {
   MEMORY_PROMPT_SECTION_TEMPLATE,
 } from './core/rank.ts'
-import { extractCurrentUserQuery, extractPendingUserQuery } from './core/query.ts'
+import { extractCurrentUserQuery, extractPendingUserQuery, proposeTurnMemory } from './core/query.ts'
 import { MAX_MEMORY_QUERY_LENGTH } from './core/schema.ts'
 import { createMemoryTool } from './tools.ts'
 import { makeMemoryRoutes } from './routes.ts'
@@ -42,6 +43,7 @@ export { createMemoryTool } from './tools.ts'
 export const Config: z<MemoryConfig> = z.object({
   version: z.number().step(1).default(1).volatile(),
   enabled: z.boolean().default(false).volatile(),
+  suggestAfterTurns: z.boolean().default(false).volatile(),
 }) as unknown as z<MemoryConfig>
 
 interface WorkspaceViewLike {
@@ -84,6 +86,7 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
   ))
   let workspaceRegistry: WorkspaceRegistryLike | undefined
   const userScope = ctx.userScope as unknown as HostUserScope
+  let searchBridge: MemorySearchBridge | undefined
   const sessionScopes = new Map<ScopeKey, SessionEntry>()
   const sessionsById = new Map<string, SessionEntry>()
 
@@ -93,12 +96,19 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
 
   const service = new MemoryService({
     userScope,
+    search: () => searchBridge,
     resolveWorkspaceForSession: sessionId => workspaceForSession(workspaceRegistry, sessionId),
     warningSink: warning => {
       // Structured diagnostics contain no memory content, identifiers, paths or
       // matched credential text. A failed memory operation never fails a model call.
       console.warn('memory: operation unavailable', warning)
     },
+  })
+
+  ctx.inject(['localSearch'] as never, child => {
+    searchBridge = child.get('localSearch' as never, false) as MemorySearchBridge | undefined
+    const stop = searchBridge?.registerMemorySource(scope => service.memoryIndexSource(scope))
+    return () => { stop?.(); searchBridge = undefined }
   })
 
   ctx.inject(['workspaceRegistry'], workspaceCtx => {
@@ -157,6 +167,15 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
       }
       entry.events = [...entry.events, event]
       void hydrate(entry)
+      if (event.type === 'turn/end' && currentConfig().enabled && currentConfig().suggestAfterTurns) {
+        const memoryContext = service.contextFor(entry.scope, { sessionId: String(session.id) })
+        if (memoryContext !== undefined) {
+          const content = proposeTurnMemory({ header: session.header, events: entry.events }, true)
+          if (content) {
+            try { service.suggest(memoryContext, { scope: 'session', sessionId: String(session.id), content }) } catch { /* Pending suggestion admission failed. */ }
+          }
+        }
+      }
     }
   })
   ctx.on('agent/created', async ({ agent }) => {
@@ -176,7 +195,13 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
   })
   ctx.on('system-prompt/assemble', async (assembly, context, next) => {
     const entry = context.scope === undefined ? undefined : sessionScopes.get(context.scope)
-    if (entry !== undefined && currentConfig().enabled && contextForSession(entry.session) !== undefined) await hydrate(entry)
+    if (entry !== undefined && currentConfig().enabled) {
+      const memoryContext = contextForSession(entry.session)
+      if (memoryContext !== undefined) {
+        await hydrate(entry)
+        service.primeQuery(memoryContext, entry.pendingQuery ?? extractCurrentUserQuery({ header: entry.session.header, events: entry.events }))
+      }
+    }
     const value = resolvedMemoryVariable(context.scope)
     // Populate our mutable registry presentation before downstream editors
     // capture it. Their subsequent filtering/replacement remains authoritative.
@@ -214,6 +239,14 @@ export function apply(ctx: Context, initialConfig: MemoryConfig = { ...DEFAULT_M
     const routes = makeMemoryRoutes({
       service,
       enabled: () => currentConfig().enabled,
+      suggestTurn: async context => {
+        if (!context.sessionId) return false
+        const snapshot = await ctx.sessionQuery.readSession(context.sessionId as unknown as Session['id'])
+        const content = proposeTurnMemory({ header: snapshot.session, events: snapshot.events }, false)
+        if (!content) return false
+        service.suggest(context, { scope: 'session', sessionId: context.sessionId, content })
+        return true
+      },
     })
     const disposers = routes.map(route => webCtx.webServer.register(route))
     return () => { for (const dispose of disposers) dispose() }

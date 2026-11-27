@@ -50,6 +50,10 @@ export function apply(ctx: ClientContext): void {
     },
   })
   ctx.inject(['slots'], scope => {
+    const openSession = (sessionId: string): void => {
+      const workspace = ctx.get('uiWorkspace' as never, false) as { openSession(id: string): void } | undefined
+      workspace?.openSession(sessionId)
+    }
     scope.slots.inject('web-ui.plugin.item', () => scope.slots.register({
       name: 'web-ui.plugin.item',
       id: 'memory',
@@ -58,6 +62,7 @@ export function apply(ctx: ClientContext): void {
       inject: () => ({
         config: normalizeMemoryConfig(settingsScope.getSnapshot().value),
         settingsScope,
+        onOpenSession: ctx.get('uiWorkspace' as never, false) ? openSession : undefined,
       }),
     }, MemorySettingsCard))
     // Memory management and activity stay in settings, not the conversation header.

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
+import { dismissFirstRunModelChooserWhenShown } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { evaluateNativeSettings, openNativeSettings } from './native-settings-fixture.mjs'
 import { assertNativeSettingsContained as assertContained } from './native-settings-geometry-fixture.mjs'
@@ -75,6 +76,7 @@ try {
   })
   assert.equal(await electronApp.evaluate(({ app }) => app.isPackaged), Boolean(packagedExecutable))
   page = await electronApp.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(page)
   page.on('pageerror', (error) => console.error(`renderer error: ${error.message}`))
   if (traceCloseCalls) {
     debuggerSession = await page.context().newCDPSession(page)

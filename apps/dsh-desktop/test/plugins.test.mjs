@@ -141,6 +141,19 @@ test('plugin inventory distinguishes protected built-ins from community bundles'
   assert.equal(compatibilityDependency.managedByDesktop, true)
 })
 
+test('nbfast displays its product name and resolves under its existing package identity', async () => {
+  const packageName = '@ningbainb/dsh-fast-ops'
+  const manifest = JSON.parse(await readFile(new URL('../../../packages/dsh-fast-ops/package.json', import.meta.url), 'utf8'))
+  const inventory = createPluginInventory({ dependencies: { [packageName]: 'workspace:*' } }, {
+    hostCompatibility,
+    installedManifests: new Map([[packageName, manifest]]),
+  })
+  const plugin = inventory.find(item => item.name === packageName)
+  assert.equal(plugin?.displayName, 'nbfast')
+  assert.equal(plugin?.builtIn, true)
+  assert.equal(plugin?.enabled, true)
+})
+
 test('profile recovery candidates do not inspect broken third-party package manifests', async () => {
   const profileDir = await mkdtemp(join(tmpdir(), 'dsh-desktop-plugin-recovery-candidates-'))
   const packageName = '@community/opaque'

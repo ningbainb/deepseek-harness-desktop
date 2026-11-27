@@ -17,9 +17,11 @@ const NATIVE_FIELDS = Object.freeze(['module', 'capability', 'process', 'version
 const ROUTE_PACKAGE_PATHS = Object.freeze([
   'packages/dsh-aionui-panel/',
   'packages/dsh-agent-inbox/',
+  'packages/dsh-chat-artifacts/',
   'packages/dsh-desktop-compat/',
   'packages/dsh-git-graph/',
   'packages/dsh-live-stats/',
+  'packages/dsh-local-search/',
   'packages/dsh-memory/',
   'packages/dsh-pet/',
   'packages/dsh-remote-web-ui/',
@@ -32,7 +34,7 @@ const ROUTE_PACKAGE_PATHS = Object.freeze([
 const DATA_DOMAINS = Object.freeze([
   'sessions-and-attachments', 'workspaces', 'model-providers', 'api-and-oauth-credentials',
   'memory-and-personal-prompt', 'user-scope', 'plugin-config-and-source', 'skills-and-presets',
-  'tasks-runs-evidence', 'automation', 'ssh-qq-remote', 'window-theme-preferences',
+  'tasks-runs-evidence', 'automation', 'ssh-qq-remote', 'window-theme-preferences', 'local-search-index',
 ])
 
 function parse(path) {

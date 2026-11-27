@@ -10,21 +10,28 @@
  */
 
 import { createHash, randomUUID } from 'node:crypto'
+import { mountMcpApps } from './host/mcp-app-servers.ts'
+import { mountDiagramRuntime } from './host/diagram-runtime.ts'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView } from '@deepseek-ai/dsh-tools'
+import { artifactIndex, recentArtifactReferences } from './core/artifact-index.ts'
+import { applyArtifactEdits, type PatchArtifactArgs } from './core/patch.ts'
 import {
   ARTIFACT_DEFAULT_HEIGHT,
   ARTIFACT_KINDS,
-  ARTIFACT_MAX_BYTES,
-  ARTIFACT_MAX_HEIGHT,
-  ARTIFACT_MIN_HEIGHT,
+  ARTIFACT_MAX_DESCRIPTION_LENGTH,
+  ARTIFACT_MODES,
+  ArtifactValidationError,
+  isArtifactId,
   normalizeArtifactArgs,
   type ArtifactRecord,
   type RenderArtifactArgs,
 } from './core/types.ts'
-import { CHAT_ARTIFACTS_TOOL_NAME } from './invariant.ts'
+import { CHAT_ARTIFACTS_PATCH_TOOL_NAME, CHAT_ARTIFACTS_TOOL_NAME } from './invariant.ts'
+import { CHAT_ARTIFACTS_GUIDANCE, CHAT_ARTIFACTS_SECTION_ORDER } from './prompt.ts'
 
 export {
   ARTIFACT_DEFAULT_HEIGHT,
@@ -32,8 +39,10 @@ export {
   ARTIFACT_MAX_BYTES,
   ARTIFACT_MAX_HEIGHT,
   ARTIFACT_MIN_HEIGHT,
+  ARTIFACT_MODES,
   ArtifactValidationError,
   artifactSourceFromMeta,
+  isArtifactId,
   isArtifactRecord,
   normalizeArtifactArgs,
   utf8ByteLength,
@@ -41,45 +50,77 @@ export {
 } from './core/types.ts'
 export type {
   ArtifactKind,
+  ArtifactMode,
   ArtifactRecord,
   NormalizedArtifactArgs,
   RenderArtifactArgs,
 } from './core/types.ts'
-export { CHAT_ARTIFACTS_PLUGIN_ID, CHAT_ARTIFACTS_TOOL_NAME } from './invariant.ts'
+export { applyArtifactEdits } from './core/patch.ts'
+export type { ArtifactEdit, PatchArtifactArgs } from './core/patch.ts'
+export { sanitizeStreamingHtml } from './core/streaming.ts'
+export { CHAT_ARTIFACTS_PATCH_TOOL_NAME, CHAT_ARTIFACTS_PLUGIN_ID, CHAT_ARTIFACTS_TOOL_NAME } from './invariant.ts'
+export { CHAT_ARTIFACTS_GUIDANCE, CHAT_ARTIFACTS_SECTION_ORDER } from './prompt.ts'
 
 export const name = 'chat-artifacts'
-export const inject = ['tools', 'systemPrompt']
+export const inject = ['tools', 'systemPrompt', 'sessions', 'sessionProjections']
 
-/** Order inside the model tool-guidance band. */
-export const CHAT_ARTIFACTS_SECTION_ORDER = 230
+const recordSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    artifactId: { type: 'string', required: true },
+    title: { type: 'string', required: true },
+    kind: { type: 'string', required: true, enum: ARTIFACT_KINDS },
+    html: { type: 'string', required: true },
+    height: { type: 'integer', required: true },
+    description: { type: 'string' },
+    bytes: { type: 'integer', required: true },
+    sha256: { type: 'string', required: true },
+    mode: { type: 'string', enum: ARTIFACT_MODES },
+    version: { type: 'integer' },
+    parentArtifactId: { type: 'string' },
+  },
+} as const
 
-/**
- * Model-facing guidance. It intentionally describes when not to use the tool:
- * visual output should reduce cognitive load, not decorate every response.
- */
-export const CHAT_ARTIFACTS_GUIDANCE =
-  'You can use the render_artifact tool to place a safe visualization directly in the conversation. '
-  + 'Use it only when a diagram, flow, timeline, roadmap, comparison matrix, dashboard, table, wireframe, '
-  + 'or report materially improves understanding; do not use it for simple questions, short lists, or '
-  + 'ordinary code explanations. Keep the normal written answer and use one artifact for the visual part. '
-  + 'The tool accepts a self-contained HTML fragment with inline CSS and SVG. It does not run JavaScript: '
-  + 'never emit script elements, inline event handlers, fetch, WebSocket, external URLs or CDNs, Electron '
-  + 'or Node APIs, parent-window access, popups, forms, or automatic downloads. Use data: or blob: media '
-  + 'resources only. Make the layout responsive, keep height between 240 and 720 pixels (default 420), '
-  + 'and keep HTML at or below 512 KiB. Choose the narrowest useful kind from architecture, flow, timeline, '
-  + 'comparison, roadmap, dashboard, table, wireframe, report, and other.'
+function snapshot(args: RenderArtifactArgs, identity: Pick<ArtifactRecord, 'artifactId' | 'version' | 'parentArtifactId'>): ArtifactRecord {
+  const normalized = normalizeArtifactArgs(args)
+  return {
+    ...identity,
+    ...normalized,
+    bytes: Buffer.byteLength(normalized.html, 'utf8'),
+    sha256: createHash('sha256').update(normalized.html, 'utf8').digest('hex'),
+  }
+}
 
 /** Build the canonical value persisted in presentationMeta. */
 export function createArtifactRecord(args: RenderArtifactArgs): ArtifactRecord {
-  const normalized = normalizeArtifactArgs(args)
-  const bytes = Buffer.byteLength(normalized.html, 'utf8')
-  const sha256 = createHash('sha256').update(normalized.html, 'utf8').digest('hex')
-  return {
+  return snapshot(args, {
     artifactId: 'artifact_' + randomUUID().replaceAll('-', ''),
-    ...normalized,
-    bytes,
-    sha256,
+    version: 1,
+  })
+}
+
+function createPatchedRecord(current: ArtifactRecord, args: PatchArtifactArgs): ArtifactRecord {
+  if (args.summary !== undefined && Array.from(args.summary.trim()).length > ARTIFACT_MAX_DESCRIPTION_LENGTH) {
+    throw new ArtifactValidationError(['summary must be at most ' + ARTIFACT_MAX_DESCRIPTION_LENGTH + ' characters'])
   }
+  const version = (current.version ?? 1) + 1
+  if (!Number.isSafeInteger(version)) throw new ArtifactValidationError(['artifact version exceeds the supported range'])
+  return snapshot({
+    ...current,
+    title: args.title ?? current.title,
+    height: args.height ?? current.height,
+    html: applyArtifactEdits(current.html, args.edits),
+  }, {
+    artifactId: current.artifactId,
+    version,
+    ...(current.parentArtifactId === undefined ? {} : { parentArtifactId: current.parentArtifactId }),
+  })
+}
+
+function artifactResultText(value: ArtifactRecord): string {
+  return 'Artifact "' + value.title + '" is ready (' + value.artifactId + ', v' + (value.version ?? 1)
+    + ', ' + value.kind + ', ' + value.bytes + ' bytes).'
 }
 
 /** Pending row intent for the official generic fallback. */
@@ -95,11 +136,14 @@ export function renderArtifactCallView(args: Pick<RenderArtifactArgs, 'title' | 
   }
 }
 
-/** Register the model tool and the automatic-use guidance section. */
-export function apply(ctx: Context): void {
+/** Register the native tools and the automatic-use guidance section. */
+export async function apply(ctx: Context, config: { mcpAppServers?: unknown } = {}): Promise<void> {
+  mountMcpApps(ctx, config.mcpAppServers)
+  mountDiagramRuntime(ctx)
+  const index = await ctx.sessionProjections.register(artifactIndex)
   ctx.effect(() => ctx.tools.register(defineTool({
     name: CHAT_ARTIFACTS_TOOL_NAME,
-    description: 'Render a safe, self-contained HTML/CSS/SVG visualization inline in the conversation when it materially improves comprehension. The HTML is sandboxed with JavaScript and network access disabled.',
+    description: 'Render a self-contained inline diagram, dashboard, or interactive example. Use it proactively for project architecture and concept explanations when a visual would clarify relationships or steps. Choose interactive mode for isolated inline JavaScript.',
     parameters: {
       title: {
         type: 'string',
@@ -115,7 +159,13 @@ export function apply(ctx: Context): void {
       html: {
         type: 'string',
         required: true,
-        description: 'Self-contained HTML fragment with inline CSS and SVG; no JavaScript, external resources, or network calls.',
+        description: 'Self-contained HTML fragment with inline CSS and SVG. Interactive mode also permits inline JavaScript. External resources and network calls are prohibited.',
+      },
+      mode: {
+        type: 'string',
+        enum: ARTIFACT_MODES,
+        default: 'static',
+        description: 'Use static for purely visual artifacts. Use interactive when local controls require JavaScript.',
       },
       height: {
         type: 'integer',
@@ -128,23 +178,10 @@ export function apply(ctx: Context): void {
       },
     },
     output: {
-      schema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          artifactId: { type: 'string', required: true },
-          title: { type: 'string', required: true },
-          kind: { type: 'string', required: true, enum: ARTIFACT_KINDS },
-          html: { type: 'string', required: true },
-          height: { type: 'integer', required: true },
-          description: { type: 'string' },
-          bytes: { type: 'integer', required: true },
-          sha256: { type: 'string', required: true },
-        },
-      },
+      schema: recordSchema,
       render: (_args, value) => [{
         type: 'text',
-        text: 'Artifact "' + value.title + '" is ready (' + value.artifactId + ', ' + value.kind + ', ' + value.bytes + ' bytes).',
+        text: artifactResultText(value),
       }],
       presentationMeta: (_args, value) => value,
     },
@@ -161,9 +198,67 @@ export function apply(ctx: Context): void {
     }),
   })), 'dsh-chat-artifacts: tool')
 
+  ctx.effect(() => ctx.tools.register(defineTool({
+    name: CHAT_ARTIFACTS_PATCH_TOOL_NAME,
+    description: 'Update the latest version of an artifact in this conversation using uniquely matching literal replacements.',
+    parameters: {
+      artifactId: { type: 'string', required: true, description: 'Artifact identifier returned by a previous artifact tool result.' },
+      edits: {
+        type: 'array',
+        required: true,
+        description: 'Ordered replacements. Each oldString must match exactly once after preceding edits. Use an empty array to update only title or height.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            oldString: { type: 'string', required: true },
+            newString: { type: 'string', required: true },
+          },
+        },
+      },
+      title: { type: 'string', description: 'New display title when changing the title.' },
+      height: { type: 'integer', description: 'New preferred frame height in pixels, from 240 to 720.' },
+      summary: { type: 'string', description: 'Short description of the changes for the conversation.' },
+    },
+    output: {
+      schema: recordSchema,
+      render: (args, value) => [{
+        type: 'text',
+        text: [artifactResultText(value), args.summary?.trim()].filter(Boolean).join(' '),
+      }],
+      presentationMeta: (_args, value) => value,
+    },
+    async execute(args, exec) {
+      exec.signal.throwIfAborted()
+      if (!isArtifactId(args.artifactId)) throw new ArtifactValidationError(['artifactId is invalid'])
+      const session = exec.agent?.session
+      if (!session || ctx.sessions.get(session.id) !== session) {
+        throw new ArtifactValidationError(['patch_artifact requires the current session to be live'])
+      }
+      const state = index.stateOf(session)
+      const current = state.latest[args.artifactId]
+      if (!current) throw new ArtifactValidationError(['artifactId was not found in the current session'])
+      const pending = Object.values(state.calls).find(call => call.artifactId === args.artifactId)
+      if (pending?.callId !== exec.callId) {
+        throw new ArtifactValidationError(['patch_artifact requires a directly logged call and one update at a time for this artifact'])
+      }
+      const record = createPatchedRecord(current, args)
+      exec.signal.throwIfAborted()
+      return record
+    },
+    presentCall: args => ({ card: 'generic', title: 'Update artifact', kind: 'other', rawInput: { artifactId: args.artifactId, title: args.title } }),
+    presentResult: () => ({ card: 'generic', title: 'Update artifact' }),
+  })), 'dsh-chat-artifacts: patch tool')
+
   ctx.effect(() => ctx.systemPrompt.section({
     name: 'plugin:chat-artifacts',
     order: CHAT_ARTIFACTS_SECTION_ORDER,
     text: CHAT_ARTIFACTS_GUIDANCE,
   }), 'dsh-chat-artifacts: prompt section')
+  ctx.effect(() => ctx.systemPrompt.context({
+    name: 'plugin:chat-artifacts:recent',
+    order: CHAT_ARTIFACTS_SECTION_ORDER,
+    text: ({ session }) => session && ctx.sessions.get(session.id) === session
+      ? recentArtifactReferences(index.stateOf(session)) : '',
+  }), 'dsh-chat-artifacts: recent diagrams')
 }

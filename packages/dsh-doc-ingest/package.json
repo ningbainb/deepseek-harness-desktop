@@ -1,0 +1,79 @@
+{
+  "name": "@ningbainb/dsh-doc-ingest",
+  "description": "Read local office documents, PDFs, and approved public webpages as structured Markdown for DeepSeek Harness Desktop.",
+  "version": "0.1.0",
+  "author": "ningbainb",
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b && tsdown --config-loader native",
+    "typecheck": "tsc -b --force --pretty false",
+    "test": "vitest run",
+    "prepare": "tsdown --config-loader native"
+  },
+  "dependencies": {
+    "defuddle": "0.19.13",
+    "ipaddr.js": "2.5.0",
+    "linkedom": "0.18.15",
+    "yauzl": "3.4.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.2.0-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-user-approval": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-workspace": "0.2.3-alpha.2",
+    "@ningbainb/dsh-user-scope": "workspace:*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.2.0-alpha.1",
+    "@deepseek-ai/dsh-tools": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-user-approval": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-workspace": "0.2.3-alpha.2",
+    "@ningbainb/dsh-user-scope": "workspace:*",
+    "@types/node": "^22.20.0",
+    "@types/yauzl": "3.4.0",
+    "fflate": "0.8.3",
+    "officeparser": "8.4.1",
+    "pdfjs-dist": "6.2.108",
+    "unpdf": "2.2.3",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/**/*.js.map",
+    "lib/**/*.d.ts",
+    "lib/**/*.d.ts.map",
+    "lib/pdf-assets",
+    "src",
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "README.i18n.yaml",
+    "NOTICE.md"
+  ],
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ningbainb/deepseek-harness-desktop.git",
+    "directory": "packages/dsh-doc-ingest"
+  },
+  "engines": {
+    "node": "^22.19 || >=24"
+  }
+}

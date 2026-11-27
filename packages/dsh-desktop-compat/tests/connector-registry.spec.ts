@@ -145,6 +145,9 @@ describe('ConnectorRegistryService and Work Mode integration', () => {
     await vi.waitFor(() => expect(presetRegister).toHaveBeenCalledWith(expect.objectContaining({
       id: WORK_OFFICE_PRESET_ID,
       name: '工作模式',
+      plugins: expect.arrayContaining([
+        expect.objectContaining({ id: 'doc-ingest', name: '@ningbainb/dsh-doc-ingest', config: { tools: true } }),
+      ]),
     })))
 
     let registeredRoute: { path: string; handler: Function } | undefined

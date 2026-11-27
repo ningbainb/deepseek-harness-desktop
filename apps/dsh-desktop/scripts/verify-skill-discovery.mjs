@@ -11,7 +11,7 @@ import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permissio
 import { DEFAULT_STARTUP_TIMEOUT_MS } from '../src/runtime-controller.mjs'
 import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const packagedExecutable = process.env.DSH_DESKTOP_E2E_EXECUTABLE
@@ -61,6 +61,7 @@ try {
     console.error((await readFile(resolve(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')).slice(-8_000))
     throw error
   }
+  await dismissFirstRunModelChooserWhenShown(page)
 
   const inventory = await page.evaluate(() => window.dshDesktop.listSkills())
   const desktopSkill = inventory.skills.find((skill) => skill.name === skillName)
@@ -81,10 +82,7 @@ try {
     predicate: candidate => candidate.url().includes('extensions.html'),
     timeout: 10_000,
   }).catch(() => electronApp.windows().find(candidate => candidate.url().includes('extensions.html')))
-  // This fixture starts from a fresh profile and the unrelated first-run mask
-  // may still be present. Dispatch the same bubbling click so the Desktop
-  // capture router is exercised without coupling skill discovery to onboarding.
-  await entry.dispatchEvent('click')
+  await entry.click()
   let dock = await dockPromise
   for (let attempt = 0; !dock && attempt < 120; attempt += 1) {
     dock = electronApp.windows().find(candidate => candidate.url().includes('extensions.html'))

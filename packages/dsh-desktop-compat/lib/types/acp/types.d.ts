@@ -1,3 +1,4 @@
+import type { AcpTranscriptMessage } from './acp-transcript.ts';
 export declare const ACP_API_PREFIX = "/api/dsh-acp";
 export type AcpAuthMode = 'oauth-personal' | 'oauth-business' | 'gemini-api-key' | 'agent-platform' | 'custom';
 export type AcpInvocationSource = 'human-interactive' | 'scheduler' | 'subagent' | 'agent-team' | 'workflow-ptc' | 'background' | 'remote-bot' | 'auto-prompt';
@@ -10,6 +11,11 @@ export interface AcpAgentDefinition {
     authMode: AcpAuthMode;
     custom?: boolean;
     timeoutMs?: number;
+    compliancePolicy?: 'human-interactive';
+}
+export interface AcpPresetDefinition extends AcpAgentDefinition {
+    npmPackage?: string;
+    installCommand?: string;
 }
 export interface AcpNegotiatedCapabilities {
     protocolVersion: number;
@@ -33,6 +39,7 @@ export interface AcpModelOption {
 export interface AcpConfigOption {
     id: string;
     name?: string;
+    category?: string;
     currentValue?: string;
     options?: Array<{
         value: string;
@@ -47,6 +54,7 @@ export interface AcpSessionInfo {
     currentModelId?: string;
     availableModels: AcpModelOption[];
     configOptions: AcpConfigOption[];
+    transcript?: AcpTranscriptMessage[];
 }
 export interface AcpPermissionRequest {
     requestId: string | number;
@@ -84,12 +92,28 @@ export type AcpStreamEvent = {
         priority?: string;
     }>;
 } | {
+    type: 'config_option_update';
+    configOptions: AcpConfigOption[];
+} | {
+    type: 'usage_update';
+    used?: number;
+    size?: number;
+    cost?: {
+        amount: number;
+        currency: string;
+    };
+} | {
     type: 'tool_call';
     toolCallId: string;
     title?: string;
     kind?: string;
     status?: string;
     rawInput?: unknown;
+    diff?: {
+        path: string;
+        oldText?: string;
+        newText?: string;
+    };
 } | {
     type: 'tool_call_update';
     toolCallId: string;
@@ -117,6 +141,7 @@ export type AcpStreamEvent = {
 } | {
     type: 'error';
     message: string;
+    code?: string;
 };
 export interface AcpMcpServerParam {
     name: string;
@@ -135,7 +160,10 @@ export interface AcpMcpServerParam {
 }
 export interface AcpProbeResult {
     agentId: string;
-    state: 'ready' | 'not-installed' | 'not-authenticated' | 'error';
+    state: 'ready' | 'installed' | 'not-installed' | 'not-authenticated' | 'error';
+    authHint?: 'credentials-present';
+    availableModels?: AcpModelOption[];
+    configOptions?: AcpConfigOption[];
     capabilities?: AcpNegotiatedCapabilities;
     error?: string;
 }

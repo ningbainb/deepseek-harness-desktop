@@ -115,6 +115,7 @@ export * from './connectors/types.ts'
 
 export {
   ANTIGRAVITY_ACP_AGENT,
+  BUILTIN_ACP_PRESETS,
   AcpAgentManager,
   AcpComplianceError,
   assertAcpUsageAllowed,

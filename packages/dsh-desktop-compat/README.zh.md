@@ -54,6 +54,10 @@ DeepSeek Harness Desktop 2.0 会在隔离的 desktop profile 中自动挂载这�
 
 恢复逻辑只处理 DSH rc.6 在取消后没有唤醒普通 next-turn 消息的问题。官方运行时实现相同的文档契约后，应移除这个兼容包。
 
+## 本机 ACP 会话
+
+桌面兼容层通过 stdio 连接本机已安装的 ACP v1 适配器。内置目录涵盖 Antigravity、Claude Code、Codex 和 OpenCode。快速探测和仅限人工交互的诊断检查可执行文件元数据。其他按需诊断把查找可执行文件和协商计入同一三秒预算。Windows 对受支持包的命令封装直接解析可执行入口。每个桌面主体的轮次摘要使用独立文件，并限制大小和脱敏。参见 [ACP 致谢](NOTICE.md) 和 [工作台指南](../dsh-llm-antigravity/README.zh.md)。
+
 ## 开发
 
 ```bash

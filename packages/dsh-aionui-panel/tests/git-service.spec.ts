@@ -300,6 +300,7 @@ describe('subprocessRunner spawn degradation', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
   })
 
   it('degrades to a failed run when spawn throws synchronously', async () => {
@@ -338,6 +339,28 @@ describe('subprocessRunner spawn degradation', () => {
     expect(ctx.subprocess.spawn).toHaveBeenCalledWith(
       expect.objectContaining({ argv: ['git', 'status'], cwd: '/w' }),
     )
+  })
+
+  it('keeps scoped Git commands independent of inherited repository and indexed config overrides', async () => {
+    const overrides = {
+      GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.autocrlf', GIT_CONFIG_VALUE_0: 'false', GIT_CONFIG_PARAMETERS: "'core.autocrlf=false'",
+      GIT_DIR: '/elsewhere/git', GIT_WORK_TREE: '/elsewhere/tree', GIT_INDEX_FILE: '/elsewhere/index',
+      GIT_COMMON_DIR: '/elsewhere/common', GIT_OBJECT_DIRECTORY: '/elsewhere/objects',
+      GIT_ALTERNATE_OBJECT_DIRECTORIES: '/elsewhere/more-objects',
+    }
+    for (const [name, value] of Object.entries(overrides)) vi.stubEnv(name, value)
+    vi.stubEnv('GIT_OPTIONAL_LOCKS', '0')
+    const spawn = vi.fn((_spec: { env?: NodeJS.ProcessEnv }) => ({ done: Promise.resolve({ exitCode: 0 }), collected }))
+
+    await subprocessRunner({ subprocess: { spawn } } as never).run(['rev-parse', '--show-toplevel'], ROOT)
+
+    const environment = spawn.mock.calls[0]?.[0].env ?? {}
+    for (const name of Object.keys(overrides)) {
+      expect(Object.hasOwn(environment, name)).toBe(true)
+      expect(environment[name]).toBeUndefined()
+      expect(process.env[name]).toBeDefined()
+    }
+    expect(Object.hasOwn(environment, 'GIT_OPTIONAL_LOCKS')).toBe(false)
   })
 
   it('degrades to a failed run when the done promise rejects', async () => {

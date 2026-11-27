@@ -1,15 +1,20 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
+import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import { BriefcaseIcon } from './ConnectorIcon.tsx'
 import { OfficeAppsModal } from './OfficeAppsModal.tsx'
 import type { WorkModeLocaleKey } from './locales.ts'
 import { officeAppsStore } from './office-apps-store.ts'
 import css from './work-mode.module.css'
 
+type StarterSession = Pick<SessionSnapshot, 'blank' | 'running' | 'awaitingFirstTurn'>
+const useNoSession = () => undefined
+
 export interface OfficeAppsComposerTriggerProps {
   t: (key: WorkModeLocaleKey) => string
   locale: 'zh' | 'en'
   isBlankSession?: boolean
+  useSession?: (select: (session: StarterSession) => boolean) => boolean | undefined
   onOpenExtensions: () => void
   onOpenExternalUrl: (url: string) => void
   onRunPrompt: (prompt?: string) => void
@@ -19,25 +24,29 @@ export function OfficeAppsComposerTrigger({
   t,
   locale,
   isBlankSession = true,
+  useSession = useNoSession,
   onOpenExtensions,
   onOpenExternalUrl,
   onRunPrompt,
 }: OfficeAppsComposerTriggerProps) {
   const store = useSyncExternalStore(officeAppsStore.subscribe, officeAppsStore.getSnapshot, officeAppsStore.getSnapshot)
+  const inOffice = store.experienceMode === 'office'
+  const showStarters = useSession(session => session.blank && !session.running && !session.awaitingFirstTurn) ?? isBlankSession
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [dockTarget, setDockTarget] = useState<Element | null>(null)
 
   useEffect(() => {
-    officeAppsStore.ensureLoaded()
-  }, [])
+    if (inOffice) officeAppsStore.ensureLoaded()
+  }, [inOffice])
 
   useLayoutEffect(() => {
     const btn = triggerRef.current
-    if (!btn) return
-    const root = btn.closest('[data-composer-card]')?.parentElement
+    const root = btn?.closest('[data-composer-card]')?.parentElement
     const dock = root?.querySelector(':scope > [data-composer-dock]') ?? root?.querySelector('[data-composer-dock]') ?? null
     if (dock !== dockTarget) setDockTarget(dock)
   })
+
+  if (!inOffice) return null
 
   const connected = (store.snapshot?.items ?? []).filter(i => i.config.enabled && i.status === 'connected')
   const firstName = connected[0]?.entry.name[locale]
@@ -54,7 +63,7 @@ export function OfficeAppsComposerTrigger({
     <OfficeStarterDock
       t={t}
       locale={locale}
-      isBlankSession={isBlankSession}
+      isBlankSession={showStarters}
       onRunPrompt={onRunPrompt}
     />
   )

@@ -5,6 +5,9 @@ copyright: Copyright (c) 2026 ningbai牛逼 and DeepSeek Harness Desktop contrib
 asar: true
 asarUnpack:
   - node_modules/**
+  - '**/node_modules/@ast-grep/napi-*/**/*.node'
+  - '**/node_modules/@ast-grep/lang-*/prebuilds/**/*'
+  - '**/node_modules/sqlite-vec*/**/*.{dll,so,dylib}'
   - src/**
   - package.json
   - runtime-support/browser-component.json

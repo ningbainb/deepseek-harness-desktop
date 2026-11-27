@@ -19,9 +19,7 @@
     "src/index.ts",
     "src/invariant.ts",
     "src/core/**/*.ts",
+    "src/client/css-modules.d.ts",
     "tests/**/*.ts"
-  ],
-  "exclude": [
-    "src/client"
   ]
 }

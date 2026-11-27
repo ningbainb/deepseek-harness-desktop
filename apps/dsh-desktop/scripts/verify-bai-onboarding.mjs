@@ -67,6 +67,11 @@ try {
   evidence.firstRun = true
   assert.deepEqual(await application.evaluate(() => globalThis.baiBrowserLinks), [], 'passive startup does not open the browser')
   await dismissRuntimeOnboarding(page)
+  const firstRunChooser = page.locator('[data-dsh-first-run-chooser]')
+  await firstRunChooser.waitFor({ state: 'visible', timeout: 30_000 })
+  await firstRunChooser.getByRole('button', { name: /^(?:稍后再说|Maybe later)$/u }).click()
+  await firstRunChooser.waitFor({ state: 'hidden' })
+  assert.deepEqual(await application.evaluate(() => globalThis.baiBrowserLinks), [], 'deferring model setup does not open the browser')
   const entry = page.locator('button[data-dsh-relay-model-entry]').first()
   await entry.waitFor({ state: 'visible', timeout: 30_000 })
   await entry.filter({ hasText: /聚合中转（登录解锁模型）|Relay \(sign in to unlock\)|bai（登录后获取模型）|bai \(models after sign-in\)/u }).waitFor({ state: 'visible', timeout: 60_000 })

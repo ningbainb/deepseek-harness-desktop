@@ -21,6 +21,7 @@
     "types": []
   },
   "include": [
+    "src/invariant.ts",
     "src/client/**/*.ts",
     "src/client/**/*.tsx",
     "src/core/**/*.ts"

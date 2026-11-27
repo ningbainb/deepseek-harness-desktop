@@ -233,6 +233,17 @@ export function makeMemoryRoutes(options) {
             }
             return;
         }
+        if (pathname === MEMORY_PENDING_PATH && body.operation === 'suggest-turn') {
+            try {
+                if (!context.sessionId || !options.suggestTurn)
+                    throw new MemoryAccessError('invalid-target');
+                writeJson(response, 200, { ok: true, suggested: await options.suggestTurn(context) });
+            }
+            catch (error) {
+                writeJson(response, 400, { ok: false, code: genericErrorCode(error) });
+            }
+            return;
+        }
         const pendingPrefix = MEMORY_PENDING_PATH + '/';
         if (pathname.startsWith(pendingPrefix)) {
             let id;

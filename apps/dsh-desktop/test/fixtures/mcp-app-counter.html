@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>MCP counter and table</title>
+<main>
+  <h2>MCP counter and table</h2>
+  <p id="status" role="status" data-fixture-handshake="waiting-for-script">Connecting</p>
+  <p>Host theme <output id="theme"></output></p>
+  <p>Counter <output id="count"></output></p>
+  <button id="refresh" type="button" disabled>Refresh counter</button>
+  <button id="filter" type="button" disabled>Filter blue rows</button>
+  <table aria-label="Fixture table">
+    <thead><tr><th scope="col">Item</th><th scope="col">Category</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <button id="save" type="button" disabled>Save fixture note</button>
+  <p id="save-result" role="status"></p>
+</main>
+<script>
+{
+  const controls = ['refresh', 'filter', 'save'].map(id => document.getElementById(id))
+  const status = document.getElementById('status')
+  const theme = document.getElementById('theme')
+  const count = document.getElementById('count')
+  const saveResult = document.getElementById('save-result')
+  const rows = document.getElementById('rows')
+  const waiting = new Map()
+  let requestId = 0
+
+  function send(message) {
+    parent.postMessage({ jsonrpc: '2.0', ...message }, '*')
+  }
+
+  function request(method, params) {
+    const id = ++requestId
+    const reply = Promise.withResolvers()
+    waiting.set(id, reply)
+    send({ id, method, params })
+    return reply.promise
+  }
+
+  function applyData(data) {
+    if (Number.isInteger(data?.count)) count.textContent = String(data.count)
+    if (Array.isArray(data?.rows)) {
+      rows.replaceChildren(...data.rows.map(item => {
+        const row = document.createElement('tr')
+        for (const value of [item.item, item.category]) {
+          const cell = document.createElement('td')
+          cell.textContent = value
+          row.append(cell)
+        }
+        return row
+      }))
+    }
+  }
+
+  window.addEventListener('message', event => {
+    const message = event.data
+    if (event.source !== parent || message?.jsonrpc !== '2.0') return
+    if (message.method === 'ui/notifications/host-context-changed') {
+      if (message.params?.theme) theme.textContent = message.params.theme
+      return
+    }
+    if (message.method === 'ui/notifications/tool-result') {
+      applyData(message.params?.structuredContent)
+      if (count.textContent && rows.childElementCount) {
+        status.textContent = 'Connected'
+        status.dataset.fixtureHandshake = 'tool-result'
+        for (const control of controls) control.disabled = false
+      }
+      return
+    }
+    if (message.method === 'ui/resource-teardown' && message.id != null) {
+      send({ id: message.id, result: {} })
+      return
+    }
+    const reply = waiting.get(message.id)
+    if (!reply) return
+    waiting.delete(message.id)
+    if (message.error) reply.reject(message.error)
+    else reply.resolve(message.result)
+  })
+
+  async function refresh(name, args) {
+    try {
+      const result = await request('tools/call', { name, arguments: args })
+      applyData(result.structuredContent)
+    } catch (error) {
+      status.textContent = `MCP error ${error.code}`
+    }
+  }
+
+  controls[0].addEventListener('click', () => void refresh('read_counter', {}))
+  controls[1].addEventListener('click', () => void refresh('filter_table', { category: 'blue' }))
+  controls[2].addEventListener('click', async () => {
+    saveResult.textContent = 'Waiting for approval'
+    try {
+      await request('tools/call', { name: 'save_note', arguments: { note: 'Synthetic fixture note' } })
+      saveResult.textContent = 'Saved'
+    } catch (error) {
+      saveResult.textContent = `Write denied (${error.code})`
+    }
+  })
+
+  status.dataset.fixtureHandshake = 'initialize-sent'
+  request('ui/initialize', {
+    protocolVersion: '2026-01-26',
+    appInfo: { name: 'Fixture counter and table', version: '1.0.0' },
+    appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
+  }).then(result => {
+    if (result.protocolVersion !== '2026-01-26') throw new Error('Unexpected MCP Apps protocol version')
+    status.dataset.fixtureHandshake = 'initialize-accepted'
+    theme.textContent = result.hostContext?.theme ?? ''
+    send({ method: 'ui/notifications/initialized', params: {} })
+    send({ method: 'ui/notifications/size-changed', params: { width: 420, height: 290 } })
+  }).catch(error => { status.textContent = `Initialization failed (${error.code ?? 'protocol'})` })
+}
+</script>
+</html>

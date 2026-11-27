@@ -127,6 +127,10 @@ const CORE_SUITES = [
     args: [],
   },
   ...(process.platform === 'win32' ? [{
+    name: 'Gemini Native Conversation, Office Statistics, nbfast and Remote Settings',
+    script: 'scripts/verify-gemini-remote-settings.mjs',
+    args: [],
+  }, {
     name: 'Browser Control One-shot Approval under Full Filesystem Permission',
     script: 'scripts/verify-control-approval.mjs',
     args: [],
@@ -239,6 +243,24 @@ const CORE_SUITES = [
     script: 'scripts/verify-preset-export.mjs',
     args: [],
   },
+  {
+    name: 'Chat Artifact Streaming, Sandboxing, Versions and Replay',
+    script: 'scripts/verify-chat-artifacts.mjs',
+    args: [],
+  },
+  ...(SOURCE_ONLY ? [{
+    name: 'MCP Apps Standard Bridge, Theme and Write Approval',
+    script: 'scripts/verify-mcp-apps.mjs',
+    args: [],
+  }, {
+    name: 'Local Conversation Search and Workspace Scope',
+    script: 'scripts/verify-local-search.mjs',
+    args: [],
+  }, {
+    name: 'Workspace Checkpoints, Native Restore and Undo',
+    script: 'scripts/verify-workspace-checkpoints.mjs',
+    args: [],
+  }] : []),
   {
     name: 'Direct-Start Matrix & Repair Unit Integration',
     script: '--test',

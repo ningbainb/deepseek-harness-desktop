@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AntigravityAcpStore } from '../src/client/acpStore.ts'
 import { apply } from '../src/client/SettingsCard.tsx'
 
+vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({ MarkdownText: () => null, UserMessageBubble: () => null }))
+
 describe('Antigravity interactive ACP store and plugin registration', () => {
   const originalFetch = globalThis.fetch
 
@@ -11,6 +13,54 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch
+  })
+
+  it('starts a distinct ACP conversation when the native chat changes in the same workspace', async () => {
+    const store = new AntigravityAcpStore()
+    const requests: Array<{ url: string; sessionId?: string }> = []
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body))
+      requests.push({ url, sessionId: body.dshSessionId ?? body.sessionId })
+      if (url.endsWith('/start')) return Response.json({ session: {
+        sessionId: body.dshSessionId, acpSessionId: body.dshSessionId, cwd: body.cwd, currentModelId: body.modelId,
+      } })
+      if (url.endsWith('/prompt')) return new Response('data: {"type":"message_delta","text":"First chat"}\n\n')
+      return Response.json({})
+    }) as typeof fetch
+
+    await store.openWithModel('gemini-test', 'D:\\work', 'chat-one')
+    await store.sendPrompt('First chat')
+    const previousId = store.getSnapshot().dshSessionId
+    await store.openWithModel('gemini-test', 'D:\\work', 'chat-two')
+
+    expect(store.getSnapshot()).toMatchObject({ conversationId: 'chat-two', messages: [] })
+    expect(store.getSnapshot().dshSessionId).not.toBe(previousId)
+    expect(requests.find(request => request.url.endsWith('/close'))?.sessionId).toBe(previousId)
+  })
+
+  it('reopens the same Gemini conversation during connection and generation', async () => {
+    const store = new AntigravityAcpStore()
+    const start = Promise.withResolvers<Response>()
+    const prompt = Promise.withResolvers<Response>()
+    const fetchMock = vi.fn((url: string) => url.endsWith('/start') ? start.promise : prompt.promise)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const cwd = 'D:\\work'
+    const connecting = store.openWithModel('gemini-test', cwd)
+    const sessionId = store.getSnapshot().dshSessionId
+    store.closeToNormalChat()
+    await store.openWithModel('gemini-test', cwd)
+    expect(store.getSnapshot()).toMatchObject({ active: true, starting: true, dshSessionId: sessionId })
+    start.resolve(Response.json({ session: { sessionId, acpSessionId: 'acp-mock', cwd, currentModelId: 'gemini-test' } }))
+    await connecting
+
+    const generating = store.sendPrompt('Keep the pending turn')
+    store.closeToNormalChat()
+    await store.openWithModel('gemini-test', cwd)
+    expect(store.getSnapshot()).toMatchObject({ active: true, busy: true, dshSessionId: sessionId })
+    prompt.resolve(new Response('data: {"type":"message_delta","text":"Still here"}\n\n'))
+    await generating
+    expect(store.getSnapshot().messages[1]).toMatchObject({ text: 'Still here', streaming: false })
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/dsh-acp/session/start', '/api/dsh-acp/session/prompt'])
   })
 
   it('refreshes diagnostic, opens session, switches model, streams split SSE chunks, and resolves permissions', async () => {
@@ -87,20 +137,18 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
 
     await store.openWithModel('gemini-3.8-flash-low', 'D:\\work')
     expect(store.getSnapshot().active).toBe(true)
-    expect(store.getSnapshot().viewMode).toBe('inset')
     expect(store.getSnapshot().acpSessionId).toBe('acp-live-1')
     expect(store.getSnapshot().selectedModelId).toBe('gemini-3.8-flash-low')
 
-    store.setViewMode('pip')
-    expect(store.getSnapshot().viewMode).toBe('pip')
-    store.setViewMode('minimized')
-    expect(store.getSnapshot().viewMode).toBe('minimized')
+    store.closeToNormalChat()
+    expect(store.getSnapshot().active).toBe(false)
     await store.openWithModel('gemini-4-neon-high', 'D:\\work')
-    expect(store.getSnapshot().viewMode).toBe('inset')
-
-    await store.switchModel('gemini-4-neon-high')
-    expect(store.getSnapshot().selectedModelId).toBe('gemini-4-neon-high')
+    expect(store.getSnapshot().active).toBe(true)
     expect(calls.some(c => c.url === '/api/dsh-acp/session/model' && c.body?.modelId === 'gemini-4-neon-high')).toBe(true)
+
+    await store.switchModel('gemini-3.8-flash-low')
+    expect(store.getSnapshot().selectedModelId).toBe('gemini-3.8-flash-low')
+    expect(calls.some(c => c.url === '/api/dsh-acp/session/model' && c.body?.modelId === 'gemini-3.8-flash-low')).toBe(true)
 
     await store.sendPrompt('hi gemini')
     const msgs = store.getSnapshot().messages
@@ -124,7 +172,7 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
     expect(calls.some(c => c.url === '/api/dsh-acp/session/close')).toBe(true)
   })
 
-  it('registers settings card, composer Gemini trigger, and ACP frame HOC into DSH slots', () => {
+  it('registers settings and the inline Gemini view in DSH slots', () => {
     const effects: Array<() => void> = []
     const injectedSlots: string[] = []
     const registeredSlots: string[] = []
@@ -138,7 +186,36 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
       },
     }
     apply(fakeCtx as never)
-    expect(injectedSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame'])
-    expect(registeredSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame'])
+    expect(injectedSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame', 'conversation.input.right'])
+    expect(registeredSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame', 'conversation.input.right'])
+  })
+
+  it('requests separate Desktop interaction proofs for the exact start and prompt body', async () => {
+    const store = new AntigravityAcpStore(false)
+    const createAcpInteractionProof = vi.fn(async (operation: string, _raw: string) => 'proof-' + operation)
+    vi.stubGlobal('dshDesktop', { createAcpInteractionProof })
+    const requested: Array<{ url: string; body: string; proof: string | null }> = []
+    globalThis.fetch = (async (url: string, init?: RequestInit) => {
+      const body = String(init?.body)
+      requested.push({ url, body, proof: new Headers(init?.headers).get('x-dsh-acp-interaction') })
+      if (url.endsWith('/start')) return Response.json({ session: {
+        sessionId: JSON.parse(body).dshSessionId, acpSessionId: 'acp-mock',
+        cwd: JSON.parse(body).cwd, currentModelId: 'gemini-test',
+      } })
+      return new Response('data: {"type":"turn_finished","stopReason":"end_turn"}\n\n')
+    }) as typeof fetch
+    try {
+      await store.openWithModel('gemini-test', 'D:\\work')
+      await store.sendPrompt('你好')
+      expect(createAcpInteractionProof.mock.calls).toEqual([
+        ['start', requested[0].body], ['prompt', requested[1].body],
+      ])
+      expect(requested.map(({ url, proof }) => [url, proof])).toEqual([
+        ['/api/dsh-acp/session/start', 'proof-start'],
+        ['/api/dsh-acp/session/prompt', 'proof-prompt'],
+      ])
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

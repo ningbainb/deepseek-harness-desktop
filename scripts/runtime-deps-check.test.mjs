@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { checkRuntimeImports } from './runtime-deps-check.mjs'
+import { checkFastOpsNativePackaging, checkLocalSearchNativePackaging, checkRuntimeImports } from './runtime-deps-check.mjs'
 
 test('flags a runtime import of a devDependencies-only package (issue #70)', () => {
   const violations = checkRuntimeImports(
@@ -50,4 +50,18 @@ test('flags dynamic import() of a devDependencies-only package', () => {
   )
   assert.equal(violations.length, 1)
   assert.equal(violations[0].specifier, 'some-optional-runtime-dep')
+})
+
+test('accepts the optional native dependency while requiring its ASAR and prebuild contracts', () => {
+  const optional = { optionalDependencies: { '@ast-grep/napi': '0.51.3', '@ast-grep/lang-python': '0.0.6' } }
+  assert.deepEqual(checkRuntimeImports(optional, { 'lib/index.js': "await import('@ast-grep/napi')" }), [])
+  const unpack = ['**/node_modules/@ast-grep/napi-*/**/*.node', '**/node_modules/@ast-grep/lang-*/prebuilds/**/*']
+  assert.deepEqual(checkFastOpsNativePackaging(optional, unpack, { '@ast-grep/lang-python': false }), [])
+  assert.equal(checkFastOpsNativePackaging(optional, [], { '@ast-grep/lang-python': true }).length, 2)
+})
+
+test('requires optional sqlite-vec and its platform ASAR rule', () => {
+  const unpack = ['**/node_modules/sqlite-vec*/**/*.{dll,so,dylib}']
+  assert.deepEqual(checkLocalSearchNativePackaging({ optionalDependencies: { 'sqlite-vec': '0.1.9' } }, unpack), [])
+  assert.equal(checkLocalSearchNativePackaging({ dependencies: { 'sqlite-vec': '0.1.9' } }, []).length, 2)
 })

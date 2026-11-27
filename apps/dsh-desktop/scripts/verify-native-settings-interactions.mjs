@@ -7,7 +7,7 @@ import { _electron as electron } from 'playwright'
 import { parse } from 'yaml'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { installSidebarLedgerDiagnostic, captureSidebarLedgerDiagnostic } from './sidebar-ledger-diagnostic-fixture.mjs'
 
 const appDir = resolve(import.meta.dirname, '..')
@@ -49,6 +49,7 @@ try {
   if (sidebarDiagnostic) console.log('sidebar diagnostic Electron root', app.process().pid)
   await useChineseFixtureLocale(app)
   page = await app.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(page)
   if (sidebarDiagnostic) page.on('console', message => {
     if (['error', 'warning'].includes(message.type())) consoleEvents.push({ type: message.type(), text: message.text().slice(0, 8000) })
   })

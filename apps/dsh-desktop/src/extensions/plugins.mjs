@@ -209,6 +209,8 @@ const NINGBAINB_AUTHORED_PACKAGES = new Set([
   '@ningbainb/dsh-chat-artifacts',
   '@ningbainb/dsh-win-control',
   '@ningbainb/dsh-fast-ops',
+  '@ningbainb/dsh-doc-ingest',
+  '@ningbainb/dsh-local-search',
   '@ningbainb/dsh-im-hub',
   '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-client-ui-web-ui-settings',

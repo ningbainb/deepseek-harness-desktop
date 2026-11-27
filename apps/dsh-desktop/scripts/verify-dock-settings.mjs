@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
@@ -174,6 +174,7 @@ try {
     })
   })
   const main = await app.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(main)
   await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: startupTimeout })
   await main.waitForSelector('[data-dsh-frame]', { timeout: startupTimeout })
   restoreCompanionPreference = await useOriginalPetForTest(main)

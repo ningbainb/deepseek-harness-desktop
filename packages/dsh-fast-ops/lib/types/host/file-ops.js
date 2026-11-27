@@ -41,6 +41,7 @@ export async function readFilesBatch(rootDir, files, options = {}) {
     if (serializedBytes > maxInlineBytes && options.cache && options.sessionId) {
         const ref = options.cache.put({
             sessionId: options.sessionId,
+            principalId: options.principalId,
             producerTool: 'fast_read_files',
             items: results,
             ttlMs: options.ttlMs ?? 3600000,
@@ -139,6 +140,41 @@ async function walkFiles(rootDir, baseRel, includeHidden, maxScanFiles, out) {
         }
     }
 }
+const MAX_CONTEXT_LINES_AROUND_MATCH = 5;
+const MAX_CONTEXT_BLOCK_LINES = 16;
+const MAX_CONTEXT_LINE_LENGTH = 240;
+export function collectSearchContext(path, revision, lines, matchLines, radius) {
+    const ranges = [];
+    for (const line of matchLines) {
+        const start = Math.max(1, line - radius);
+        const end = Math.min(lines.length, line + radius);
+        const previous = ranges.at(-1);
+        if (previous && start <= previous.end + 1) {
+            previous.end = Math.max(previous.end, end);
+            previous.hits.push(line);
+        }
+        else {
+            ranges.push({ start, end, hits: [line] });
+        }
+    }
+    const context = [];
+    for (const range of ranges) {
+        for (let startLine = range.start; startLine <= range.end; startLine += MAX_CONTEXT_BLOCK_LINES) {
+            const endLine = Math.min(range.end, startLine + MAX_CONTEXT_BLOCK_LINES - 1);
+            const original = lines.slice(startLine - 1, endLine);
+            let truncated = false;
+            const excerpt = original.map(line => {
+                if (line.length <= MAX_CONTEXT_LINE_LENGTH)
+                    return line;
+                truncated = true;
+                return line.slice(0, MAX_CONTEXT_LINE_LENGTH).replace(/[\uD800-\uDBFF]$/u, '') + '…';
+            });
+            context.push({ path, revision, startLine, endLine,
+                matchLines: range.hits.filter(line => line >= startLine && line <= endLine), lines: excerpt, truncated });
+        }
+    }
+    return context;
+}
 export async function searchWorkspace(rootDir, params, options = {}) {
     const base = resolveSafeWorkspacePath(rootDir, params.path ?? '.');
     if (!base.ok)
@@ -173,6 +209,9 @@ export async function searchWorkspace(rootDir, params, options = {}) {
         return { ok: false, error: 'invalid-regex', items: [] };
     }
     const matches = [];
+    const context = [];
+    const requestedContext = params.contextLines ?? 0;
+    const radius = Number.isFinite(requestedContext) ? Math.max(0, Math.min(MAX_CONTEXT_LINES_AROUND_MATCH, Math.floor(requestedContext))) : 0;
     const matchedFiles = new Set();
     const maxCollected = 2000;
     for (const relPath of eligible) {
@@ -188,22 +227,39 @@ export async function searchWorkspace(rootDir, params, options = {}) {
         if (buf.byteLength > 2 * 1024 * 1024 || isLikelyBinary(buf))
             continue;
         const lines = Buffer.from(buf).toString('utf8').split(/\r?\n/u);
+        const pagedMatchLines = [];
         for (let idx = 0; idx < lines.length; idx++) {
             if (!regex.test(lines[idx]))
                 continue;
             matchedFiles.add(relPath);
+            if (radius > 0 && matches.length >= offset && matches.length < offset + limit)
+                pagedMatchLines.push(idx + 1);
             const snippet = lines[idx].length > 240 ? `${lines[idx].slice(0, 240)}...` : lines[idx];
             matches.push({ path: relPath, line: idx + 1, text: snippet });
             if (matches.length >= maxCollected)
                 break;
         }
+        if (pagedMatchLines.length > 0)
+            context.push(...collectSearchContext(relPath, sha256Hex(buf), lines, pagedMatchLines, radius));
     }
     const paged = matches.slice(offset, offset + limit);
     const serializedBytes = Buffer.byteLength(JSON.stringify(paged), 'utf8');
     const maxInlineBytes = options.maxInlineBytes ?? 16384;
+    const contextRef = context.length > 0 && options.cache && options.sessionId
+        && serializedBytes + Buffer.byteLength(JSON.stringify(context), 'utf8') > maxInlineBytes
+        ? options.cache.put({
+            sessionId: options.sessionId,
+            principalId: options.principalId,
+            producerTool: 'fast_search',
+            items: context,
+            ttlMs: options.ttlMs ?? 3600000,
+            preview: `fast_search: ${context.length} context excerpts for the requested match page`,
+        }) : undefined;
+    const contextOutput = radius === 0 ? {} : contextRef ? { contextRef } : { context };
     if (serializedBytes > maxInlineBytes && options.cache && options.sessionId) {
         const ref = options.cache.put({
             sessionId: options.sessionId,
+            principalId: options.principalId,
             producerTool: 'fast_search',
             items: matches,
             ttlMs: options.ttlMs ?? 3600000,
@@ -217,6 +273,7 @@ export async function searchWorkspace(rootDir, params, options = {}) {
             items: paged.slice(0, 15),
             nextOffset: null,
             ref,
+            ...contextOutput,
             spilled: true,
         };
     }
@@ -227,7 +284,8 @@ export async function searchWorkspace(rootDir, params, options = {}) {
         filesMatched: matchedFiles.size,
         items: paged,
         nextOffset: offset + paged.length < matches.length ? offset + paged.length : null,
-        spilled: false,
+        ...contextOutput,
+        spilled: contextRef !== undefined,
     };
 }
 export async function writeFileAtomicBytes(targetPath, content) {
@@ -548,6 +606,7 @@ export async function readTableFile(rootDir, params, options = {}) {
     if (bytes > maxInlineBytes && options.cache && options.sessionId) {
         const ref = options.cache.put({
             sessionId: options.sessionId,
+            principalId: options.principalId,
             producerTool: 'fast_read_table',
             items: dataRows,
             ttlMs: options.ttlMs ?? 3600000,

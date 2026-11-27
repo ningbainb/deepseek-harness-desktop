@@ -4,6 +4,7 @@ import { type ModelPreferencesConfig } from './model-projection.ts';
 export type ModelSelectProps = PropsRuntime<'conversation.input.model'> & PropsLocale<'model-preferences'> & ModelSelectInjected & {
     modelSessionId: string;
     sessionCwd?: string;
+    getSessionCwd?: () => string | undefined;
     settingsScope: import('@deepseek-ai/dsh-client-ui-settings/client').ConfigForm<ModelPreferencesConfig>;
 };
 /**

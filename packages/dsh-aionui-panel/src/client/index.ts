@@ -28,7 +28,7 @@ import { mountPanels } from './mount.tsx'
 import { NS, dictionaries, setLanguage, type AionUiPanelKey } from './locales.ts'
 import { DragFileInlay, type DragFileInjected } from './drag/DragFileInlay.tsx'
 import { insertPathIntoDraft } from './drag/file-drag.ts'
-import { FileAttachmentQueue, uploadAttachment, checkAttachment } from './drag/attachments.ts'
+import { FileAttachmentQueue, uploadAttachment, checkAttachment, summarizeAttachment } from './drag/attachments.ts'
 import { observeNativeUploadEvents } from './drag/native-upload-events.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { openNativePreview } from './native-preview.ts'
@@ -119,8 +119,16 @@ export function apply(ctx: ClientContext): void {
           read: () => shell.state.getSnapshot().draft,
           insert: reference => insertPath(sessionId, reference),
           remove: reference => shell.setDraft(shell.state.getSnapshot().draft.replace(reference, '')),
+          replace: (from, to) => {
+            const draft = shell.state.getSnapshot().draft
+            if (!draft.includes(from)) return false
+            const next = draft.replace(from, () => to)
+            shell.setDraft(next)
+            return shell.state.getSnapshot().draft === next
+          },
           subscribe: listener => shell.state.subscribe(listener),
-        }, (file, signal) => uploadAttachment(sessionId, file, signal), path => checkAttachment(sessionId, path))
+        }, (file, signal) => uploadAttachment(sessionId, file, signal), path => checkAttachment(sessionId, path),
+        'dshDesktop' in globalThis ? (path, signal) => summarizeAttachment(sessionId, path, signal) : undefined)
         fileQueues.set(sessionId, queue)
       }
       return queue
@@ -158,6 +166,7 @@ export function apply(ctx: ClientContext): void {
         locale: NS,
         inject: (sessionId: SessionId | undefined): DragFileInjected => ({
           fileQueue: fileQueue(sessionId),
+          documentDrop: 'dshDesktop' in globalThis,
           addFiles: supportsNativeFileUploads(conversation as unknown as DraftAttachmentConversation)
             ? (files: readonly File[]) => addDraftImages(sessionId, files)
             : undefined,

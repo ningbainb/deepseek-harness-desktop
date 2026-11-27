@@ -7,7 +7,7 @@
  *
  * - node:* builtins are always available;
  * - @deepseek-ai/* is provided by the DSH runtime (see .npmrc);
- * - everything else must be declared in the package's `dependencies`.
+ * - everything else must be declared in `dependencies` or `optionalDependencies`.
  *
  * A runtime import of a package that only sits in devDependencies crashes
  * dsh web at boot with ERR_MODULE_NOT_FOUND (skin-center 0.1.9, issue #70):
@@ -27,6 +27,7 @@
 import { readFileSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
+import { createRequire } from 'node:module'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -39,12 +40,12 @@ const BARE_IMPORT = /(?:from\s+|import\s*\()\s*['"]([^'".][^'"]*)['"]/g
  * Pure function (no filesystem access) so the node:test suite can feed it
  * inline fixtures.
  *
- * @param {{ dependencies?: Record<string,string> }} pkgJson package.json
+ * @param {{ dependencies?: Record<string,string>, optionalDependencies?: Record<string,string> }} pkgJson package.json
  * @param {Record<string,string>} files map of file path -> source text
  * @returns {{ file: string, specifier: string }[]} violations
  */
 export function checkRuntimeImports(pkgJson, files) {
-  const deps = new Set(Object.keys(pkgJson.dependencies ?? {}))
+  const deps = new Set([...Object.keys(pkgJson.dependencies ?? {}), ...Object.keys(pkgJson.optionalDependencies ?? {})])
   const violations = []
   for (const [file, source] of Object.entries(files)) {
     for (const match of source.matchAll(BARE_IMPORT)) {
@@ -60,6 +61,35 @@ export function checkRuntimeImports(pkgJson, files) {
     }
   }
   return violations
+}
+
+export function checkFastOpsNativePackaging(manifest, unpackGlobs, allowBuilds) {
+  const optional = manifest.optionalDependencies ?? {}
+  const direct = manifest.dependencies ?? {}
+  const grammars = Object.keys(optional).filter(name => name.startsWith('@ast-grep/lang-'))
+  const problems = []
+  if (!optional['@ast-grep/napi'] || Object.keys(direct).some(name => name.startsWith('@ast-grep/'))) {
+    problems.push('ast-grep must remain optional for the TypeScript fallback')
+  }
+  if (!unpackGlobs.includes('**/node_modules/@ast-grep/napi-*/**/*.node')
+      || !unpackGlobs.includes('**/node_modules/@ast-grep/lang-*/prebuilds/**/*')) {
+    problems.push('ast-grep native files must be unpacked from ASAR')
+  }
+  for (const grammar of grammars) {
+    if (allowBuilds[grammar] !== false) problems.push(`${grammar} must use its shipped prebuilds`)
+  }
+  return problems
+}
+
+export function checkLocalSearchNativePackaging(manifest, unpackGlobs) {
+  const problems = []
+  if (!manifest.optionalDependencies?.['sqlite-vec'] || manifest.dependencies?.['sqlite-vec']) {
+    problems.push('sqlite-vec must remain optional for local search')
+  }
+  if (!unpackGlobs.includes('**/node_modules/sqlite-vec*/**/*.{dll,so,dylib}')) {
+    problems.push('sqlite-vec platform extensions must be unpacked from ASAR')
+  }
+  return problems
 }
 
 /** All git-tracked files under packages/, grouped by package dir. */
@@ -98,6 +128,21 @@ if (isCli) {
         console.error(`       ${v.file} imports "${v.specifier}" which is not in dependencies`)
       }
     }
+  }
+  const { parse } = createRequire(new URL('../apps/dsh-desktop/package.json', import.meta.url))('yaml')
+  const fastOpsManifest = JSON.parse(readFileSync(join(ROOT, 'packages/dsh-fast-ops/package.json'), 'utf8'))
+  const localSearchManifest = JSON.parse(readFileSync(join(ROOT, 'packages/dsh-local-search/package.json'), 'utf8'))
+  const packaging = parse(readFileSync(join(ROOT, 'apps/dsh-desktop/electron-builder.yml'), 'utf8'))
+  const workspace = parse(readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8'))
+  const nativeProblems = checkFastOpsNativePackaging(fastOpsManifest, packaging.asarUnpack ?? [], workspace.allowBuilds ?? {})
+  if (nativeProblems.length) {
+    failed += 1
+    for (const problem of nativeProblems) console.error(`[FAIL] nbfast native packaging: ${problem}`)
+  }
+  const vectorProblems = checkLocalSearchNativePackaging(localSearchManifest, packaging.asarUnpack ?? [])
+  if (vectorProblems.length) {
+    failed += 1
+    for (const problem of vectorProblems) console.error(`[FAIL] Local search native packaging: ${problem}`)
   }
   if (failed > 0) {
     console.error(`\n${failed} package(s) FAILED runtime dependency check`)

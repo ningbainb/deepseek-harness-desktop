@@ -90,7 +90,7 @@ export class OfficeAppsStore {
     const mode = readStoredMode()
     applyDomExperienceMode(mode)
     if (mode !== this.state.experienceMode) {
-      this.patch({ experienceMode: mode })
+      this.patch({ experienceMode: mode, catalogOpen: false, activeConnectorId: undefined })
     }
   }
 
@@ -102,7 +102,7 @@ export class OfficeAppsStore {
     } catch {}
     applyDomExperienceMode(mode)
     if (mode !== this.state.experienceMode) {
-      this.patch({ experienceMode: mode })
+      this.patch({ experienceMode: mode, catalogOpen: false, activeConnectorId: undefined })
     } else {
       this.emit()
     }

@@ -269,10 +269,7 @@ export function ChatGptAuthSection({ close, t }: ChatGptAuthSectionProps): React
               type="button"
               className={css.primaryButton}
               disabled={pending || !state.writable}
-              onClick={() => {
-                reportFeatureEvent({ feature: 'chatgpt-login', outcome: 'started', detail: 'local-codex' })
-                void run(() => chatGptAuthClient.importLocal())
-              }}
+              onClick={() => void run(() => chatGptAuthClient.importLocal())}
             >
               {t('localCodexSync' satisfies ChatGptAuthKey)}
             </button>

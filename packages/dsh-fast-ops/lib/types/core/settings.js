@@ -13,6 +13,7 @@ export function defaultSettings() {
         maxInlineBytes: 16384,
         resultCacheTtlMs: 3600000,
         maxCachedRefs: 128,
+        denoise: { enabled: true, git: true, test: true, build: true },
     };
 }
 function clampInt(value, min, max) {
@@ -28,6 +29,20 @@ export function normalizeSettings(input) {
     if (input === null || typeof input !== 'object')
         return { settings, problems };
     const raw = input;
+    if (raw.denoise !== undefined) {
+        if (raw.denoise === null || typeof raw.denoise !== 'object' || Array.isArray(raw.denoise)) {
+            problems.push('denoise');
+        }
+        else {
+            const values = raw.denoise;
+            for (const key of ['enabled', 'git', 'test', 'build']) {
+                if (typeof values[key] === 'boolean')
+                    settings.denoise[key] = values[key];
+                else if (values[key] !== undefined)
+                    problems.push(`denoise.${key}`);
+            }
+        }
+    }
     if (typeof raw.enabled === 'boolean')
         settings.enabled = raw.enabled;
     else if (raw.enabled !== undefined)

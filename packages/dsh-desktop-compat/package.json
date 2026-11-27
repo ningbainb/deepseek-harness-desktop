@@ -67,7 +67,9 @@
     "src",
     "cordis.patch.yml",
     "README.md",
-    "README.zh.md"
+    "README.zh.md",
+    "README.i18n.yaml",
+    "NOTICE.md"
   ],
   "license": "Apache-2.0",
   "repository": {

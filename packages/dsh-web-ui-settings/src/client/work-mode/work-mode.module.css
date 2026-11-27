@@ -41,6 +41,10 @@
   padding-top: 10px;
 }
 
+:global([data-conversation-content]):has(:global([data-antigravity-acp-chat][data-has-messages])) .starterDock {
+  display: none;
+}
+
 .starterPill {
   display: inline-flex;
   align-items: center;

@@ -16,6 +16,8 @@ patchFrom:
   - ../dsh-agent-inbox
   - ../dsh-llm-antigravity
   - ../dsh-personal-prompt
+  - ../dsh-local-search
+  - ../dsh-checkpoints
   - ../dsh-memory
   - ../dsh-aionui-panel
   - ../dsh-task-board
@@ -30,6 +32,7 @@ patchFrom:
   - ../dsh-chat-artifacts
   - ../dsh-win-control
   - ../dsh-fast-ops
+  - ../dsh-doc-ingest
   - ../dsh-im-hub
   - ../dsh-liangshen
   - ../dsh-skins
@@ -54,6 +57,7 @@ deps:
   - ../dsh-chat-artifacts
   - ../dsh-win-control
   - ../dsh-fast-ops
+  - ../dsh-doc-ingest
   - ../dsh-im-hub
   - ../dsh-liangshen
   - ../dsh-web-ui-settings
@@ -63,6 +67,8 @@ deps:
   - ../dsh-agent-inbox
   - ../dsh-llm-antigravity
   - ../dsh-personal-prompt
+  - ../dsh-local-search
+  - ../dsh-checkpoints
   - ../dsh-memory
   - ../dsh-skins
   # skin-center 是 dsh-skins patch 行（ui-skin-center）的宿主，必须与

@@ -353,6 +353,15 @@ packageExtensions:
 allowBuilds:
   # The cloudflared postinstall downloads the platform binary (the auto-tunnel
   # feature ships its own tunnel client — users install nothing).
+  # The audited npm archives already provide their platform grammars.
+  '@ast-grep/lang-c': false
+  '@ast-grep/lang-cpp': false
+  '@ast-grep/lang-csharp': false
+  '@ast-grep/lang-go': false
+  '@ast-grep/lang-java': false
+  '@ast-grep/lang-json': false
+  '@ast-grep/lang-python': false
+  '@ast-grep/lang-rust': false
   '@deepseek-ai/dsh-subprocess-local': true
   '@google/genai': true
   cloudflared: true

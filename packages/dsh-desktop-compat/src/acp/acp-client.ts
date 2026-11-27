@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { readFile, realpath, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { createInterface } from 'node:readline'
 import type {
   AcpConfigOption,
@@ -63,6 +63,32 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+function parseConfigOptions(value: unknown): AcpConfigOption[] {
+  if (!Array.isArray(value)) return []
+  return value.filter(isPlainObject).filter(opt => typeof opt.id === 'string').map(opt => ({
+    id: String(opt.id),
+    name: typeof opt.name === 'string' ? opt.name : undefined,
+    category: typeof opt.category === 'string' ? opt.category : undefined,
+    currentValue: typeof opt.currentValue === 'string' ? opt.currentValue : undefined,
+    options: Array.isArray(opt.options) ? opt.options.filter(isPlainObject)
+      .flatMap(entry => Array.isArray(entry.options) ? entry.options.filter(isPlainObject) : [entry])
+      .filter(entry => typeof entry.value === 'string')
+      .map(entry => ({ value: String(entry.value), name: typeof entry.name === 'string' ? entry.name : undefined })) : undefined,
+  }))
+}
+
+function toDiff(content: unknown): { path: string; oldText?: string; newText?: string } | undefined {
+  const item = Array.isArray(content)
+    ? content.filter(isPlainObject).find(item => item.type === 'diff' && typeof item.path === 'string')
+    : undefined
+  if (!item) return undefined
+  return {
+    path: String(item.path),
+    ...(typeof item.oldText === 'string' ? { oldText: item.oldText } : {}),
+    ...(typeof item.newText === 'string' ? { newText: item.newText } : {}),
+  }
+}
+
 function parseLineSlice(content: string, line?: number, limit?: number): string {
   if (line === undefined && limit === undefined) return content
   const lines = content.split(/\r?\n/u)
@@ -73,6 +99,7 @@ function parseLineSlice(content: string, line?: number, limit?: number): string 
 
 export class AcpClient {
   private child?: ChildProcessWithoutNullStreams
+  private shutdown?: Promise<void>
   private nextId = 0
   private pending = new Map<number, {
     resolve: (value: unknown) => void
@@ -80,7 +107,7 @@ export class AcpClient {
     timer: ReturnType<typeof setTimeout>
   }>()
   private sessionListeners = new Map<string, (event: AcpStreamEvent) => void>()
-  private stderrTail = ''
+  private fileSystem = { readTextFile: false, writeTextFile: false }
   private closed = false
   private closePromise?: Promise<void>
   private negotiated?: AcpNegotiatedCapabilities
@@ -104,10 +131,7 @@ export class AcpClient {
     }) as ChildProcessWithoutNullStreams
     this.child = child
 
-    child.stderr.setEncoding('utf8')
-    child.stderr.on('data', (chunk: string) => {
-      this.stderrTail = (this.stderrTail + chunk).slice(-16_384)
-    })
+    child.stderr.resume()
     child.stdin.on('error', () => {})
 
     const lines = createInterface({ input: child.stdout, crlfDelay: Infinity })
@@ -140,8 +164,7 @@ export class AcpClient {
       child.once('close', (code) => {
         lines.close()
         this.closed = true
-        const suffix = this.stderrTail.trim() ? `: ${this.stderrTail.trim()}` : ''
-        rejectAll(new AcpClientError('PROCESS_EXITED', `ACP server exited with code ${code ?? 'null'}${suffix}`))
+        rejectAll(new AcpClientError('PROCESS_EXITED', 'ACP process exited with status ' + String(code)))
         resolvePromise()
       })
     })
@@ -205,7 +228,11 @@ export class AcpClient {
       if (isPlainObject(msg.error)) {
         const errMsg = typeof msg.error.message === 'string' ? msg.error.message : 'ACP request failed'
         const errCode = Number(msg.error.code ?? -32000)
-        entry.reject(new AcpClientError(errCode === -32000 && /auth/iu.test(errMsg) ? 'AUTH_REQUIRED' : 'RPC_ERROR', errMsg))
+        const missingSession = errCode === -32004 || /(?:session|thread).*(?:not found|does not exist)/iu.test(errMsg)
+        const failure = (errCode === -32000 && /auth|logged in|login|sign.in|credential/iu.test(errMsg)) || errCode === 401
+          ? 'AUTH_REQUIRED'
+          : errCode === 429 || /rate.limit|too many requests/iu.test(errMsg) ? 'RATE_LIMITED' : 'RPC_ERROR'
+        entry.reject(new AcpClientError(missingSession ? 'REMOTE_SESSION_NOT_FOUND' : failure, errMsg))
       } else {
         entry.resolve(msg.result)
       }
@@ -229,34 +256,43 @@ export class AcpClient {
       }))
       return [{ type: 'plan_update', entries }]
     }
+    if (kind === 'config_option_update' && Array.isArray(update.configOptions)) {
+      return [{ type: 'config_option_update', configOptions: parseConfigOptions(update.configOptions) }]
+    }
+    if (kind === 'usage_update') {
+      const usage = isPlainObject(update.usage) ? update.usage : update
+      const cost = isPlainObject(usage.cost) && typeof usage.cost.amount === 'number' && typeof usage.cost.currency === 'string'
+        ? { amount: usage.cost.amount, currency: usage.cost.currency }
+        : undefined
+      return [{
+        type: 'usage_update',
+        ...(typeof usage.used === 'number' ? { used: usage.used } : {}),
+        ...(typeof usage.size === 'number' ? { size: usage.size } : {}),
+        ...(cost ? { cost } : {}),
+      }]
+    }
     if (kind === 'tool_call') {
+      if (typeof update.toolCallId !== 'string' || !update.toolCallId) return []
+      const diff = toDiff(update.content)
       return [{
         type: 'tool_call',
-        toolCallId: String(update.toolCallId ?? ''),
+        toolCallId: update.toolCallId,
         ...(typeof update.title === 'string' ? { title: update.title } : {}),
         ...(typeof update.kind === 'string' ? { kind: update.kind } : {}),
         ...(typeof update.status === 'string' ? { status: update.status } : {}),
         ...(update.rawInput !== undefined ? { rawInput: update.rawInput } : {}),
+        ...(diff ? { diff } : {}),
       }]
     }
     if (kind === 'tool_call_update') {
-      const diffItem = Array.isArray(update.content)
-        ? update.content.find(item => isPlainObject(item) && item.type === 'diff' && typeof item.path === 'string')
-        : undefined
+      if (typeof update.toolCallId !== 'string' || !update.toolCallId) return []
+      const diff = toDiff(update.content)
       return [{
         type: 'tool_call_update',
-        toolCallId: String(update.toolCallId ?? ''),
+        toolCallId: update.toolCallId,
         ...(typeof update.status === 'string' ? { status: update.status } : {}),
         ...(update.content !== undefined ? { content: update.content } : {}),
-        ...(isPlainObject(diffItem)
-          ? {
-              diff: {
-                path: String(diffItem.path),
-                ...(typeof diffItem.oldText === 'string' ? { oldText: diffItem.oldText } : {}),
-                ...(typeof diffItem.newText === 'string' ? { newText: diffItem.newText } : {}),
-              },
-            }
-          : {}),
+        ...(diff ? { diff } : {}),
       }]
     }
     return []
@@ -303,6 +339,10 @@ export class AcpClient {
     }
 
     if (method === 'fs/read_text_file') {
+      if (!this.fileSystem.readTextFile) {
+        reply({ error: { code: -32601, message: 'ACP client filesystem reads are disabled' } })
+        return
+      }
       try {
         const safePath = await assertWorkspaceContained(this.options.cwd, String(params.path ?? ''))
         const raw = await readFile(safePath, 'utf8')
@@ -321,6 +361,10 @@ export class AcpClient {
     }
 
     if (method === 'fs/write_text_file') {
+      if (!this.fileSystem.writeTextFile) {
+        reply({ error: { code: -32601, message: 'ACP client filesystem writes are disabled' } })
+        return
+      }
       try {
         const safePath = await assertWorkspaceContained(this.options.cwd, String(params.path ?? ''))
         const content = typeof params.content === 'string' ? params.content : ''
@@ -331,7 +375,9 @@ export class AcpClient {
           reply({ error: { code: -32001, message: 'file write rejected by client policy' } })
           return
         }
-        await writeFile(safePath, content, 'utf8')
+        const confirmedPath = await assertWorkspaceContained(this.options.cwd, String(params.path ?? ''))
+        if (confirmedPath !== safePath) throw new AcpClientError('WORKSPACE_ESCAPE', 'ACP file path changed during approval')
+        await writeFile(confirmedPath, content, 'utf8')
         reply({ result: {} })
       } catch (error) {
         reply({ error: { code: -32000, message: error instanceof Error ? error.message : 'failed to write file' } })
@@ -348,12 +394,17 @@ export class AcpClient {
       fs?: { readTextFile?: boolean; writeTextFile?: boolean }
       terminal?: boolean
     } = { fs: { readTextFile: true, writeTextFile: true }, terminal: false },
+    timeoutMs = 30_000,
   ): Promise<AcpNegotiatedCapabilities> {
+    this.fileSystem = {
+      readTextFile: clientCapabilities.fs?.readTextFile === true,
+      writeTextFile: clientCapabilities.fs?.writeTextFile === true,
+    }
     const result = await this.request<Record<string, unknown>>('initialize', {
       protocolVersion: 1,
       clientCapabilities,
       clientInfo,
-    }, 30_000)
+    }, timeoutMs)
     const protocolVersion = Number(result.protocolVersion ?? 0)
     if (protocolVersion !== 1) {
       throw new AcpClientError('UNSUPPORTED_PROTOCOL', `unsupported ACP protocolVersion: ${String(result.protocolVersion)}`)
@@ -397,35 +448,27 @@ export class AcpClient {
     const acpSessionId = typeof result.sessionId === 'string' ? result.sessionId : ''
     if (!acpSessionId) throw new AcpClientError('INVALID_SESSION', 'ACP agent did not return a sessionId')
     const modelsObj = isPlainObject(result.models) ? result.models : undefined
-    const availableModels = Array.isArray(modelsObj?.availableModels)
+    const configOptions = parseConfigOptions(result.configOptions)
+    const model = configOptions.find(option => option.category === 'model')
+    const legacyModels = Array.isArray(modelsObj?.availableModels)
       ? modelsObj.availableModels.filter(isPlainObject).map(m => ({
           id: String(m.modelId ?? m.id ?? ''),
           name: typeof m.name === 'string' ? m.name : undefined,
         }))
       : []
-    const configOptions = Array.isArray(result.configOptions)
-      ? result.configOptions.filter(isPlainObject).map(opt => ({
-          id: String(opt.id ?? ''),
-          name: typeof opt.name === 'string' ? opt.name : undefined,
-          currentValue: typeof opt.currentValue === 'string' ? opt.currentValue : undefined,
-          options: Array.isArray(opt.options)
-            ? opt.options.filter(isPlainObject).map(o => ({
-                value: String(o.value ?? ''),
-                name: typeof o.name === 'string' ? o.name : undefined,
-              }))
-            : undefined,
-        }))
-      : []
+    const availableModels = model?.options?.map(option => ({ id: option.value, name: option.name })) ?? legacyModels
     return {
       acpSessionId,
-      currentModelId: typeof modelsObj?.currentModelId === 'string' ? modelsObj.currentModelId : undefined,
+      currentModelId: model?.currentValue ?? (typeof modelsObj?.currentModelId === 'string' ? modelsObj.currentModelId : undefined),
       availableModels,
       configOptions,
     }
   }
 
-  async newSession({ cwd, mcpServers = [] }: { cwd: string; mcpServers?: AcpMcpServerParam[] }) {
-    const res = await this.request<Record<string, unknown>>('session/new', { cwd, mcpServers }, 30_000)
+  async newSession({ cwd, mcpServers = [], timeoutMs = 30_000 }: {
+    cwd: string; mcpServers?: AcpMcpServerParam[]; timeoutMs?: number
+  }) {
+    const res = await this.request<Record<string, unknown>>('session/new', { cwd, mcpServers }, timeoutMs)
     return this.parseSessionPayload(res)
   }
 
@@ -442,7 +485,12 @@ export class AcpClient {
   }
 
   async setConfigOption(sessionId: string, configId: string, value: string): Promise<void> {
-    await this.request('session/set_config_option', { sessionId, configId, value }, 15_000)
+    await this.updateConfigOption(sessionId, configId, value)
+  }
+
+  async updateConfigOption(sessionId: string, configId: string, value: string): Promise<AcpConfigOption[] | undefined> {
+    const result = await this.request<Record<string, unknown>>('session/set_config_option', { sessionId, configId, value }, 15_000)
+    return Array.isArray(result?.configOptions) ? parseConfigOptions(result.configOptions) : undefined
   }
 
   async prompt({
@@ -483,20 +531,44 @@ export class AcpClient {
   }
 
   async close(): Promise<void> {
+    return this.shutdown ??= this.closeProcess()
+  }
+
+  private async closeProcess(): Promise<void> {
     this.closed = true
     const child = this.child
     if (!child) return
     try { child.stdin.end() } catch {}
-    if (child.exitCode === null && child.signalCode === null) {
-      child.kill('SIGTERM')
-      const killTimer = setTimeout(() => {
-        if (child.exitCode === null && child.signalCode === null) {
-          try { child.kill('SIGKILL') } catch {}
-        }
-      }, 500)
-      killTimer.unref()
+    const isRunning = () => child.pid !== undefined && child.exitCode === null && child.signalCode === null
+    const killChild = () => {
+      if (isRunning()) try { child.kill('SIGKILL') } catch {}
+    }
+    const closeTimer = setTimeout(() => {
+      if (!isRunning()) return
+      const systemRoot = process.env.SystemRoot
+      if (process.platform === 'win32' && systemRoot && isAbsolute(systemRoot) && child.pid !== undefined) {
+        try {
+          const task = spawn(join(systemRoot, 'System32', 'taskkill.exe'), ['/pid', String(child.pid), '/t', '/f'], {
+            shell: false, windowsHide: true, stdio: 'ignore',
+          })
+          task.once('error', killChild)
+          task.once('exit', code => { if (code !== 0) killChild() })
+          task.unref()
+          return
+        } catch {}
+      }
+      killChild()
+    }, 100)
+    const pipeTimer = setTimeout(() => {
+      killChild()
+      child.stdout.destroy()
+      child.stderr.destroy()
+    }, 240)
+    try {
       await this.closePromise
-      clearTimeout(killTimer)
+    } finally {
+      clearTimeout(closeTimer)
+      clearTimeout(pipeTimer)
     }
   }
 }

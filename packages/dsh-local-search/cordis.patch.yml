@@ -1,0 +1,3 @@
+- insert:
+    - id: local-search
+      name: '@ningbainb/dsh-local-search'

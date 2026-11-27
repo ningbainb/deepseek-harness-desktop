@@ -13,11 +13,7 @@ export declare const zh: {
     readonly 'relayShowcase.gptDesc': "全能推理与工具 · 登录后可用";
     readonly 'relayShowcase.multiName': "DeepSeek / Gemini";
     readonly 'relayShowcase.multiDesc': "国内直连高性价比 · 登录后可用";
-    readonly 'antigravity.group': "Antigravity (Gemini)";
-    readonly 'antigravity.badge': "框中框 ACP";
-    readonly 'antigravity.desc': "本机人工交互 · 不进入自动路由";
-    readonly 'antigravity.expand': "展开全部 ({count})";
-    readonly 'antigravity.collapse': "收起模型";
+    readonly 'antigravity.group': "Gemini";
     readonly 'trigger.aria': "当前模型：{model}";
     readonly 'trigger.ariaDisabled': "模型选择不可用";
     readonly 'menu.aria': "模型选择器";

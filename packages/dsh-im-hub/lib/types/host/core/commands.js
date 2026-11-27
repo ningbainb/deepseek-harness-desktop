@@ -83,7 +83,7 @@ export function splitMessageChunks(text, maxChars = 3500) {
 }
 export function formatHelpMessage(channel) {
     return [
-        `🤖 DSH IM Hub (${channel}) 命令帮助`,
+        `DSH IM Hub (${channel}) 命令帮助`,
         '- `/new` — 开启新对话上下文',
         '- `/stop` — 中止当前正在生成的回复',
         '- `/status` — 查看当前会话与工作区状态',

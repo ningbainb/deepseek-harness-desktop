@@ -455,3 +455,50 @@
 }
 
 .scopeFilter { height: 34px; min-width: 0; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); font: inherit; }
+.searchBody, .searchForm {
+  display: grid;
+  gap: 8px;
+}
+
+.searchBody {
+  margin-top: 10px;
+}
+
+.searchForm {
+  justify-items: start;
+}
+
+.searchForm .field {
+  width: 100%;
+}
+
+.searchStatus, .searchDates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.searchStatus > span {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background-color: var(--dsw-alias-bg-module-platform);
+}
+
+.searchHits {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.searchSource {
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-primary);
+}
+
+.scoreMeter {
+  width: 5em;
+  height: 0.65em;
+}

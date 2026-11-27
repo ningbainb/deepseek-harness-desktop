@@ -47,14 +47,14 @@ type SettingsActions = { openSection?: OpenSection }
 const copy = {
   zh: {
     'data-location': '数据目录迁移', 'agent-inbox': '审批收件箱', 'llm-antigravity': 'Antigravity CLI (Gemini)',
-    'win-control': 'Windows 桌面操控', 'fast-ops': '省 Token 批量操作', 'im-hub': 'IM 远程通道中心',
+    'win-control': 'Windows 桌面操控', 'fast-ops': 'nbfast', 'im-hub': 'IM 远程通道中心',
     personal: '个人偏好', responses: '回复偏好', memory: '记忆', advancedModels: '高级模型策略',
     valueMode: '性价比模式', image: '图像理解', promptCustomizer: 'Agent 高级提示词 (P2)',
     unavailable: '此设置暂时不可用。', promptCustomizerError: '无法打开高级提示词设置，请重试。',
   },
   en: {
     'data-location': 'Data directory migration', 'agent-inbox': 'Approval inbox', 'llm-antigravity': 'Antigravity CLI (Gemini)',
-    'win-control': 'Windows Control', 'fast-ops': 'Fast Ops', 'im-hub': 'IM Hub',
+    'win-control': 'Windows Control', 'fast-ops': 'nbfast', 'im-hub': 'IM Hub',
     personal: 'Personal preferences', responses: 'Response preferences', memory: 'Memory', advancedModels: 'Advanced models',
     valueMode: 'Value Mode', image: 'Image understanding', promptCustomizer: 'Advanced agent prompt (P2)',
     unavailable: 'This setting is temporarily unavailable.', promptCustomizerError: 'Could not open advanced prompt settings. Please try again.',

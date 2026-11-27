@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { cp, lstat, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 
 import { applyWindowIcon, resolveAppIconPath } from './app-icon.mjs'
+import { createAcpInteractionSigner } from './acp-interaction.mjs'
 import { resolveDesktopVersion } from './app-version.mjs'
 import { createDesktopDataMigration } from './desktop-data-migration.mjs'
 import { resolveDesktopDataLocation } from './desktop-data-location.mjs'
@@ -913,6 +914,7 @@ export async function startElectronApp(metadata) {
     state,
   })
   const networkPlan = resolveDesktopNetworkPlan(process.argv, process.env)
+  const acpInteraction = createAcpInteractionSigner(mainWindow)
   const marketNetworkSession = electronSession.fromPartition('dsh-network-market', { cache: false })
   const updateProbeSession = electronSession.fromPartition('dsh-network-update-probe', { cache: false })
   const marketFetch = createAbortableElectronSessionFetch(marketNetworkSession)
@@ -1187,7 +1189,7 @@ export async function startElectronApp(metadata) {
    * the installed executable. A probe failure is deliberately non-fatal:
    * startup must remain usable, and no download is attempted automatically.
    */
-  const resolveManagedGitRuntimePathEntries = async (pathEntries, runtimeKind) => {
+  const resolveManagedGitRuntime = async (pathEntries, runtimeKind) => {
     try {
       const result = await boundedManagedGitInspection(
         entries => managedGitRuntimeService.inspect(entries),
@@ -1198,12 +1200,15 @@ export async function startElectronApp(metadata) {
       } else if (result.source === 'managed') {
         await logStore.append(`[managed-git] verified managed Git selected for ${runtimeKind} Runtime`).catch(() => {})
       }
-      return prioritizeRuntimeBinPathEntries(pathEntries[0], result.pathEntries)
+      return {
+        pathEntries: prioritizeRuntimeBinPathEntries(pathEntries[0], result.pathEntries),
+        executablePath: result.executablePath,
+      }
     } catch (error) {
       await logStore.append(
         `[managed-git] inspection unavailable for ${runtimeKind} Runtime: ${error instanceof Error ? error.name : 'unknown'}`,
       ).catch(() => {})
-      return Object.freeze([...pathEntries])
+      return { pathEntries: Object.freeze([...pathEntries]) }
     }
   }
   /**
@@ -1473,7 +1478,12 @@ export async function startElectronApp(metadata) {
   const ensureProfile = () => ensureProfileForMode('full')
   const desktopRuntimeEnvironment = () => desktopRuntimeEnvironmentFor({
     credentialEnvironment: legacyCredentialEnvironment,
-    proxyEnvironment: runtimeProxyProjection.environment,
+    proxyEnvironment: {
+      ...runtimeProxyProjection.environment,
+      DSH_DESKTOP_DOC_PROXY_UNAVAILABLE: runtimeProxyProjection.status === 'unsupported' || networkPlan.api?.mode === 'system' ? '1' : '',
+      DSH_DESKTOP_ACP_GESTURE_PUBLIC_KEY: acpInteraction.publicKeyBase64,
+      DSH_DESKTOP_CHECKPOINT_GIT: checkpointGitPath ?? '',
+    },
     qqBotCredentials,
     backgroundAutomation: true,
     fullUser: true,
@@ -1485,7 +1495,7 @@ export async function startElectronApp(metadata) {
     executable: process.execPath,
     pnpmCli: resolvePnpmCliPath(),
   })
-  const runtimePathEntries = await resolveManagedGitRuntimePathEntries([runtimeBin], 'primary')
+  const { pathEntries: runtimePathEntries, executablePath: checkpointGitPath } = await resolveManagedGitRuntime([runtimeBin], 'primary')
   const runtimeSupportDirectory = app.isPackaged
     ? join(process.resourcesPath, 'runtime-support')
     : join(SOURCE_DIR, '..', 'runtime-support')
@@ -2086,6 +2096,53 @@ export async function startElectronApp(metadata) {
   })
   const unregisterIpc = registerDesktopIpc({
     ipcMain,
+    createAcpInteractionProof: acpInteraction.issue,
+    confirmMcpAppTool: (event, challengeId) => acpInteraction.confirmMcpAppTool(event, challengeId, async id => {
+      try {
+        const endpoint = new URL(`/api/mcp-apps/approval/${id}`, runtimeProvider.status?.url)
+        const response = await runtimeProvider.fetch(endpoint.href, {
+          headers: { 'x-dsh-mcp-apps': '1' }, signal: AbortSignal.timeout(3000),
+        })
+        if (!response.ok) return false
+        const { serverName, toolName, argumentsPreview } = await response.json()
+        if (typeof serverName !== 'string' || !/^[A-Za-z0-9_.-]{1,80}$/u.test(serverName)
+          || typeof toolName !== 'string' || !/^[A-Za-z0-9_.-]{1,128}$/u.test(toolName)) return false
+        const zh = app.getLocale().startsWith('zh')
+        const argumentText = typeof argumentsPreview === 'string'
+          ? argumentsPreview.replace(/[\x00-\x09\x0b-\x1f\x7f\u202a-\u202e\u2066-\u2069]/gu, '').slice(0, 1000)
+          : ''
+        const result = await dialog.showMessageBox(mainWindow, {
+          type: 'warning', title: zh ? 'MCP App 工具审批' : 'MCP App tool approval',
+          message: zh ? `允许 ${serverName} 执行 ${toolName} 吗？` : `Allow ${serverName} to run ${toolName}?`,
+          detail: argumentText, buttons: zh ? ['拒绝', '允许一次'] : ['Reject', 'Allow once'],
+          defaultId: 0, cancelId: 0, noLink: true,
+        })
+        return result.response === 1
+      } catch { return false }
+    }),
+    confirmCheckpointRestore: (event, challengeId) => acpInteraction.confirmCheckpointRestore(event, challengeId, async id => {
+      try {
+        const endpoint = new URL(`/api/dsh-checkpoints/approval/${id}`, runtimeProvider.status?.url)
+        const response = await runtimeProvider.fetch(endpoint.href, {
+          headers: { 'x-dsh-checkpoints': '1' }, signal: AbortSignal.timeout(3000),
+        })
+        if (!response.ok) return false
+        const { result } = await response.json()
+        const { files, deleteCount, target } = result ?? {}
+        if (!Number.isSafeInteger(files) || files < 1 || !Number.isSafeInteger(deleteCount) || deleteCount < 0
+          || deleteCount > files || typeof target !== 'string' || !/^[a-z0-9-]{12,64}$/iu.test(target)) return false
+        const zh = app.getLocale().startsWith('zh')
+        const choice = await dialog.showMessageBox(mainWindow, {
+          type: 'warning', title: zh ? '工作区检查点恢复' : 'Workspace checkpoint restore',
+          message: zh ? `恢复检查点 ${target.slice(0, 12)}？` : `Restore checkpoint ${target.slice(0, 12)}?`,
+          detail: zh ? `将应用 ${files} 项文件变更，其中 ${deleteCount} 项为删除。当前状态会先保存为撤销检查点。`
+            : `This applies ${files} file changes, including ${deleteCount} deletions. The current state is saved as an undo checkpoint first.`,
+          buttons: zh ? ['取消', '确认恢复'] : ['Cancel', 'Restore'],
+          defaultId: 0, cancelId: 0, noLink: true,
+        })
+        return choice.response === 1
+      } catch { return false }
+    }),
     app,
     surfaceRegistry,
     controller: runtimeProvider,

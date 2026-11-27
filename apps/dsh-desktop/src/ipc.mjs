@@ -410,7 +410,7 @@ export function normalizeDesktopDockOpenOptions(value) {
   const keys = Object.keys(value)
   if (
     keys.some(key => key !== 'setting' && key !== 'tab' && key !== 'plugin')
-    || (value.setting !== undefined && !['control-center', 'win-control', 'fast-ops', 'im-hub', 'value-mode', 'models', 'usage', 'plugin-options', 'prompt-customizer'].includes(value.setting))
+    || (value.setting !== undefined && !['control-center', 'win-control', 'fast-ops', 'im-hub', 'value-mode', 'models', 'usage', 'plugin-options', 'prompt-customizer', 'agent-inbox'].includes(value.setting))
     || (value.tab !== undefined && !['plugins', 'market', 'skills'].includes(value.tab))
     || (value.setting !== undefined && value.tab !== undefined)
   ) {
@@ -470,6 +470,9 @@ const publicRepairRetryResult = (value) => {
 export function registerDesktopIpc({
   ipcMain,
   surfaceRegistry = ipcMain.surfaceRegistry,
+  createAcpInteractionProof = () => undefined,
+  confirmMcpAppTool = () => undefined,
+  confirmCheckpointRestore = () => undefined,
   controller,
   runtimeProvider = controller,
   getWindow,
@@ -582,6 +585,8 @@ export function registerDesktopIpc({
     'desktop:skills-list',
     'desktop:notification-show',
     'desktop:workspace-file-open',
+    'desktop:acp-interaction-proof',
+    'desktop:mcp-app-tool-confirm',
     'desktop:conversation-import-open',
     'desktop:conversation-import-probe',
     'desktop:conversation-import-scan',
@@ -631,6 +636,9 @@ export function registerDesktopIpc({
     return publicRuntimeStatus(controller.status, recovery, background)
   }
   handle('desktop:status', [main, extensions], () => getPublicStatus())
+  handle('desktop:acp-interaction-proof', [main], (event, _surface, operation, bodyJson) => createAcpInteractionProof(event, operation, bodyJson))
+  handle('desktop:mcp-app-tool-confirm', [main], (event, _surface, challengeId) => confirmMcpAppTool(event, challengeId))
+  handle('desktop:checkpoint-restore-confirm', [main], (event, _surface, challengeId) => confirmCheckpointRestore(event, challengeId))
   handle('desktop:repair-status', main, async () => {
     try {
       return publicRepairStatus(await getRepairStatus())

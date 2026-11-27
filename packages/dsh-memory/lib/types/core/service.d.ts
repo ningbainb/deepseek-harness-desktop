@@ -2,7 +2,7 @@ import type { AccessResource, AccessScope, PrincipalId, SessionId, UserScopeServ
 import { type MemoryItem, type MemoryPublicItem, type MemoryScope, type MemorySnapshot, type MemorySource } from './schema.ts';
 import { type RankedMemory } from './rank.ts';
 import { MemoryStore } from '../store.ts';
-import type { MemoryActivity } from './activity.ts';
+import type { MemoryActivity, MemoryMatchReason } from './activity.ts';
 export interface MemoryDraft {
     id?: string;
     scope: MemoryScope;
@@ -61,6 +61,41 @@ export interface MemoryServiceOptions {
     now?: () => number;
     resolveWorkspaceForSession?: (sessionId: string) => string | undefined;
     warningSink?: (warning: MemoryWarning) => void;
+    search?: () => MemorySearchBridge | undefined;
+}
+interface MemorySearchDocument {
+    id: string;
+    scope: MemoryScope;
+    workspaceId?: string;
+    sessionId?: string;
+    title: string;
+    text: string;
+    tags: readonly string[];
+    updatedAt: number;
+    expiresAt?: number;
+    pinned: boolean;
+}
+interface SearchGeneration {
+    revision: string;
+    docs: MemorySearchDocument[];
+}
+interface SearchMatch {
+    id: string;
+    updatedAt: number;
+    reasons: readonly MemoryMatchReason[];
+    score: number;
+}
+export interface MemorySearchBridge {
+    registerMemorySource(source: (scope: AccessScope) => Promise<SearchGeneration>): () => void;
+    syncMemory(scope: AccessScope, revision: string, docs: MemorySearchDocument[]): Promise<void>;
+    warmMemoryQuery(scope: AccessScope, query: string): Promise<void>;
+    searchMemory(scope: AccessScope, revision: string, query: string, filter: {
+        workspaceId?: string;
+        sessionId?: string;
+        now: number;
+        limit: number;
+        exclude?: ReadonlySet<string>;
+    }): SearchMatch[] | undefined;
 }
 export interface PendingMemorySuggestion {
     readonly id: string;
@@ -78,6 +113,8 @@ export declare class MemoryService {
     private readonly userScope;
     private readonly resolveWorkspaceForSession?;
     private readonly warningSink?;
+    private readonly searchBridge?;
+    private readonly indexGenerations;
     private readonly cache;
     private readonly loading;
     private readonly loadedAt;
@@ -86,6 +123,11 @@ export declare class MemoryService {
     private readonly activity;
     private readonly ignored;
     constructor(options: MemoryServiceOptions);
+    private indexGeneration;
+    memoryIndexSource(scope: AccessScope): Promise<SearchGeneration>;
+    private primeIndex;
+    primeQuery(context: MemoryRequestContext, query: string): void;
+    private rankSnapshot;
     desktopScope(): AccessScope | undefined;
     currentScope(): AccessScope | undefined;
     localContext(): MemoryRequestContext | undefined;

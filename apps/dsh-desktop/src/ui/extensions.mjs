@@ -1543,7 +1543,7 @@ const searchEntries = [
   ['共享浏览器', '独立组件 下载 取消 重试 浏览器权限', 'shared-browser-tab'],
   ['智能操控', 'Browser Use Computer Use 浏览器 电脑 Playwright Cua', 'control-page-tab'],
   ['Windows 桌面操控', 'Windows-MCP Win Control 桌面自动化 截屏 工具门控', 'win-control-tab'],
-  ['省 Token 批量操作', 'Fast Ops 批量读取 搜索 CAS 编辑 表格 结果缓存', 'fast-ops-tab'],
+  ['nbfast', 'fastops fast-ops Fast Ops 省 Token 批量操作 Token-Efficient Batch Toolkit 批量读取 搜索 CAS 编辑 表格 结果缓存', 'fast-ops-tab'],
   ['IM 远程通道中心', 'IM Hub 飞书 钉钉 企业微信 Webhook 双端审批', 'im-hub-tab'],
   ['团队功能开关', 'Agent Team 协作 多智能体', 'agent-team-tab'],
   ['任务看板', '任务 管理 进度 Task Board Kanban', 'task-board-tool'],
@@ -1690,6 +1690,11 @@ const removeNavigationListener = window.dshDesktop.onExtensionNavigate((payload)
   if (payload?.setting === 'prompt-customizer') {
     resetFeatureSearch()
     void activateTab(document.getElementById('value-mode-tab'), false, 'prompt-customizer')
+    return
+  }
+  if (payload?.setting === 'agent-inbox') {
+    resetFeatureSearch()
+    void activateTab(document.getElementById('agent-inbox-tab'), true, 'agent-inbox', undefined, true)
     return
   }
   if (['control-center', 'win-control', 'fast-ops', 'im-hub', 'value-mode', 'models', 'usage', 'plugin-options'].includes(payload?.setting)) {

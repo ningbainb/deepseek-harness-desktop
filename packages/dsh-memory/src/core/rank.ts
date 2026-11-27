@@ -1,4 +1,5 @@
 import type { PrincipalId, SessionId, WorkspaceId } from '@ningbainb/dsh-user-scope'
+import type { MemoryMatchReason } from './activity.ts'
 import {
   MAX_MEMORY_INJECTION_ITEMS,
   MAX_MEMORY_INJECTION_LENGTH,
@@ -20,26 +21,30 @@ export interface RankedMemory {
   scopeRank: 1 | 2 | 3
   overlap: number
   reason?: 'content' | 'tag' | 'content-and-tag'
+  score?: number
+  reasons?: readonly MemoryMatchReason[]
 }
 
 function tokens(value: string): Set<string> {
   const result = new Set<string>()
-  const normalized = value.normalize('NFKC').toLowerCase().slice(0, MAX_MEMORY_QUERY_LENGTH)
+  const normalized = value.normalize('NFKC').slice(0, MAX_MEMORY_QUERY_LENGTH)
   const matches = normalized.match(/[\p{Script=Han}]+|[\p{L}\p{N}_]+/gu) ?? []
   for (const token of matches) {
     if (/^\p{Script=Han}+$/u.test(token)) {
-      // Han bigrams avoid retrieving unrelated facts on a single common character.
-      for (let index = 0; index < token.length - 1; index++) result.add(token.slice(index, index + 2))
-    } else if (token.length > 1) result.add(token)
+      const characters = [...token]
+      for (let index = 0; index < characters.length - 1; index++) {
+        result.add(characters.slice(index, index + 2).join(''))
+        if (index + 2 < characters.length) result.add(characters.slice(index, index + 3).join(''))
+      }
+    } else if (token.length > 1) {
+      result.add(token.toLowerCase())
+      for (const word of token.replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, '$1 $2')
+        .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2').toLowerCase().split(/[_ ]/u)) {
+        if (word.length > 1) result.add(word)
+      }
+    }
   }
   return result
-}
-
-function overlap(query: Set<string>, content: string): number {
-  if (query.size === 0) return 0
-  let count = 0
-  for (const token of tokens(content)) if (query.has(token)) count += 1
-  return count
 }
 
 export function memoryScopeMatches(
@@ -63,21 +68,48 @@ function scopeRank(item: MemoryItem, query: MemoryQuery): 1 | 2 | 3 | undefined 
 /** Rank only the current principal's live memories with deterministic tie breaks. */
 export function rankMemories(items: readonly MemoryItem[], query: MemoryQuery): RankedMemory[] {
   const queryTokens = tokens(query.query ?? '')
-  const ranked: RankedMemory[] = []
+  const corpus: { item: MemoryItem; rank: 1 | 2 | 3; content: Set<string>; tags: Set<string> }[] = []
   for (const item of items) {
     const rank = scopeRank(item, query)
     if (rank === undefined) continue
-    const contentOverlap = overlap(queryTokens, item.content)
-    const tagOverlap = overlap(queryTokens, item.tags.join(' '))
+    corpus.push({ item, rank, content: tokens(item.content), tags: tokens(item.tags.join(' ')) })
+  }
+  const frequency = new Map<string, number>()
+  for (const { content, tags } of corpus) for (const term of queryTokens) {
+    if (content.has(term) || tags.has(term)) frequency.set(term, (frequency.get(term) ?? 0) + 1)
+  }
+  const averageLength = corpus.reduce((sum, row) => sum + row.content.size, 0) / corpus.length || 1
+  const ranked: RankedMemory[] = []
+  for (const { item, rank, content, tags } of corpus) {
+    let contentOverlap = 0
+    let tagOverlap = 0
+    let score = 0
+    for (const term of queryTokens) {
+      const contentMatch = Number(content.has(term))
+      const tagMatch = Number(tags.has(term))
+      contentOverlap += contentMatch
+      tagOverlap += tagMatch
+      const termWeight = contentMatch + 2 * tagMatch
+      if (termWeight === 0) continue
+      const df = frequency.get(term) ?? 0
+      score += Math.log(1 + (corpus.length - df + 0.5) / (df + 0.5))
+        * (termWeight * 2.2) / (termWeight + 1.2 * (0.25 + 0.75 * content.size / averageLength))
+    }
     const itemOverlap = contentOverlap + tagOverlap * 2
     if ((query.query ?? '').trim() !== '' && itemOverlap === 0) continue
+    const reasons: MemoryMatchReason[] = contentOverlap ? ['keyword'] : []
+    if (tagOverlap) reasons.push('tags')
+    if (item.pinned) reasons.push('pinned')
+    const age = Math.max(0, query.now - item.updatedAt)
+    score *= 1 + 0.15 * Math.exp(-age / (30 * 86400000))
     ranked.push({ item: { ...item, tags: [...item.tags] }, scopeRank: rank, overlap: itemOverlap,
-      reason: contentOverlap && tagOverlap ? 'content-and-tag' : tagOverlap ? 'tag' : 'content' })
+      reason: contentOverlap && tagOverlap ? 'content-and-tag' : tagOverlap ? 'tag' : 'content', score, reasons })
   }
   ranked.sort((a, b) => {
     if (a.overlap !== b.overlap) return b.overlap - a.overlap
     if (a.scopeRank !== b.scopeRank) return b.scopeRank - a.scopeRank
     if (a.item.pinned !== b.item.pinned) return a.item.pinned ? -1 : 1
+    if (a.score !== b.score) return (b.score ?? 0) - (a.score ?? 0)
     if (a.item.updatedAt !== b.item.updatedAt) return b.item.updatedAt - a.item.updatedAt
     return a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0
   })

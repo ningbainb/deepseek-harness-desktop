@@ -14,7 +14,7 @@ import {
   type FastOpsSettings,
 } from './core/settings.ts'
 import { readSettings, resolveDshHome, writeSettingsAtomic } from './host/settings-store.ts'
-import { FastOpsController } from './host/tool-registry.ts'
+import { FAST_OPS_RESULTS_SERVICE, FastOpsController, type FastOpsResultsService } from './host/tool-registry.ts'
 
 export {
   INLINE_BYTE_OPTIONS,
@@ -42,9 +42,11 @@ export {
 } from './host/file-ops.ts'
 export {
   ALL_FAST_OPS_TOOLS,
+  FAST_OPS_RESULTS_SERVICE,
   FastOpsController,
   RESIDENT_TOOLS,
   SPECIALIZED_TOOLS,
+  type FastOpsResultsService,
 } from './host/tool-registry.ts'
 
 function sendJson(response: WebRouteResponseLike, status: number, body: unknown): void {
@@ -95,6 +97,8 @@ export function apply(ctx: Context): void {
     ctx,
     getSettings: () => cachedSettings,
   })
+  const results: FastOpsResultsService = { putText: input => controller.putText(input) }
+  ctx.provide(FAST_OPS_RESULTS_SERVICE, results)
 
   void readSettings(home).then((loaded) => {
     cachedSettings = loaded
@@ -117,6 +121,7 @@ export function apply(ctx: Context): void {
         sendJson(response, 200, {
           settings: cachedSettings,
           counters: controller.counters,
+          astAvailable: await controller.isAstAvailable(),
           cache: controller.cache.stats(),
         })
         return

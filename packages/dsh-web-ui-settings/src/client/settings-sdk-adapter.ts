@@ -31,7 +31,6 @@ export interface OfficeAppsIntegrationOptions<K extends string> {
 }
 
 interface SessionsLike {
-  list?: { getSnapshot(): { byId?: Record<string, { blank?: boolean }> } }
   current?(): string | undefined
 }
 
@@ -81,8 +80,6 @@ export function registerOfficeAppsIntegration<K extends string>(
       inject(slotName: string, factory: () => () => void): () => void
       register(spec: Record<string, unknown>, component: ComponentType<any>): () => void
     }
-    sessions?: SessionsLike
-    get?(service: string): unknown
   }
 
   const locale = runtimeCtx.locale
@@ -104,20 +101,13 @@ export function registerOfficeAppsIntegration<K extends string>(
     id: 'office-apps-trigger',
     order: 20,
     locale: ns,
-    inject: (sessionId?: string) => {
-      const sessionsSvc = (runtimeCtx.sessions ?? runtimeCtx.get?.('sessions')) as SessionsLike | undefined
-      const targetId = sessionId ?? sessionsSvc?.current?.()
-      const summary = targetId ? sessionsSvc?.list?.getSnapshot().byId?.[targetId] : undefined
-      const isBlankSession = summary ? Boolean(summary.blank) : true
-      return {
-        t: translate,
-        locale: currentLang(),
-        isBlankSession,
-        onOpenExtensions: options.onOpenExtensions,
-        onOpenExternalUrl: openExternalUrl,
-        onRunPrompt: (prompt?: string) => startOfficeWorkSession(ctx, prompt),
-      }
-    },
+    inject: () => ({
+      t: translate,
+      locale: currentLang(),
+      onOpenExtensions: options.onOpenExtensions,
+      onOpenExternalUrl: openExternalUrl,
+      onRunPrompt: (prompt?: string) => startOfficeWorkSession(ctx, prompt),
+    }),
   }, options.OfficeAppsComposerTrigger as ComponentType<any>)))
 
   return () => {

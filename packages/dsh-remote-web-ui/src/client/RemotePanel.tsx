@@ -111,7 +111,7 @@ export function RemotePanel({
       </div>
 
       {state.kind === 'lan-required' ? (
-        <div className={css.banner} role="alert">
+        <div className={css.banner} role="alert" data-dsh-remote-lan-required>
           <p className={css.bannerTitle}>{t('status.lanRequired')}</p>
           <p className={css.bannerHint}>{t('status.lanRequiredHint')}</p>
           {localGateway !== undefined && localGateway.availableAddresses.length > 0 ? (

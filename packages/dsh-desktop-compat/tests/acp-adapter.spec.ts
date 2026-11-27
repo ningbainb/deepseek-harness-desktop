@@ -1,10 +1,12 @@
 import { PassThrough } from 'node:stream'
+import { createHash, generateKeyPairSync, randomUUID, sign } from 'node:crypto'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ACP_GESTURE_PUBLIC_KEY_ENV } from '../src/acp/interaction-proof.ts'
 import {
   ANTIGRAVITY_ACP_AGENT,
   AcpAgentManager,
@@ -20,7 +22,9 @@ const mockServerPath = fileURLToPath(new URL('./fixtures/mock-acp-server.mjs', i
 
 describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
   const dirs: string[] = []
+  const activeManagers: AcpAgentManager[] = []
   afterEach(async () => {
+    await Promise.all(activeManagers.splice(0).map(manager => manager.dispose()))
     for (const dir of dirs.splice(0)) {
       await rm(dir, { recursive: true, force: true })
     }
@@ -39,8 +43,12 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
     const approvalReq = vi.fn(async () => ({ outcome: 'allowed-once' }))
     ctx.provide('approval' as never, { request: approvalReq } as never)
     ;(ctx as unknown as { approval: unknown }).approval = { request: approvalReq }
+    const finishCheckpoint = vi.fn(async () => {})
+    const beginWorkspaceMutation = vi.fn(async (_input: { sessionId: string; workspacePath: string; signal?: AbortSignal }) => finishCheckpoint)
+    ctx.provide('workspaceCheckpoints' as never, { beginWorkspaceMutation } as never)
 
     const manager = new AcpAgentManager(ctx, { dshHome: home })
+    activeManagers.push(manager)
     await manager.upsertCustomAgent({
       id: 'mock-acp',
       name: 'Mock ACP Agent',
@@ -68,6 +76,9 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
 
     await manager.setModel('dsh-s-1', 'gemini-flash')
     await manager.setConfigOption('dsh-s-1', 'thought_level', 'high')
+    await expect(manager.setConfigOption('dsh-s-1', 'mode', 'bypassPermissions')).rejects.toMatchObject({ code: 'CONFIG_POLICY_DENIED' })
+    await expect(manager.setConfigOption('dsh-s-1', 'mode', 'unadvertised')).rejects.toMatchObject({ code: 'INVALID_CONFIG_OPTION' })
+    await expect(manager.setConfigOption('dsh-s-1', 'mode', 'plan')).resolves.toBeUndefined()
 
     const events: AcpStreamEvent[] = []
     const res = await manager.sendPrompt({
@@ -77,6 +88,10 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
       onEvent: ev => events.push(ev),
     })
     expect(res.stopReason).toBe('end_turn')
+    expect(beginWorkspaceMutation).toHaveBeenCalledExactlyOnceWith({
+      sessionId: 'dsh-s-1', workspacePath: workspace, signal: expect.any(AbortSignal),
+    })
+    expect(finishCheckpoint).toHaveBeenCalledTimes(1)
     expect(approvalReq).toHaveBeenCalledTimes(1)
     expect(events).toEqual(expect.arrayContaining([
       { type: 'thought_delta', text: 'planning steps' },
@@ -120,6 +135,25 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
       signal: controller.signal,
     })
     expect(slowRes.stopReason).toBe('cancelled')
+    expect(finishCheckpoint).toHaveBeenCalledTimes(3)
+
+    const paused = Promise.withResolvers<AbortSignal | undefined>()
+    const preflightEvents: AcpStreamEvent[] = []
+    beginWorkspaceMutation.mockImplementationOnce(async ({ signal }) => {
+      paused.resolve(signal)
+      if (signal && !signal.aborted) await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
+      return finishCheckpoint
+    })
+    const preflight = manager.sendPrompt({
+      sessionId: 'dsh-s-1', text: 'run workflow', invocationSource: 'human-interactive',
+      onEvent: event => preflightEvents.push(event),
+    })
+    const preparingSignal = await paused.promise
+    expect(manager.cancelSession('dsh-s-1')).toBe(true)
+    expect(preparingSignal?.aborted).toBe(true)
+    await expect(preflight).resolves.toEqual({ stopReason: 'cancelled' })
+    expect(preflightEvents).toEqual([{ type: 'turn_finished', stopReason: 'cancelled' }])
+    expect(finishCheckpoint).toHaveBeenCalledTimes(4)
 
     await manager.dispose()
   })
@@ -132,6 +166,68 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
     }
     expect(() => assertAcpUsageAllowed({ ...ANTIGRAVITY_ACP_AGENT, authMode: 'gemini-api-key' }, 'scheduler')).toThrow(AcpComplianceError)
     expect(() => assertAcpUsageAllowed({ ...ANTIGRAVITY_ACP_AGENT, authMode: 'agent-platform' }, 'subagent')).toThrow(AcpComplianceError)
+  })
+
+  it('requires fresh Desktop proofs for every restricted session start and prompt', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'dsh-acp-proof-route-'))
+    dirs.push(workspace)
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519')
+    const signBody = (operation: string, body: unknown) => {
+      const bytes = Buffer.from(JSON.stringify({
+        issuedAt: Date.now(),
+        nonce: randomUUID(),
+        operation,
+        bodyHash: createHash('sha256').update(JSON.stringify(body), 'utf8').digest('hex'),
+      }))
+      return bytes.toString('base64url') + '.' + sign(null, bytes, privateKey).toString('base64url')
+    }
+    const ctx = new Context()
+    let route: { handler: Function } | undefined
+    const webServer = { register: (value: { handler: Function }) => { route = value; return () => {} } }
+    ctx.provide('webServer' as never, webServer as never)
+    ;(ctx as unknown as { webServer: unknown }).webServer = webServer
+    const manager = new AcpAgentManager(ctx, { dshHome: workspace })
+    vi.stubEnv(ACP_GESTURE_PUBLIC_KEY_ENV, publicKey.export({ format: 'der', type: 'spki' }).toString('base64'))
+    try {
+      registerAcpRoutes(ctx, manager)
+      await manager.upsertCustomAgent({
+        id: 'interactive-mock', name: 'Interactive Mock', command: process.execPath,
+        args: [mockServerPath], authMode: 'oauth-personal',
+      })
+      const invoke = async (path: string, body: Record<string, unknown>, proof?: string) => {
+        const req = Object.assign(new PassThrough(), {
+          method: 'POST', url: '/api/dsh-acp' + path,
+          headers: { host: '127.0.0.1', origin: 'http://127.0.0.1', 'x-dsh-acp': '1', ...(proof ? { 'x-dsh-acp-interaction': proof } : {}) },
+          socket: { remoteAddress: '127.0.0.1' },
+        })
+        let status = 0
+        const res = {
+          headersSent: false, writableEnded: false,
+          writeHead: (code: number) => { status = code; res.headersSent = true; return res },
+          on: () => res, off: () => res,
+          end: () => { res.writableEnded = true },
+          write: () => true,
+        }
+        const received = route!.handler(req, res, { principal: { kind: 'owner' } })
+        req.end(Buffer.from(JSON.stringify(body)))
+        await received
+        return status
+      }
+      const start = { agentId: 'interactive-mock', cwd: workspace, dshSessionId: 'gesture-test' }
+      const startProof = signBody('start', start)
+      expect(await invoke('/session/start', start)).toBe(403)
+      expect(await invoke('/session/start', { ...start, dshSessionId: 'different-session' }, startProof)).toBe(403)
+      expect(await invoke('/session/start', start, startProof)).toBe(200)
+      expect(await invoke('/session/start', start, startProof)).toBe(403)
+
+      const prompt = { sessionId: 'gesture-test', text: 'escape-read' }
+      expect(await invoke('/session/prompt', prompt)).toBe(403)
+      expect(await invoke('/session/prompt', prompt, signBody('start', prompt))).toBe(403)
+      expect(await invoke('/session/prompt', prompt, signBody('prompt', prompt))).toBe(200)
+    } finally {
+      vi.unstubAllEnvs()
+      await manager.dispose()
+    }
   })
 
   it('defaults permission requests to fail-closed cancelled when no handler is provided and enforces CSRF on routes', async () => {
@@ -192,7 +288,7 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
     })
     expect(saved.status).toBe(200)
     const agents = await invoke('GET', '/api/dsh-acp/agents', { 'x-dsh-acp': '1' }, 'owner')
-    expect(agents.body.agents.map((a: { id: string }) => a.id)).toEqual(['antigravity', 'local-mock'])
+    expect(agents.body.agents.map((a: { id: string }) => a.id)).toEqual(['antigravity', 'claude-code', 'codex', 'opencode', 'local-mock'])
 
     // Interactive session routes: start with model switch, stream SSE + interactive permission, close
     expect((await invoke('POST', '/api/dsh-acp/session/start', {}, 'owner', { agentId: 'local-mock' })).status).toBe(403)
@@ -222,6 +318,7 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
     let sseEndedResolve!: () => void
     const sseEnded = new Promise<void>(r => { sseEndedResolve = r })
     let permissionResolved = false
+    let deniedPersistentChoice: number | undefined
     const sseRes = {
       headersSent: false,
       writableEnded: false,
@@ -237,7 +334,13 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
             permissionResolved = true
             void invoke('POST', '/api/dsh-acp/session/permission', { 'x-dsh-acp': '1' }, 'owner', {
               permissionId: ev.permissionId,
-              optionId: 'allow-once',
+              optionId: 'allow-always',
+            }).then(result => {
+              deniedPersistentChoice = result.status
+              return invoke('POST', '/api/dsh-acp/session/permission', { 'x-dsh-acp': '1' }, 'owner', {
+                permissionId: ev.permissionId,
+                optionId: 'allow-once',
+              })
             })
           }
         }
@@ -249,6 +352,7 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
     sseReq.end(Buffer.from(JSON.stringify({ sessionId: 'http-s-1', text: 'run prompt' })))
     await sseEnded
     await promptPromise
+    expect(deniedPersistentChoice).toBe(400)
 
     const sseEvents = sseChunks
       .join('')

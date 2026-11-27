@@ -135,12 +135,13 @@ export function apply(ctx) {
             inject: (sessionId) => {
                 const directory = models.directoryFor(sessionId);
                 const available = sessions.subagentAddress(sessionId) === undefined;
-                const sessionCwd = sessions
-                    .getSnapshot?.()?.byId?.[String(sessionId)]?.cwd;
                 return {
                     available,
                     modelSessionId: String(sessionId),
-                    ...(typeof sessionCwd === 'string' && sessionCwd.trim() ? { sessionCwd } : {}),
+                    getSessionCwd: () => {
+                        const cwd = sessions.binding(sessionId)?.session.projections.faceOf('workingDirectory').getSnapshot();
+                        return typeof cwd === 'string' && cwd.trim() ? cwd : sessions.list.getSnapshot().byId[sessionId]?.cwd;
+                    },
                     directory: directory.store,
                     settingsScope,
                     resolveText: text => ctx.locale.resolveText(text),

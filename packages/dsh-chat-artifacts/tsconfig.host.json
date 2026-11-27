@@ -21,7 +21,9 @@
   },
   "include": [
     "src/index.ts",
+    "src/prompt.ts",
     "src/invariant.ts",
-    "src/core/**/*.ts"
+    "src/core/**/*.ts",
+    "src/host/**/*.ts"
   ]
 }

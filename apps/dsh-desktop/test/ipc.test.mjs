@@ -375,6 +375,7 @@ test('Extension Dock deep links accept only the collaboration settings and plugi
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'value-mode' }), { setting: 'value-mode' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'models' }), { setting: 'models' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'usage' }), { setting: 'usage' })
+  assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'agent-inbox' }), { setting: 'agent-inbox' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' }), { setting: 'plugin-options', plugin: '@local/dsh-prompt-pilot' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ setting: 'plugin-options' }), { setting: 'plugin-options' })
   assert.deepEqual(normalizeDesktopDockOpenOptions({ tab: 'market' }), { tab: 'market' })

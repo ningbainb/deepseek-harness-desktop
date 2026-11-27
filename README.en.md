@@ -8,6 +8,12 @@ DeepSeek Harness Desktop is a community-maintained, open-source workspace built 
 
 [Download](https://github.com/ningbainb/deepseek-harness-desktop/releases/latest) · [Website](https://1521003.xyz/) · [Documentation](docs/desktop.md) · [Changelog](CHANGELOG.md)
 
+## 5.7 development preview
+
+- The ACP workbench selects local agents per conversation. nbfast adds code outlines, structure-aware search and rewrites, and terminal summaries with access to the original output. [ACP](packages/dsh-llm-antigravity/README.md) · [nbfast](packages/dsh-fast-ops/README.md)
+- Work Mode extracts documents and approved web pages. Memory and knowledge search covers conversations, confirmed memories, and selected sources with workspace filters. [Document ingest](packages/dsh-doc-ingest/README.md) · [Local search](packages/dsh-local-search/README.md)
+- MCP Apps can use scoped interactive tools in a conversation. Standard artifacts render Mermaid offline and export SVG or PNG. Workspace checkpoints review changes by turn and support approved restores with undo. [MCP Apps](packages/dsh-chat-artifacts/README.md) · [Checkpoints](packages/dsh-checkpoints/README.md)
+
 ![Windows conversation workspace](website/assets/desktop-5.3.5-main.webp)
 
 ## What's new in 5.3.5

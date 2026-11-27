@@ -16,6 +16,7 @@ export interface ReadBatchItemResult {
 }
 export declare function readFilesBatch(rootDir: string, files: readonly ReadRangeRequest[], options?: {
     sessionId?: string;
+    principalId?: string;
     maxInlineBytes?: number;
     ttlMs?: number;
     cache?: ResultCache;
@@ -34,9 +35,21 @@ export interface SearchWorkspaceParams {
     includeHidden?: boolean;
     offset?: number;
     limit?: number;
+    contextLines?: number;
 }
+type SearchContext = {
+    path: string;
+    revision: string;
+    startLine: number;
+    endLine: number;
+    matchLines: number[];
+    lines: string[];
+    truncated: boolean;
+};
+export declare function collectSearchContext(path: string, revision: string, lines: readonly string[], matchLines: readonly number[], radius: number): SearchContext[];
 export declare function searchWorkspace(rootDir: string, params: SearchWorkspaceParams, options?: {
     sessionId?: string;
+    principalId?: string;
     maxInlineBytes?: number;
     ttlMs?: number;
     cache?: ResultCache;
@@ -49,7 +62,6 @@ export declare function searchWorkspace(rootDir: string, params: SearchWorkspace
     filesMatched?: undefined;
     nextOffset?: undefined;
     spilled?: undefined;
-    ref?: undefined;
 } | {
     ok: boolean;
     mode: "glob";
@@ -61,8 +73,10 @@ export declare function searchWorkspace(rootDir: string, params: SearchWorkspace
     nextOffset: number | null;
     spilled: boolean;
     error?: undefined;
-    ref?: undefined;
 } | {
+    spilled: boolean;
+    contextRef?: undefined;
+    context?: undefined;
     ok: boolean;
     mode: "grep";
     totalMatches: number;
@@ -74,9 +88,43 @@ export declare function searchWorkspace(rootDir: string, params: SearchWorkspace
     }[];
     nextOffset: null;
     ref: StorageReference;
-    spilled: boolean;
     error?: undefined;
 } | {
+    spilled: boolean;
+    contextRef: StorageReference;
+    context?: undefined;
+    ok: boolean;
+    mode: "grep";
+    totalMatches: number;
+    filesMatched: number;
+    items: {
+        path: string;
+        line: number;
+        text: string;
+    }[];
+    nextOffset: null;
+    ref: StorageReference;
+    error?: undefined;
+} | {
+    spilled: boolean;
+    context: SearchContext[];
+    contextRef?: undefined;
+    ok: boolean;
+    mode: "grep";
+    totalMatches: number;
+    filesMatched: number;
+    items: {
+        path: string;
+        line: number;
+        text: string;
+    }[];
+    nextOffset: null;
+    ref: StorageReference;
+    error?: undefined;
+} | {
+    spilled: boolean;
+    contextRef?: undefined;
+    context?: undefined;
     ok: boolean;
     mode: "grep";
     totalMatches: number;
@@ -87,9 +135,37 @@ export declare function searchWorkspace(rootDir: string, params: SearchWorkspace
         text: string;
     }[];
     nextOffset: number | null;
-    spilled: boolean;
     error?: undefined;
-    ref?: undefined;
+} | {
+    spilled: boolean;
+    contextRef: StorageReference;
+    context?: undefined;
+    ok: boolean;
+    mode: "grep";
+    totalMatches: number;
+    filesMatched: number;
+    items: {
+        path: string;
+        line: number;
+        text: string;
+    }[];
+    nextOffset: number | null;
+    error?: undefined;
+} | {
+    spilled: boolean;
+    context: SearchContext[];
+    contextRef?: undefined;
+    ok: boolean;
+    mode: "grep";
+    totalMatches: number;
+    filesMatched: number;
+    items: {
+        path: string;
+        line: number;
+        text: string;
+    }[];
+    nextOffset: number | null;
+    error?: undefined;
 }>;
 export declare function writeFileAtomicBytes(targetPath: string, content: string): Promise<void>;
 export declare function buildCompactDiff(beforeText: string, afterText: string, path: string): string;
@@ -239,6 +315,7 @@ export declare function readTableFile(rootDir: string, params: {
     columns?: readonly string[];
 }, options?: {
     sessionId?: string;
+    principalId?: string;
     maxInlineBytes?: number;
     ttlMs?: number;
     cache?: ResultCache;
@@ -283,4 +360,5 @@ export declare function readTableFile(rootDir: string, params: {
     error?: undefined;
     ref?: undefined;
 }>;
+export {};
 //# sourceMappingURL=file-ops.d.ts.map

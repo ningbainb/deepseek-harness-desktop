@@ -6,6 +6,9 @@ export interface ToolSchemaLike {
 }
 export interface AgentSessionLike {
     id: string;
+    header?: {
+        cwd?: string;
+    };
 }
 export interface AgentLike {
     id?: string;
@@ -16,7 +19,7 @@ export interface AgentLike {
     } | null;
     ctx?: {
         get?: (name: string) => unknown;
-        tools?: ScopedToolsLike;
+        tools?: unknown;
     };
 }
 export interface ScopedToolsLike {
@@ -44,6 +47,7 @@ export interface ToolRegistrationSpec {
     returns?: unknown;
     execute: (args: Record<string, unknown> | undefined, exec?: {
         agent?: AgentLike;
+        signal?: AbortSignal;
     }) => unknown;
 }
 export interface ToolsServiceLike {
@@ -71,14 +75,22 @@ export interface WorkspaceEntryLike {
 export interface WorkspacesServiceLike {
     list?: () => ReadonlyArray<WorkspaceEntryLike>;
 }
+export interface WorkingDirectoryServiceLike {
+    ensure: (agent: AgentLike, signal?: AbortSignal) => Promise<string>;
+}
 export interface UserScopeServiceLike {
-    desktopScope?: () => {
-        principalId: string;
-    } | undefined;
-    currentScope?: () => {
-        source?: string;
-        principalId: string;
-    } | undefined;
+    desktopScope?: () => ScopeIdentity | undefined;
+    currentScope?: () => ScopeIdentity | undefined;
+    canAccess?: (scope: ScopeIdentity, resource: {
+        kind: 'session';
+        sessionId: string;
+    }) => {
+        allowed: boolean;
+    };
+}
+interface ScopeIdentity {
+    source?: string;
+    principalId: string;
 }
 export interface WebRouteRequestLike {
     url?: string;
@@ -115,4 +127,5 @@ export interface LocaleServiceLike {
     register: (namespace: string, dictionaries: Record<string, Record<string, string>>) => () => void;
 }
 export declare function getHostService<T>(ctx: Context, name: string): T | undefined;
+export {};
 //# sourceMappingURL=host-types.d.ts.map

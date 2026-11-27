@@ -45,3 +45,18 @@ export function extractCurrentUserQuery(session) {
     }
     return messages.join('\n').slice(0, MAX_MEMORY_QUERY_LENGTH);
 }
+/** Propose one short, user-authored observation from the latest ended turn. */
+export function proposeTurnMemory(snapshot, passive) {
+    if (snapshot.header.origin === 'subagent')
+        return undefined;
+    const end = snapshot.events.findLastIndex(event => event.type === 'turn/end');
+    if (end === -1)
+        return undefined;
+    const text = extractCurrentUserQuery({ ...snapshot, events: snapshot.events.slice(0, end + 1) });
+    if (!text)
+        return undefined;
+    const lines = text.split(/[\r\n]+/u).map(line => line.trim()).filter(Boolean);
+    const observation = lines.find(line => /(?:\b(?:prefer|remember|always use|default to)\b|记住|偏好|默认|以后(?:请|用)|始终)/iu.test(line));
+    const proposed = observation ?? (passive ? undefined : lines[0]);
+    return proposed ? [...proposed].slice(0, 320).join('') : undefined;
+}

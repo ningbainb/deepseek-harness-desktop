@@ -11,7 +11,7 @@ import { _electron as electron } from 'playwright'
 
 import { seedConversationHistory } from './conversation-history-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { readSessionLogText, waitForSessionLog } from './session-log-fixture.mjs'
 import { prepareWorkspaceStateProbe, readWorkspaceStateProbe } from './workspace-state-probe-fixture.mjs'
 
@@ -141,6 +141,7 @@ async function launch() {
   activeApp = instance
   await useChineseFixtureLocale(instance)
   const page = await instance.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(page)
   const rendererErrors = []
   const rendererConsole = []
   const failedRequests = []
@@ -256,23 +257,26 @@ async function waitForRenamedCheckpoint(page, sessionId) {
   assert.fail(`official renamed checkpoint did not become durable at cut ${expectedSeq}: ${JSON.stringify(checkpoint)}`)
 }
 
-async function openSeededSession(page, sessionId) {
+async function openSeededSession(page, sessionId, workspaceId) {
   console.log('seeded session navigation', JSON.stringify({ at: Date.now(), sessionId }))
-  const turns = page.locator('[data-chat-flow-kind="user"]')
-  if (await turns.count() === messageCount) return
+  const sessionRow = page.locator(`[role="treeitem"][data-row-key="session:${sessionId}"]`)
+  const selectedRow = sessionRow.and(page.locator('[aria-selected="true"]'))
+  const conversationSelector = `[data-conversation-content][data-conversation-session="${sessionId}"]`
+  const turns = page.locator(conversationSelector).locator('[data-chat-flow-kind="user"]')
+  if (await selectedRow.isVisible() && await turns.count() === messageCount) return
 
   const listed = await rpc(page, 'session.list', {})
   const summaries = Array.isArray(listed?.items) ? listed.items : []
   const summary = summaries.find(item => item?.id === sessionId || item?.sessionId === sessionId)
   assert.ok(summary, `restored session is missing from session.list: ${JSON.stringify(listed)}`)
 
-  const group = page.getByRole('treeitem').filter({ hasText: basename(workspacePath) }).first()
+  const group = page.locator(`[role="treeitem"][data-row-key=${JSON.stringify('workspace:' + workspaceId)}]`)
   await group.waitFor({ state: 'visible', timeout: 30_000 })
-  if (await group.getAttribute('aria-expanded') !== 'true') await group.dispatchEvent('click')
-  await page.waitForTimeout(500)
-  assert.equal(await group.getAttribute('aria-expanded'), 'true', 'the fixture workspace must be expanded')
+  if (await group.getAttribute('aria-expanded') !== 'true') {
+    await group.getByText(basename(workspacePath), { exact: true }).click()
+  }
+  await group.and(page.locator('[aria-expanded="true"]')).waitFor({ state: 'visible', timeout: 30_000 })
 
-  const sessionRow = page.getByRole('treeitem').filter({ hasText: fixtureTitle }).last()
   try {
     await sessionRow.waitFor({ state: 'visible', timeout: 30_000 })
   } catch (error) {
@@ -285,9 +289,13 @@ async function openSeededSession(page, sessionId) {
     await page.screenshot({ path: join(temporary, 'restored-session-row-failure.png') })
     throw error
   }
-  await sessionRow.click({ force: true })
   try {
-    await page.waitForFunction(expected => document.querySelectorAll('[data-chat-flow-kind="user"]').length === expected, messageCount, {
+    if (!await selectedRow.isVisible()) await sessionRow.click({ timeout: 30_000 })
+    await selectedRow.waitFor({ state: 'visible', timeout: 30_000 })
+    await page.waitForFunction(({ selector, expected }) =>
+      document.querySelector(selector)?.querySelectorAll('[data-chat-flow-kind="user"]').length === expected, {
+      selector: conversationSelector, expected: messageCount,
+    }, {
       timeout: 30_000,
     })
   } catch (error) {
@@ -297,6 +305,7 @@ async function openSeededSession(page, sessionId) {
       expanded: row.getAttribute('aria-expanded'),
     })))
     console.error(`restored session open diagnostic:\n${JSON.stringify({ summary, diagnostic, renderedTurns: await turns.count() }, null, 2)}`)
+    await page.screenshot({ path: join(temporary, 'restored-session-open-failure.png') })
     throw error
   }
 }
@@ -332,6 +341,9 @@ async function verifyStatsSupplement(page) {
     await page.screenshot({ path: join(resolve(process.env.DSH_DESKTOP_DOCK_SCREENSHOTS), 'native-stats-details.png') })
   }
   await summary.click()
+  await supplement.and(page.locator('[data-preview="hover"]')).waitFor({ state: 'visible' })
+  await nativeTime.hover()
+  await supplement.locator('dl').waitFor({ state: 'hidden' })
   assert.equal(await supplement.evaluate(element => element.open), false)
   assert.equal(await supplement.locator('dl').isVisible(), false)
   // Native drill-down is still usable; we never mutate or replace its controls.
@@ -443,6 +455,7 @@ try {
   const workspace = await rpc(first.page, 'workspace.create', { path: workspacePath })
   const workspaceId = workspace?.workspace?.workspaceId ?? workspace?.workspaceId
   assert.equal(typeof workspaceId, 'string', JSON.stringify(workspace))
+  const openFixtureSession = (page, id) => openSeededSession(page, id, workspaceId)
   const created = await rpc(first.page, 'session.create', { workspaceId })
   assert.equal(typeof created?.sessionId, 'string', JSON.stringify(created))
   const sessionId = created.sessionId
@@ -468,7 +481,7 @@ try {
   const second = await launch()
   activeApp = second.instance
   assert.equal(await readSessionLogText(logPath), originalSeededLog, 'startup checkpoint recovery must not rewrite the original conversation log')
-  await openSeededSession(second.page, sessionId)
+  await openFixtureSession(second.page, sessionId)
   const seededSummary = await waitForSeededSummary(second.page, sessionId, asOfSeq)
   assert.equal(seededSummary?.blank, false, 'the restored history must not be classified as a reusable blank draft')
   if (nativeTurns) {
@@ -480,6 +493,7 @@ try {
   assert.equal(await turns.count(), messageCount)
   assert.match(await turns.first().innerText(), /G02\.5 turn 01/u)
   assert.match(await turns.last().innerText(), /G02\.5 turn 20/u)
+  console.log(`PASS reopened the saved session with all ${messageCount} messages and the original log intact`)
   if (nativeTurns) await verifyStatsSupplement(second.page)
 
   await second.page.evaluate(() => {
@@ -625,7 +639,7 @@ try {
   }
   await second.page.locator('[data-dsh-turn-navigator]').waitFor({ state: 'detached' })
   await second.page.locator('[data-dsh-live-stats]').waitFor({ state: 'detached' })
-  await openSeededSession(second.page, sessionId)
+  await openFixtureSession(second.page, sessionId)
   assert.equal(await turns.count(), messageCount, 'history remains navigable after leaving for an empty session')
   if (nativeTurns) {
     await second.page.locator('[data-dsh-live-stats]').waitFor({ state: 'visible' })
@@ -634,9 +648,9 @@ try {
   if (process.argv.includes('--native-tabs')) {
     const { verifyNativeBrowserSessionIsolation, verifyNativeBlankDraftReuse, navigateNativeBrowserSession } = await import('./native-browser-session-fixture.mjs')
     const nativeWindow = await activeApp.browserWindow(second.page)
-    await verifyNativeBrowserSessionIsolation({ page: second.page, rpc, sessionId, workspacePath, logPath, openSeededSession,
+    await verifyNativeBrowserSessionIsolation({ page: second.page, rpc, sessionId, workspacePath, logPath, openSeededSession: openFixtureSession,
       navigateToSession: id => navigateNativeBrowserSession(nativeWindow, id), readWorkspace: () => readWorkspaceStateProbe(second.page) })
-    await verifyNativeBlankDraftReuse({ page: second.page, rpc, sessionId, workspacePath, openSeededSession,
+    await verifyNativeBlankDraftReuse({ page: second.page, rpc, sessionId, workspacePath, openSeededSession: openFixtureSession,
       navigateToSession: id => navigateNativeBrowserSession(nativeWindow, id), readWorkspace: () => readWorkspaceStateProbe(second.page) })
   }
   assert.deepEqual(second.rendererErrors, [])
@@ -652,7 +666,7 @@ try {
   if (process.argv.includes('--mode-switch')) {
     const { verifyModeSwitchLifecycle } = await import('./mode-switch-lifecycle-fixture.mjs')
     const modeResult = await verifyModeSwitchLifecycle({ page: second.page, rpc, sessionId, workspaceId,
-      workspacePath, messageCount, logPath, openSeededSession, runtimeFetchGate,
+      workspacePath, messageCount, logPath, openSeededSession: openFixtureSession, runtimeFetchGate,
       readWorkspace: () => readWorkspaceStateProbe(second.page) })
     await activeApp.close()
     activeApp = undefined

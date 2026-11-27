@@ -53,7 +53,12 @@ describe('model preference client registration', () => {
         failures: [],
       },
     }))
-    const sessions = { subagentAddress: vi.fn(() => undefined) }
+    let workingDirectory = 'D:/fixture/worktree'
+    const sessions = {
+      subagentAddress: vi.fn(() => undefined),
+      binding: () => ({ session: { projections: { faceOf: () => ({ getSnapshot: () => workingDirectory }) } } }),
+      list: { getSnapshot: () => ({ byId: { 'session-a': { cwd: 'D:/fixture/project' } } }) },
+    }
     const stopCatalogChanges = vi.fn()
     const subscribeRemote = vi.fn((_event: string, _callback: (key: string) => void) => stopCatalogChanges)
     const slotRegistrations: Array<{ contribution: any; component: unknown }> = []
@@ -119,6 +124,9 @@ describe('model preference client registration', () => {
     expect(slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.priority).toBe(-10)
     const composer = slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.inject('session-a')
     expect(composer.directory).toBe(directory.store)
+    expect(composer.getSessionCwd?.()).toBe('D:/fixture/worktree')
+    workingDirectory = 'D:/fixture/other-worktree'
+    expect(composer.getSessionCwd?.()).toBe(workingDirectory)
     expect(composer.resolveText({ en: 'Recommended', zh: '推荐' })).toBe('推荐')
     expect(composer.resolveText('Provider label')).toBe('Provider label')
   })

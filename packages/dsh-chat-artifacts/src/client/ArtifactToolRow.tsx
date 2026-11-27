@@ -1,133 +1,65 @@
 import {
-  IconChevronDownOutlineRegular,
   IconDataOutlineMedium,
-  IconLoadingOutlineMedium,
   StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
-import type { ToolCallBlock, ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { ToolResultNode } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { PropsLocale, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import {
-  ARTIFACT_KINDS,
-  artifactSourceFromMeta,
-  isArtifactRecord,
-  type ArtifactKind,
-} from '../core/types.ts'
-import type { ChatArtifactsKey } from './locales.ts'
-import css from './artifact.module.css'
+import { artifactSourceFromMeta, isArtifactRecord } from '../core/types.ts'
+import { CHAT_ARTIFACTS_PATCH_TOOL_NAME } from '../invariant.ts'
 import { ArtifactCard } from './ArtifactCard.tsx'
+import { artifactAnchor, artifactTranscript } from './artifact-transcript.ts'
+import css from './artifact.module.css'
 
-type ArtifactTranslate = TranslateNS<'chat-artifacts'>
-type ArtifactToolRowProps = ToolCallViewProps & PropsLocale<'chat-artifacts'>
-type RowState = 'running' | 'ok' | 'error' | 'stopped'
+type Translate = TranslateNS<'chat-artifacts'>
 
-function isSettled(block: ToolCallBlock): block is ToolResultNode {
-  return 'kind' in block && block.kind === 'tool-result'
+function errorText(node: ToolResultNode, t: Translate): string {
+  const firstLine = node.content.flatMap(block => block.type === 'text' ? block.text.split(/\r?\n/u) : [])
+    .map(line => line.trim()).find(Boolean)
+  return firstLine ?? node.error?.code ?? t('card.unknownError')
 }
 
-function callArgs(block: ToolCallBlock): string {
-  return isSettled(block) ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : ''
+function openPinnedArtifact(anchor: string) {
+  const target = document.getElementById(anchor)
+  if (!target) return
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({ block: 'nearest', behavior: 'auto' })
 }
 
-function pendingArgs(raw: string): { title?: string; kind?: ArtifactKind } {
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    if (typeof parsed !== 'object' || parsed === null) return {}
-    const value = parsed as { title?: unknown; kind?: unknown }
-    return {
-      ...(typeof value.title === 'string' ? { title: value.title } : {}),
-      ...(typeof value.kind === 'string' && (ARTIFACT_KINDS as readonly string[]).includes(value.kind)
-        ? { kind: value.kind as ArtifactKind }
-        : {}),
-    }
-  } catch {
-    return {}
+export function ArtifactToolRow({ phase, block, toolName, useChat, inputActions, inspect, t }: ToolCallViewProps & PropsLocale<'chat-artifacts'>) {
+  const pinned = useChat(snapshot => phase === 'result' ? artifactTranscript(snapshot).pinnedCalls.get(block.callId) : undefined,
+    (a, b) => a?.record === b?.record && a?.turn === b?.turn)
+  const label = t(toolName === CHAT_ARTIFACTS_PATCH_TOOL_NAME ? 'tool.patch' : 'tool.render')
+  if (phase !== 'result') {
+    const title = block.args.textPrefix('title', 160)?.trim() || label
+    return <div className={css.toolSummary}><span><IconDataOutlineMedium />{title}</span></div>
   }
-}
-
-function resultText(node: ToolResultNode): string {
-  return node.content.map(block => block.type === 'text' ? block.text : JSON.stringify(block) ?? '').join('\n').trim()
-}
-
-function firstLine(text: string): string {
-  return text.split(/\r?\n/u).map(line => line.trim()).find(Boolean) ?? ''
-}
-
-function errorText(node: ToolResultNode, t: ArtifactTranslate): string {
-  const text = firstLine(resultText(node))
-  if (text.length > 0) return text
-  if (node.error !== undefined) return node.error.code
-  return t('card.unknownError')
-}
-
-function kindLabel(t: ArtifactTranslate, kind: ArtifactKind): string {
-  const key = ('kind.' + kind) as ChatArtifactsKey
-  return t(key)
-}
-
-function StatusIcon({ state }: { state: RowState }) {
-  if (state === 'running') return <IconLoadingOutlineMedium className={css.statusIcon} />
-  if (state === 'error') return <StateDot state="error" />
-  if (state === 'stopped') return <StateDot state="warning" />
-  return <IconDataOutlineMedium className={css.statusIcon} />
-}
-
-interface FallbackRowProps {
-  state: RowState
-  title: string
-  summary: string
-  t: ArtifactTranslate
-  source?: string
-}
-
-function FallbackRow({ state, title, summary, t, source }: FallbackRowProps) {
-  return (
-    <section className={css.fallback} data-artifact-state={state}>
-      <div className={css.fallbackHeader}>
-        <div className={css.heading}>
-          <StatusIcon state={state} />
-          <div className={css.headingText}>
-            <div className={css.title}>{title}</div>
-            <div className={css.meta}>{summary}</div>
-          </div>
-        </div>
-        <IconChevronDownOutlineRegular className={css.fallbackChevron} />
-      </div>
-      {source !== undefined ? (
-        <details className={css.fallbackSource}>
-          <summary>{t('card.viewSource')}</summary>
-          <pre className={css.source}><code>{source}</code></pre>
-        </details>
-      ) : null}
-    </section>
-  )
-}
-
-/** Keyed Tool renderer for render_artifact, including pending and replay fallback states. */
-export function ArtifactToolRow({ block, t }: ArtifactToolRowProps) {
-  if (!isSettled(block)) {
-    const args = pendingArgs(callArgs(block))
-    const title = args.title?.trim() || 'Render artifact'
-    const summary = args.kind === undefined ? t('card.generating') : kindLabel(t, args.kind) + ' · ' + t('card.generating')
-    return <FallbackRow state="running" title={title} summary={summary} t={t} />
+  if (!block.isError && isArtifactRecord(block.meta)) {
+    if (!pinned) return <ArtifactCard artifact={block.meta} t={t} inputActions={inputActions} />
+    const anchor = artifactAnchor(pinned.turn, pinned.record.artifactId)
+    return <div data-artifact-tool-summary="" className={css.toolSummary}>
+      <span><IconDataOutlineMedium />{block.meta.title}</span>
+      <button type="button" className={css.actionButton} onClick={() => openPinnedArtifact(anchor)}>{t('card.locate')}</button>
+      {inspect && <button type="button" className={css.actionButton} onClick={inspect}>{t('card.inspect')}</button>}
+      {!inspect && <details><summary>{t('card.inspect')}</summary>
+        <pre className={css.source}><code>{block.meta.html}</code></pre>
+      </details>}
+    </div>
   }
-
-  if (block.isError) {
-    return <FallbackRow state="error" title="Render artifact" summary={errorText(block, t)} t={t} />
-  }
-
-  if (isArtifactRecord(block.meta)) {
-    return <ArtifactCard artifact={block.meta} t={t} />
-  }
-
   const source = artifactSourceFromMeta(block.meta)
-  return (
-    <FallbackRow
-      state="error"
-      title="Render artifact"
-      summary={source === undefined ? t('card.unavailable') : t('card.invalid')}
-      t={t}
-      source={source}
-    />
-  )
+  return <section className={css.fallback} data-artifact-state="error">
+    <div className={css.fallbackHeader}>
+      <div className={css.heading}>
+        <StateDot state="error" />
+        <div className={css.headingText}>
+          <div className={css.title}>{label}</div>
+          <p className={css.errorText}>{block.isError ? errorText(block, t) : t(source === undefined ? 'card.unavailable' : 'card.invalid')}</p>
+        </div>
+      </div>
+    </div>
+    {source !== undefined && <details className={css.fallbackSource}>
+      <summary>{t('card.viewSource')}</summary>
+      <pre className={css.source}><code>{source}</code></pre>
+    </details>}
+  </section>
 }

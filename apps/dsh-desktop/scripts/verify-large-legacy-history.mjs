@@ -9,7 +9,7 @@ import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { networkTiming, profileSource, profileComboSource, profileComboPosition, profileUrlShape, profileUrlAliases, rpcOutcome } from './history-performance-diagnostics.mjs'
 import { resolveRuntimePackages } from '../src/profile.mjs'
 import { installHistoryFlowLayoutControl } from './history-flow-layout-control.mjs'
@@ -62,7 +62,7 @@ const dshHome = join(temporary, 'dsh-home')
 const workspacePath = join(temporary, 'history-workspace')
 const require = createRequire(await realpath(join(appDir, 'node_modules/@deepseek-ai/dsh-base/package.json')))
 const { Context } = await import(pathToFileURL(require.resolve('@deepseek-ai/cordis')))
-const { default: Backend } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-persistence-jsonl')))
+const Backend = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-session-persistence-jsonl')))
 const report = { complete: false, sourceBytes: source.length, runs: [] }
 report.applicationTarget = packagedExecutable === undefined ? 'source' : 'packaged-executable'
 if (packagedExecutable !== undefined) {
@@ -230,6 +230,7 @@ async function launch() {
   await useChineseFixtureLocale(app)
   stage = 'first-window'
   const page = await app.firstWindow()
+  await dismissFirstRunModelChooserWhenShown(page)
   activePage = page
   page.on('pageerror', () => { pageErrors++ })
   page.on('request', request => {
@@ -347,11 +348,9 @@ try {
     stage = `expand-workspace-${run + 1}`
     await group.waitFor()
     if (await group.getAttribute('aria-expanded') === 'false') await group.click()
-    const title = summary.displayTitle || summary.title || summary.projections?.values?.title
-    // Cold legacy summaries may not yet have a projected title. The UI uses
-    // the workspace label until observation has hydrated that projection.
-    const row = title ? page.getByRole('treeitem').filter({ hasText: title }).last()
-      : page.locator('[role="treeitem"][aria-selected="false"]').filter({ hasText: 'history-workspace' }).first()
+    // A cold summary may have no projected title yet. Use the native row's
+    // durable session ID even when the sidebar renders a temporary label.
+    const row = page.locator(`[role="treeitem"][data-row-key=${JSON.stringify('session:' + header.id)}]`)
     stage = `open-${run + 1}`
     await page.evaluate(() => {
       window.historyUIProbe = { tasks: 0, maxTaskMs: 0 }
@@ -365,7 +364,8 @@ try {
     // A restart can restore the selected history before the test reaches the
     // tree. Do not search for an unselected row in that case; the tail hash
     // below verifies that the automatically restored content is this history.
-    if (initiallyRenderedUsers === 0) await row.click()
+    if (initiallyRenderedUsers === 0 && await row.getAttribute('aria-selected') !== 'true') await row.click()
+    await row.and(page.locator('[aria-selected="true"]')).waitFor({ state: 'visible' })
     stage = `wait-history-${run + 1}`
     await page.waitForTimeout(500)
     const loadingFeedback = await page.evaluate(() => ({
@@ -377,10 +377,13 @@ try {
     const firstMessageMs = Math.round(stamp() - openStart)
     stage = `interact-${run + 1}`
     const settingsStart = stamp()
-    await page.getByRole('button', { name: '设置', exact: true }).click()
-    await page.locator('[role="dialog"].dsh-desktop-settings-window:visible').waitFor()
+    await page.getByRole('button', { name: '账号菜单', exact: true }).click()
+    await page.getByRole('menuitem', { name: /^设置/u }).click()
+    const settings = page.locator('[role="dialog"].dsh-desktop-settings-window:visible')
+    await settings.waitFor()
     const settingsMs = Math.round(stamp() - settingsStart)
     await page.keyboard.press('Escape')
+    await settings.waitFor({ state: 'hidden' })
     const tail = await page.locator('[data-chat-flow-kind="user"]').evaluateAll(nodes => nodes.slice(-5).map(node => node.textContent))
     const tailHash = hash(JSON.stringify(tail))
     if (run === 0) renderedTailHash = tailHash

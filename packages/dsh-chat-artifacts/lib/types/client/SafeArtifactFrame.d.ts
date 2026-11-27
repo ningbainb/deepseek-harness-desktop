@@ -1,18 +1,21 @@
-/** Defense-in-depth policy for the isolated artifact document. */
-export declare const SAFE_ARTIFACT_CSP: string;
-/** Wrap a validated fragment in a document with a restrictive CSP and theme tokens. */
-export declare function buildSafeArtifactDocument(html: string): string;
+import { type ArtifactActionRequest, type ArtifactFrameDiagnostic } from './frame-document.ts';
+export { buildSafeArtifactDocument, SAFE_ARTIFACT_CSP } from './frame-document.ts';
+export type { ArtifactActionRequest, ArtifactFrameDiagnostic } from './frame-document.ts';
 export interface SafeArtifactFrameProps {
     html: string;
     title: string;
     height: number;
     expanded: boolean;
     unloadedLabel: string;
+    mode?: 'static' | 'interactive';
+    phase?: 'streaming' | 'settled';
+    runNonce?: number;
+    manualHeight?: number;
+    onAutoHeight?: (height: number) => void;
+    onDiagnostic?: (diagnostic: ArtifactFrameDiagnostic) => void;
+    onAction?: (request: ArtifactActionRequest) => void;
 }
-/**
- * Render an artifact in a sandbox without allow-scripts. Far-away frames are
- * removed to keep long conversations cheap; the document is deterministic, so
- * remounting has no application state to lose.
- */
-export declare function SafeArtifactFrame({ html, title, height, expanded, unloadedLabel, }: SafeArtifactFrameProps): import("react").JSX.Element;
+export declare const MIN_PREVIEW_HEIGHT = 72;
+export declare const MAX_PREVIEW_HEIGHT = 3200;
+export declare function SafeArtifactFrame({ html, title, height, expanded, unloadedLabel, mode, phase, runNonce, manualHeight, onAutoHeight, onDiagnostic, onAction, }: SafeArtifactFrameProps): import("react").JSX.Element;
 //# sourceMappingURL=SafeArtifactFrame.d.ts.map

@@ -14,6 +14,12 @@ export interface FastOpsSettings {
   maxInlineBytes: number
   resultCacheTtlMs: number
   maxCachedRefs: number
+  denoise: {
+    enabled: boolean
+    git: boolean
+    test: boolean
+    build: boolean
+  }
 }
 
 export function defaultSettings(): FastOpsSettings {
@@ -25,6 +31,7 @@ export function defaultSettings(): FastOpsSettings {
     maxInlineBytes: 16384,
     resultCacheTtlMs: 3600000,
     maxCachedRefs: 128,
+    denoise: { enabled: true, git: true, test: true, build: true },
   }
 }
 
@@ -41,6 +48,17 @@ export function normalizeSettings(input: unknown): { settings: FastOpsSettings; 
   if (input === null || typeof input !== 'object') return { settings, problems }
 
   const raw = input as Record<string, unknown>
+  if (raw.denoise !== undefined) {
+    if (raw.denoise === null || typeof raw.denoise !== 'object' || Array.isArray(raw.denoise)) {
+      problems.push('denoise')
+    } else {
+      const values = raw.denoise as Record<string, unknown>
+      for (const key of ['enabled', 'git', 'test', 'build'] as const) {
+        if (typeof values[key] === 'boolean') settings.denoise[key] = values[key]
+        else if (values[key] !== undefined) problems.push(`denoise.${key}`)
+      }
+    }
+  }
 
   if (typeof raw.enabled === 'boolean') settings.enabled = raw.enabled
   else if (raw.enabled !== undefined) problems.push('enabled')

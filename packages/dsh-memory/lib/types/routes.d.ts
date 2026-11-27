@@ -9,5 +9,6 @@ export declare function isTrustedMemoryRequest(request: IncomingMessage): boolea
 export declare function makeMemoryRoutes(options: {
     service: MemoryService;
     enabled?: () => boolean;
+    suggestTurn?: (context: NonNullable<ReturnType<MemoryService['localContext']>>) => Promise<boolean>;
 }): WebRoute[];
 //# sourceMappingURL=routes.d.ts.map

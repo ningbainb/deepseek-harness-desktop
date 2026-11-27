@@ -6,32 +6,36 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import css from './llm-antigravity.module.css'
 import { authModes, defaults, efforts, namespace, statusPath, type AuthMode, type Diagnostic, type Settings } from '../config.ts'
-import { acpStore, STATUS_UPDATED_EVENT } from './acpStore.ts'
+import { STATUS_UPDATED_EVENT } from './acpStore.ts'
 import { AcpChatFrameHoc } from './AcpChatView.tsx'
+import { AcpComposerControl } from './AcpComposerControl.tsx'
+import { acpEn, acpZh } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'llm-antigravity': keyof typeof zh }
   interface SlotMap {
     'web-ui.plugin.item': { kind: 'list'; scope: 'root'; owner: { children?: never } }
-    'conversation.hero.frame': { kind: 'hoc'; scope: 'root'; owner: { hero: boolean } }
   }
 }
 
 const en = {
+  ...acpEn,
   description: 'Use your local Gemini subscription through the official Antigravity CLI.',
   installed: 'Ready', signedOut: 'Signed out', missing: 'Not installed', stopped: 'Disabled', checkFailed: 'Detection failed',
   copy: 'Copy command', copied: 'Copied', copyFailed: 'Could not copy command.',
   check: 'Check again', advanced: 'Advanced settings', recommended: 'stream-json (legacy headless)',
   acpOption: 'ACP (recommended, interactive stdio)',
-  transportHint: 'ACP uses the official Agent Client Protocol over standard input and output.',
   authMode: 'Authentication mode',
   authPersonal: 'Google account (oauth-personal, interactive ACP only)',
   authBusiness: 'Gemini Enterprise (oauth-business, interactive ACP only)',
   authApiKey: 'Gemini API key (gemini-api-key)',
   authPlatform: 'Google Cloud / Vertex AI (agent-platform)',
-  oauthComplianceNotice: 'Personal and business OAuth are restricted to direct interactive ACP sessions and never enter background automation. Once Ready, pick any model under "Antigravity (Gemini)" inside the main model selector to open it in a Frame / Picture-in-Picture ACP window.',
-  missingApiCredentialNotice: 'API-billed credentials were not detected yet. Set GEMINI_API_KEY / GOOGLE_API_KEY (or GCP Application Default Credentials), then click Refresh models so Antigravity models appear directly in the standard API catalog.',
-  openInteractive: 'Open Gemini Chat',
+  oauthComplianceNotice: 'Google sign-in is for manual local chat.',
+  missingApiCredentialNotice: 'No API-billed credentials detected.',
+  openInteractive: 'Use Gemini',
+  copyText: 'Copy', footnotes: 'Footnotes', thinking: 'Thinking…', thoughts: 'Reasoning', generating: 'Generating',
+  plan: 'Plan', details: 'Details', tool: 'Tool call', permission: 'Confirm action', deny: 'Deny', stop: 'Stop',
+  textOnly: 'Gemini accepts text here. Remove the attachment to send.',
   expand: 'Show all models', collapse: 'Show fewer models', unsaved: 'Unsaved changes', saved: 'Settings saved.', saving: 'Saving settings',
   reset: 'Discard changes',
   title: 'Antigravity CLI (Gemini)', enabled: 'Enable provider', cliPath: 'Absolute agy executable path',
@@ -46,30 +50,28 @@ const en = {
   installStep2: 'Sign in with agy acp --login in your terminal, then click Check again.',
   fillCliPath: 'Set executable path',
   loginGuide: 'Run this command in your terminal to sign in with your Google account, then refresh models:',
-  readyGuide: 'Synced to the model selector — you can pick these Gemini models directly in chat.',
-  readyOauthWithheldGuide: 'Antigravity CLI is ready. Pick any Gemini model in the main model selector to launch an isolated Frame / Picture-in-Picture ACP chat.',
-  acpCapabilitiesSummary: 'Official ACP v1 negotiated',
-  acpLoadSupported: 'session resume supported',
-  acpLoadUnsupported: 'fresh session per launch',
   'not-installed': 'Install Antigravity CLI or set its executable path.',
   'not-authenticated': 'Run agy or agy acp --login in a terminal, then refresh models.',
   error: 'Could not load models. Check agy models in a terminal.', modelCount: 'Available models',
 }
 const zh: typeof en = {
+  ...acpZh,
   description: '通过官方 Antigravity CLI 使用本机已登录的 Gemini 订阅。',
   installed: '已就绪', signedOut: '未登录', missing: '未安装', stopped: '已停用', checkFailed: '检测失败',
   copy: '复制命令', copied: '已复制', copyFailed: '无法复制命令。',
   check: '重新检测', advanced: '高级配置', recommended: 'stream-json（兼容无头流）',
   acpOption: 'ACP（推荐，官方交互协议）',
-  transportHint: 'ACP 通过标准输入输出使用官方 Agent Client Protocol。',
   authMode: '认证方式',
   authPersonal: '个人 Google 账号（仅交互 ACP）',
   authBusiness: 'Gemini Enterprise（仅交互 ACP）',
   authApiKey: 'Gemini API Key（按量计费）',
   authPlatform: 'Google Cloud / Vertex AI（ADC 按量计费）',
-  oauthComplianceNotice: '说明：个人或企业 Google OAuth 仅限本机人工交互使用，不进入后台自动化或普通 API 路由。启用就绪后，直接在聊天框「模型列表 → Antigravity (Gemini)」中点选任意模型，即可以「框中框 / 画中画」模式实时对话。',
-  missingApiCredentialNotice: '当前环境尚未检测到按量计费凭据（GEMINI_API_KEY / GOOGLE_API_KEY 或 gcloud ADC 凭据文件）。若继续使用本机登录的 OAuth 订阅，可直接在模型列表中点选「Antigravity (Gemini)」通过框中框 ACP 交互。',
-  openInteractive: '打开 Gemini 交互会话',
+  oauthComplianceNotice: 'Google 登录仅用于本机手动对话。',
+  missingApiCredentialNotice: '未检测到按量计费凭据。',
+  openInteractive: '使用 Gemini',
+  copyText: '复制', footnotes: '脚注', thinking: '正在思考…', thoughts: '思考过程', generating: '生成中',
+  plan: '执行计划', details: '详情', tool: '工具调用', permission: '确认操作', deny: '拒绝', stop: '停止生成',
+  textOnly: '此处的 Gemini 仅支持文本。移除附件后即可发送。',
   expand: '显示全部模型', collapse: '收起模型', unsaved: '有未保存的修改', saved: '设置已保存。', saving: '正在保存设置',
   reset: '还原修改',
   title: 'Antigravity CLI (Gemini)', enabled: '启用模型提供商', cliPath: 'agy 可执行文件绝对路径',
@@ -83,11 +85,6 @@ const zh: typeof en = {
   installStep2: '在终端运行 agy acp --login 完成登录，然后点击「重新检测」。',
   fillCliPath: '填写可执行文件路径',
   loginGuide: '请在终端运行以下命令完成 Google 账号登录，登录后点击「重新检测」：',
-  readyGuide: '已同步到模型选择器，可直接在会话中切换使用以下 Gemini 模型。',
-  readyOauthWithheldGuide: '已检测到本机 Antigravity CLI 与模型列表：已同步至模型选择器的「Antigravity (Gemini)」分组，选择模型即以「框中框 / 画中画」开启合规 ACP 交互。',
-  acpCapabilitiesSummary: '已协商官方 ACP v1 协议',
-  acpLoadSupported: '支持会话恢复',
-  acpLoadUnsupported: '每次独立会话',
   'not-installed': '请安装 Antigravity CLI 或配置其可执行文件路径。',
   'not-authenticated': '请在终端运行 agy 或 agy acp --login，登录后刷新模型。',
   error: '无法加载模型。请在终端检查 agy models。', modelCount: '可用模型',
@@ -122,7 +119,6 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
   const [busy, setBusy] = useState(false)
   const [saveState, setSaveState] = useState<'saving' | 'saved' | 'failed'>()
   const [copyState, setCopyState] = useState<'copied' | 'copyFailed'>()
-  const [acpCaps, setAcpCaps] = useState<{ loadSession: boolean }>()
   const [expanded, setExpanded] = useState(false)
   const detection = useRef<AbortController | null>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -146,18 +142,6 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
       if (!controller.signal.aborted) {
         setDiagnostic(value)
         window.dispatchEvent(new CustomEvent(STATUS_UPDATED_EVENT))
-      }
-      if (!controller.signal.aborted && value.state === 'ready') {
-        void fetch('/api/dsh-acp/probe', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-dsh-acp': '1' },
-          body: JSON.stringify({ agentId: 'antigravity', commandOverride: value.path }),
-          signal: controller.signal,
-        }).then(r => (r.ok ? r.json() : null)).then((probe) => {
-          if (!controller.signal.aborted && probe?.state === 'ready' && probe?.capabilities) {
-            setAcpCaps({ loadSession: Boolean(probe.capabilities.loadSession) })
-          }
-        }).catch(() => {})
       }
     } catch {
       if (!controller.signal.aborted) setDiagnostic({ state: 'error', models: [] })
@@ -272,10 +256,6 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
       {state === 'error' && <p className={css.notice} data-tone="error" role="alert">{t('error')}</p>}
 
       {state === 'ready' && <div className={css.models}>
-        <p className={css.readyBanner}>
-          {t(diagnostic?.harnessLlmAllowed ? 'readyGuide' : 'readyOauthWithheldGuide')}
-          {acpCaps && ` (${t('acpCapabilitiesSummary')}: ${t(acpCaps.loadSession ? 'acpLoadSupported' : 'acpLoadUnsupported')})`}
-        </p>
         <div className={css.modelsHead}>
           <h4>{t('modelCount')} <span className={css.countPill}>{models.length}</span></h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -284,7 +264,7 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
                 type="button"
                 className={css.quietBtn}
                 onClick={() => {
-                  void acpStore.openWithModel(models[0]?.id)
+                  document.dispatchEvent(new CustomEvent('dsh-antigravity-acp-pick', { detail: models[0]?.id }))
                 }}
               >
                 {t('openInteractive')}
@@ -330,7 +310,6 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
                 onChange={e => update('timeoutSeconds', Number(e.target.value))} />
             </label>
           </div>
-          <p className={css.fieldHint}>{t('transportHint')}</p>
           {!diagnostic?.harnessLlmAllowed && <div className={css.guideBox} data-tone="warn">
             <p className={css.guideText}>
               {t(draft.authMode === 'gemini-api-key' || draft.authMode === 'agent-platform'
@@ -380,6 +359,21 @@ export function apply(ctx: Context) {
     inject: () => ({ form: ctx.configForms.get<Settings>(namespace) }),
   }, SettingsCard))
   ctx.slots.inject('conversation.hero.frame', () => ctx.slots.register({
-    name: 'conversation.hero.frame', id: `${namespace}-acp-frame`, order: 80,
+    name: 'conversation.hero.frame', id: `${namespace}-acp-frame`, order: 80, locale: namespace,
   }, AcpChatFrameHoc))
+  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+    name: 'conversation.input.right', id: `${namespace}-acp-composer`, locale: namespace,
+    inject: sessionId => ({
+      getCwd: () => {
+        const sessions = (ctx as { get?: (key: string) => unknown }).get?.('sessions') as {
+          binding?(sessionId: string): { session: { projections: { faceOf(name: string): { getSnapshot(): unknown } } } } | undefined
+          list?: { getSnapshot(): { byId: Record<string, { cwd?: string } | undefined> } }
+        } | undefined
+        const cwd = sessions?.binding?.(String(sessionId))?.session.projections.faceOf('workingDirectory').getSnapshot()
+        return typeof cwd === 'string' && cwd.trim()
+          ? cwd
+          : sessions?.list?.getSnapshot().byId[String(sessionId)]?.cwd
+      },
+    }),
+  }, AcpComposerControl))
 }

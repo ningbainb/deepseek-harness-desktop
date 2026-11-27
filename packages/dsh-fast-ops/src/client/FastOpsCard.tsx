@@ -19,7 +19,11 @@ export interface FastOpsCardProps {
 }
 
 const RESIDENT_TOOL_NAMES = ['fast_read_files', 'fast_search', 'fast_edit_batch', 'fast_discover'] as const
-const SPECIALIZED_TOOL_NAMES = ['fast_stat', 'fast_diff', 'fast_replace', 'fast_read_table', 'fast_result'] as const
+const SPECIALIZED_TOOL_NAMES = [
+  'fast_stat', 'fast_diff', 'fast_replace', 'fast_read_table', 'fast_result',
+  'fast_outline', 'fast_ast_search', 'fast_ast_rewrite', 'fast_repo_map',
+] as const
+const DENOISE_RULES = { enabled: 'denoiseEnabled', git: 'denoiseGit', test: 'denoiseTest', build: 'denoiseBuild' } as const
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
@@ -87,6 +91,8 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
     filesReadInBatches: 0,
     cacheSpills: 0,
     toolsActivated: 0,
+    astCalls: 0,
+    denoiseTokensSaved: 0,
   }
   const cache = state?.cache ?? { totalRefs: 0, totalBytes: 0, sessionCount: 0 }
   const isDirty = state !== null && JSON.stringify(draft) !== JSON.stringify(state.settings)
@@ -138,6 +144,15 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
           <div className={css.metricValue}>{`${cache.totalRefs} (${formatBytes(cache.totalBytes)})`}</div>
           <div className={css.metricLabel}>{t('statsCacheRefs')}</div>
           <div className={css.metricSub}>{`${counters.cacheSpills} ${t('statsSpillSuffix')}`}</div>
+        </div>
+        <div className={css.metricCard}>
+          <div className={css.metricValue}>{counters.astCalls}</div>
+          <div className={css.metricLabel}>{t('statsAstCalls')}</div>
+          {state && <div className={css.metricSub}>{t(state.astAvailable ? 'astNative' : 'astFallback')}</div>}
+        </div>
+        <div className={css.metricCard}>
+          <div className={css.metricValue}>{counters.denoiseTokensSaved}</div>
+          <div className={css.metricLabel}>{t('statsDenoiseTokens')}</div>
         </div>
       </div>
 
@@ -195,6 +210,31 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
           ))}
         </div>
       </div>
+
+      <details className={css.disclosure}>
+        <summary className={css.disclosureSummary}>{t('denoiseTitle')}</summary>
+        <div className={css.disclosureBody}>
+          <p className={css.fieldDesc}>{t('denoiseDescription')}</p>
+          {Object.entries(DENOISE_RULES).map(([rule, label]) => {
+            const key = rule as keyof typeof DENOISE_RULES
+            return (
+              <label className={css.settingRow} key={key}>
+                <span className={css.rowTitle}>{t(label)}</span>
+                <span className={css.switchControl}>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className={css.switchInput}
+                    checked={draft.denoise[key]}
+                    onChange={event => setDraft(prev => ({ ...prev, denoise: { ...prev.denoise, [key]: event.target.checked } }))}
+                  />
+                  <span className={css.switchTrack} aria-hidden="true" />
+                </span>
+              </label>
+            )
+          })}
+        </div>
+      </details>
 
       <details className={css.disclosure}>
         <summary className={css.disclosureSummary}>{t('advancedTitle')}</summary>

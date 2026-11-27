@@ -101,6 +101,10 @@ export function BranchChip(props: BranchChipProps) {
     const sessions = state as { byId?: Record<string, { blank?: boolean }> }
     return sessions.byId?.[sessionId]?.blank === true
   })
+  const workspaceCwd = props.useSessions(state => {
+    if (sessionId === undefined) return undefined
+    return (state as { byId?: Record<string, { cwd?: string }> }).byId?.[sessionId]?.cwd
+  })
   // Only the dock seat carries the conversation snapshot + input owner share;
   // its row spans the whole composer stack, so the chip indents by the
   // shell's composer side clearance to start flush with the input card below
@@ -130,6 +134,19 @@ export function BranchChip(props: BranchChipProps) {
   const anchorRef = useRef<HTMLDivElement | null>(null)
   /** Latest `[data-composer-card]` query result for the dock measure pass. */
   const cardRef = useRef<HTMLElement | null>(null)
+
+  useEffect(() => {
+    if (!repo || !sessionId || !workspaceCwd) return
+    const openProjectGraph = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return
+      const detail = event.detail as { sessionId?: string; cwd?: string } | undefined
+      if (detail?.sessionId !== sessionId || detail.cwd !== workspaceCwd) return
+      setBranchOpen(false)
+      setGraphOpen(true)
+    }
+    window.addEventListener('dsh:open-project-git-graph', openProjectGraph)
+    return () => window.removeEventListener('dsh:open-project-git-graph', openProjectGraph)
+  }, [repo, sessionId, workspaceCwd])
 
   // Active-phase dock placement: the dock row spans different containers per
   // shell phase (the centered hero composer stack, or the full-width

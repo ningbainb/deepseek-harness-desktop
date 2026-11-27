@@ -92,6 +92,8 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@linxin666/dsh-liangshen',
   '@linxin666/dsh-live-stats',
   '@ningbainb/dsh-memory',
+  '@ningbainb/dsh-local-search',
+  '@ningbainb/dsh-checkpoints',
   '@linxin666/dsh-client-ui-model-preferences',
   '@linxin666/dsh-pet',
   '@linxin666/dsh-remote-web-ui',
@@ -106,6 +108,7 @@ export const AGGREGATED_BUNDLES = Object.freeze([
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-win-control',
   '@ningbainb/dsh-fast-ops',
+  '@ningbainb/dsh-doc-ingest',
   '@ningbainb/dsh-im-hub',
 ].toSorted())
 
@@ -214,6 +217,8 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@linxin666/dsh-liangshen',
   '@linxin666/dsh-live-stats',
   '@ningbainb/dsh-memory',
+  '@ningbainb/dsh-local-search',
+  '@ningbainb/dsh-checkpoints',
   '@linxin666/dsh-pet',
   '@linxin666/dsh-particle-theme',
   '@linxin666/dsh-remote-web-ui',
@@ -232,6 +237,7 @@ export const BUILTIN_RUNTIME_PACKAGES = Object.freeze([
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-win-control',
   '@ningbainb/dsh-fast-ops',
+  '@ningbainb/dsh-doc-ingest',
   '@ningbainb/dsh-im-hub',
   'dsh-better-sidebar',
   'reasoning-slider',
@@ -319,7 +325,9 @@ export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@linxin666/dsh-client-ui-task-board',
   '@linxin666/dsh-tool-describe-image',
   '@ningbainb/dsh-chat-artifacts',
+  '@ningbainb/dsh-checkpoints',
   '@ningbainb/dsh-memory',
+  '@ningbainb/dsh-local-search',
   '@ningbainb/dsh-data-location',
   '@ningbainb/dsh-agent-inbox',
   '@ningbainb/dsh-llm-antigravity',
@@ -328,6 +336,7 @@ export const DESKTOP_AGGREGATE_WORKSPACE_OVERRIDE_PACKAGES = Object.freeze([
   '@ningbainb/dsh-user-scope',
   '@ningbainb/dsh-win-control',
   '@ningbainb/dsh-fast-ops',
+  '@ningbainb/dsh-doc-ingest',
   '@ningbainb/dsh-im-hub',
 ].toSorted())
 
@@ -516,6 +525,10 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
       name: '@ningbainb/dsh-llm-antigravity'
     - id: personal-prompt
       name: '@ningbainb/dsh-personal-prompt'
+    - id: local-search
+      name: '@ningbainb/dsh-local-search'
+    - id: checkpoints
+      name: '@ningbainb/dsh-checkpoints'
     - id: memory
       name: '@ningbainb/dsh-memory'
     - id: web-ui-mode-switcher
@@ -536,6 +549,10 @@ ${LEGACY_DESKTOP_PATCH_CONFIG.trimEnd()}
       name: '@ningbainb/dsh-win-control'
     - id: fast-ops
       name: '@ningbainb/dsh-fast-ops'
+    - id: doc-ingest
+      name: '@ningbainb/dsh-doc-ingest'
+      config:
+        tools: false
     - id: im-hub
       name: '@ningbainb/dsh-im-hub'
     - id: windows-mcp-bridge

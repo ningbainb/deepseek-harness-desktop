@@ -1,75 +1,35 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { IconChevronDownOutlineRegular, IconDataOutlineMedium, IconLoadingOutlineMedium, StateDot, } from '@deepseek-ai/dsh-client-ui-primitives';
-import { ARTIFACT_KINDS, artifactSourceFromMeta, isArtifactRecord, } from "../core/types.js";
-import css from './artifact.module.css';
+import { IconDataOutlineMedium, StateDot, } from '@deepseek-ai/dsh-client-ui-primitives';
+import { artifactSourceFromMeta, isArtifactRecord } from "../core/types.js";
+import { CHAT_ARTIFACTS_PATCH_TOOL_NAME } from "../invariant.js";
 import { ArtifactCard } from "./ArtifactCard.js";
-function isSettled(block) {
-    return 'kind' in block && block.kind === 'tool-result';
-}
-function callArgs(block) {
-    return isSettled(block) ? block.call?.argsRaw ?? '' : block.phase === 'start' ? block.argsRaw : '';
-}
-function pendingArgs(raw) {
-    try {
-        const parsed = JSON.parse(raw);
-        if (typeof parsed !== 'object' || parsed === null)
-            return {};
-        const value = parsed;
-        return {
-            ...(typeof value.title === 'string' ? { title: value.title } : {}),
-            ...(typeof value.kind === 'string' && ARTIFACT_KINDS.includes(value.kind)
-                ? { kind: value.kind }
-                : {}),
-        };
-    }
-    catch {
-        return {};
-    }
-}
-function resultText(node) {
-    return node.content.map(block => block.type === 'text' ? block.text : JSON.stringify(block) ?? '').join('\n').trim();
-}
-function firstLine(text) {
-    return text.split(/\r?\n/u).map(line => line.trim()).find(Boolean) ?? '';
-}
+import { artifactAnchor, artifactTranscript } from "./artifact-transcript.js";
+import css from './artifact.module.css';
 function errorText(node, t) {
-    const text = firstLine(resultText(node));
-    if (text.length > 0)
-        return text;
-    if (node.error !== undefined)
-        return node.error.code;
-    return t('card.unknownError');
+    const firstLine = node.content.flatMap(block => block.type === 'text' ? block.text.split(/\r?\n/u) : [])
+        .map(line => line.trim()).find(Boolean);
+    return firstLine ?? node.error?.code ?? t('card.unknownError');
 }
-function kindLabel(t, kind) {
-    const key = ('kind.' + kind);
-    return t(key);
+function openPinnedArtifact(anchor) {
+    const target = document.getElementById(anchor);
+    if (!target)
+        return;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: 'nearest', behavior: 'auto' });
 }
-function StatusIcon({ state }) {
-    if (state === 'running')
-        return _jsx(IconLoadingOutlineMedium, { className: css.statusIcon });
-    if (state === 'error')
-        return _jsx(StateDot, { state: "error" });
-    if (state === 'stopped')
-        return _jsx(StateDot, { state: "warning" });
-    return _jsx(IconDataOutlineMedium, { className: css.statusIcon });
-}
-function FallbackRow({ state, title, summary, t, source }) {
-    return (_jsxs("section", { className: css.fallback, "data-artifact-state": state, children: [_jsxs("div", { className: css.fallbackHeader, children: [_jsxs("div", { className: css.heading, children: [_jsx(StatusIcon, { state: state }), _jsxs("div", { className: css.headingText, children: [_jsx("div", { className: css.title, children: title }), _jsx("div", { className: css.meta, children: summary })] })] }), _jsx(IconChevronDownOutlineRegular, { className: css.fallbackChevron })] }), source !== undefined ? (_jsxs("details", { className: css.fallbackSource, children: [_jsx("summary", { children: t('card.viewSource') }), _jsx("pre", { className: css.source, children: _jsx("code", { children: source }) })] })) : null] }));
-}
-/** Keyed Tool renderer for render_artifact, including pending and replay fallback states. */
-export function ArtifactToolRow({ block, t }) {
-    if (!isSettled(block)) {
-        const args = pendingArgs(callArgs(block));
-        const title = args.title?.trim() || 'Render artifact';
-        const summary = args.kind === undefined ? t('card.generating') : kindLabel(t, args.kind) + ' · ' + t('card.generating');
-        return _jsx(FallbackRow, { state: "running", title: title, summary: summary, t: t });
+export function ArtifactToolRow({ phase, block, toolName, useChat, inputActions, inspect, t }) {
+    const pinned = useChat(snapshot => phase === 'result' ? artifactTranscript(snapshot).pinnedCalls.get(block.callId) : undefined, (a, b) => a?.record === b?.record && a?.turn === b?.turn);
+    const label = t(toolName === CHAT_ARTIFACTS_PATCH_TOOL_NAME ? 'tool.patch' : 'tool.render');
+    if (phase !== 'result') {
+        const title = block.args.textPrefix('title', 160)?.trim() || label;
+        return _jsx("div", { className: css.toolSummary, children: _jsxs("span", { children: [_jsx(IconDataOutlineMedium, {}), title] }) });
     }
-    if (block.isError) {
-        return _jsx(FallbackRow, { state: "error", title: "Render artifact", summary: errorText(block, t), t: t });
-    }
-    if (isArtifactRecord(block.meta)) {
-        return _jsx(ArtifactCard, { artifact: block.meta, t: t });
+    if (!block.isError && isArtifactRecord(block.meta)) {
+        if (!pinned)
+            return _jsx(ArtifactCard, { artifact: block.meta, t: t, inputActions: inputActions });
+        const anchor = artifactAnchor(pinned.turn, pinned.record.artifactId);
+        return _jsxs("div", { "data-artifact-tool-summary": "", className: css.toolSummary, children: [_jsxs("span", { children: [_jsx(IconDataOutlineMedium, {}), block.meta.title] }), _jsx("button", { type: "button", className: css.actionButton, onClick: () => openPinnedArtifact(anchor), children: t('card.locate') }), inspect && _jsx("button", { type: "button", className: css.actionButton, onClick: inspect, children: t('card.inspect') }), !inspect && _jsxs("details", { children: [_jsx("summary", { children: t('card.inspect') }), _jsx("pre", { className: css.source, children: _jsx("code", { children: block.meta.html }) })] })] });
     }
     const source = artifactSourceFromMeta(block.meta);
-    return (_jsx(FallbackRow, { state: "error", title: "Render artifact", summary: source === undefined ? t('card.unavailable') : t('card.invalid'), t: t, source: source }));
+    return _jsxs("section", { className: css.fallback, "data-artifact-state": "error", children: [_jsx("div", { className: css.fallbackHeader, children: _jsxs("div", { className: css.heading, children: [_jsx(StateDot, { state: "error" }), _jsxs("div", { className: css.headingText, children: [_jsx("div", { className: css.title, children: label }), _jsx("p", { className: css.errorText, children: block.isError ? errorText(block, t) : t(source === undefined ? 'card.unavailable' : 'card.invalid') })] })] }) }), source !== undefined && _jsxs("details", { className: css.fallbackSource, children: [_jsx("summary", { children: t('card.viewSource') }), _jsx("pre", { className: css.source, children: _jsx("code", { children: source }) })] })] });
 }

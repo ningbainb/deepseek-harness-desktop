@@ -31,13 +31,24 @@ export declare class ResultCache {
     private prune;
     put(params: {
         sessionId: string;
+        principalId?: string;
         producerTool: string;
         items: readonly Record<string, unknown>[];
         ttlMs: number;
         preview?: string;
     }): StorageReference;
+    /** Preserve exact content while keeping every row within the smallest supported page. */
+    putText(params: {
+        sessionId: string;
+        principalId?: string;
+        producerTool: string;
+        text: string;
+        ttlMs: number;
+        preview?: string;
+    }): StorageReference | undefined;
     page(params: {
         sessionId: string;
+        principalId?: string;
         refId: string;
         offset?: number;
         limit?: number;
@@ -45,7 +56,7 @@ export declare class ResultCache {
         fields?: readonly string[];
         equals?: Record<string, unknown>;
     }): PageResult;
-    release(sessionId: string, refId: string): boolean;
+    release(sessionId: string, refId: string, principalId?: string): boolean;
     clearSession(sessionId: string): number;
     reclaimAll(): number;
     stats(): {

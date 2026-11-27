@@ -9,6 +9,7 @@ import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { BUILTIN_SKIN_IDS } from '../src/profile.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
+import { dismissFirstRunModelChooserWhenShown } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -63,6 +64,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 100))
   }
   assert.ok(page, 'isolated Runtime window must become ready')
+  await dismissFirstRunModelChooserWhenShown(page)
   page.on('console', message => { if (message.type() === 'error') console.error(`renderer: ${message.text()}`) })
   page.on('pageerror', error => console.error(`renderer exception: ${error.message}`))
   console.log(`Runtime window ready: ${temporary}`)

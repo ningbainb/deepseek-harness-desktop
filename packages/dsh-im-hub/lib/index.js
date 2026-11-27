@@ -1658,7 +1658,7 @@ var ApprovalBridge = class {
 		}
 		this.pending.set(id, entry);
 		const lines = [
-			`🔐 工具审批请求 [${id}]`,
+			`工具审批请求 [${id}]`,
 			`工具: \`${request.toolName}\``,
 			...commandPreview ? [`参数: \`${commandPreview}\``] : [],
 			`回复 \`/approve ${id}\` 允许，或 \`/reject ${id}\` 拒绝${this.dualApproval ? "（也可直接在桌面端确认）" : ""}`
@@ -1683,29 +1683,29 @@ var ApprovalBridge = class {
 			this.onLog?.("warn", `unauthorized approval attempt from ${senderId} on ${conversationKey}`);
 			return {
 				ok: false,
-				message: "⚠️ 当前发送者不在白名单中，无权执行审批操作。"
+				message: "当前发送者不在白名单中，无权执行审批操作。"
 			};
 		}
 		const candidates = this.pendingForConversation(conversationKey);
 		if (candidates.length === 0) return {
 			ok: false,
-			message: "ℹ️ 当前会话没有等待确认的审批请求。"
+			message: "当前会话没有等待确认的审批请求。"
 		};
 		const normalizedId = approvalId?.trim().toLowerCase();
 		const target = normalizedId ? candidates.find((item) => item.id === normalizedId) : candidates[0];
 		if (!target) return {
 			ok: false,
-			message: `⚠️ 未找到编号为 \`${approvalId}\` 的待审批请求。`
+			message: `未找到编号为 \`${approvalId}\` 的待审批请求。`
 		};
 		if (!this.finishEntry(target.id, decision)) return {
 			ok: false,
-			message: `ℹ️ 审批 [${target.id}] 已被桌面端或其他方式处理。`
+			message: `审批 [${target.id}] 已被桌面端或其他方式处理。`
 		};
 		return {
 			ok: true,
 			id: target.id,
 			toolName: target.toolName,
-			message: decision === "allowed-once" ? `✅ 已允许 [${target.id}] (\`${target.toolName}\`)` : `🛑 已拒绝 [${target.id}] (\`${target.toolName}\`)`
+			message: decision === "allowed-once" ? `已允许 [${target.id}] (\`${target.toolName}\`)` : `已拒绝 [${target.id}] (\`${target.toolName}\`)`
 		};
 	}
 	resolveById(approvalId, decision) {
@@ -1799,7 +1799,7 @@ function splitMessageChunks(text, maxChars = 3500) {
 }
 function formatHelpMessage(channel) {
 	return [
-		`🤖 DSH IM Hub (${channel}) 命令帮助`,
+		`DSH IM Hub (${channel}) 命令帮助`,
 		"- `/new` — 开启新对话上下文",
 		"- `/stop` — 中止当前正在生成的回复",
 		"- `/status` — 查看当前会话与工作区状态",
@@ -2051,13 +2051,13 @@ var HarnessBridge = class {
 			await binding.agent.whenIdle();
 		} catch (error) {
 			this.onLog?.("warn", `turn interrupted for ${binding.conversationKey}: ${error instanceof Error ? error.message : String(error)}`);
-			if (collector.chunks.length === 0) return `⚠️ 执行中断: ${error instanceof Error ? error.message : String(error)}`;
+			if (collector.chunks.length === 0) return `执行中断: ${error instanceof Error ? error.message : String(error)}`;
 		} finally {
 			this.turnCollectors.delete(binding.sessionId);
 		}
 		const body = collector.chunks.join("\n\n").trim();
-		if (collector.error && !body) return `⚠️ 本轮执行异常: ${collector.error}`;
-		if (collector.error && body) return `${body}\n\n⚠️ ${collector.error}`;
+		if (collector.error && !body) return `本轮执行异常: ${collector.error}`;
+		if (collector.error && body) return `${body}\n\n本轮执行异常: ${collector.error}`;
 		return body || "（无文本输出）";
 	}
 };
@@ -2206,7 +2206,7 @@ var ImHubManager = class {
 				const wsPath = this.harnessBridge.resolveWorkspacePath(key);
 				const pending = this.approvalBridge.pendingForConversation(key);
 				await sendReply([
-					`📊 IM Hub 状态 (${message.channel})`,
+					`IM Hub 状态 (${message.channel})`,
 					`- 会话绑定: ${binding ? `已连接 (${binding.sessionId})` : "未启动（发送消息后自动创建）"}`,
 					`- 当前工作区: \`${wsPath}\``,
 					`- 队列忙碌: ${this.queue.isBusy(key) ? "是" : "否"} (深度 ${this.queue.depth(key)})`,
@@ -2215,19 +2215,19 @@ var ImHubManager = class {
 				return;
 			}
 			case "stop":
-				await sendReply(await this.harnessBridge.stopConversation(key) ? "⏹️ 已请求中止当前回复。" : "ℹ️ 当前没有正在执行的回复。");
+				await sendReply(await this.harnessBridge.stopConversation(key) ? "已请求中止当前回复。" : "当前没有正在执行的回复。");
 				return;
 			case "new":
 				this.approvalBridge.cancelConversation(key);
 				await this.harnessBridge.resetConversation(key);
-				await sendReply("🆕 已开启新对话上下文。");
+				await sendReply("已开启新对话上下文。");
 				return;
 			case "workspace":
 				if (!cmd.path) {
-					await sendReply(`📁 当前绑定工作区: \`${this.harnessBridge.resolveWorkspacePath(key)}\``);
+					await sendReply(`当前绑定工作区: \`${this.harnessBridge.resolveWorkspacePath(key)}\``);
 					return;
 				}
-				await sendReply(`📁 已切换工作区为 \`${await this.harnessBridge.setWorkspace(key, cmd.path)}\` 并重置会话上下文。`);
+				await sendReply(`已切换工作区为 \`${await this.harnessBridge.setWorkspace(key, cmd.path)}\` 并重置会话上下文。`);
 				return;
 			case "approve":
 				await sendReply(this.approvalBridge.resolveFromIm(key, cmd.approvalId, "allowed-once", message.senderId, policy).message);
@@ -2243,7 +2243,7 @@ var ImHubManager = class {
 			} catch (error) {
 				const msg = error instanceof Error ? error.message : String(error);
 				this.pushEvent(message.channel, "error", `turn failed: ${msg}`);
-				await sendReply(`⚠️ 处理消息时出现异常: ${msg}`).catch(() => {});
+				await sendReply(`处理消息时出现异常: ${msg}`).catch(() => {});
 			}
 		});
 	}

@@ -2,68 +2,54 @@
 
 English | [中文](README.zh.md)
 
-@ningbainb/dsh-chat-artifacts adds a model-facing render_artifact tool and
-an official DSH Tool UI renderer. A successful call appears as a visualization
-inside the conversation while the normal assistant text remains the source of
-the explanation.
+`@ningbainb/dsh-chat-artifacts` renders self-contained HTML, CSS, and SVG visualizations in DSH conversations. The assistant can use it for architecture diagrams, reports, dashboards, and interactive prototypes.
 
-## Scope
+## What it does
 
-The first release covers:
+Use **Render Mermaid locally** on a static artifact containing an escaped `<pre class="mermaid">` diagram. The optional bundled runtime loads on demand. Inline SVG and rendered Mermaid diagrams export as SVG or high-resolution PNG from the artifact card.
 
-- self-contained HTML fragments with inline CSS and SVG;
-- a render_artifact tool with architecture, flow, timeline, comparison,
-  roadmap, dashboard, table, wireframe, report, and other kinds;
-- durable presentation metadata for live rendering and session replay;
-- expand/collapse, source viewing, HTML copying, and rendering failure
-  fallback;
-- iframe lazy mounting for long conversations and light/dark theme tokens.
+- `render_artifact` streams a script-free preview while the model generates HTML. When the turn finishes, each artifact's latest version remains visible beneath the assistant's response. If the plugin renderer is unavailable, the standard Tool Card shows a short text result.
+- `patch_artifact` takes an artifact ID and a sequence of literal `oldString` and `newString` replacements. Each `oldString` must match exactly once after the preceding edits. The tool saves a complete snapshot, so earlier versions remain selectable after reopening the conversation.
+- The assistant uses the surrounding conversation to decide when a diagram adds clarity. Follow-ups on the same subject can update the existing diagram. The model receives a short, session-local list of recent artifact identifiers for this purpose.
+- The card offers preview, source, and split views, plus a fullscreen workspace with desktop, tablet, and phone widths. The preview follows the DSH theme.
+- Settled Desktop previews size to their content in the conversation. The conversation handles scrolling for ordinary diagrams and reports.
+- Completed Markdown fences marked `html-live`, or `html` fences containing a complete HTML document, offer a static preview on request.
+- SEP-1865 MCP Apps from explicitly configured servers appear as interactive cards. Tables, counters, and other controls can use the originating server's tools. The card includes the original tool result and a reload control.
 
-The package is a dual-face plugin. Its host half registers the tool and the
-system-prompt guidance. Its browser half registers the render_artifact key in
-the official tool.call.toolview slot. If the browser half is unavailable,
-the DSH generic Tool Card still receives the short text result.
+## Install
+
+Add the package to a DSH profile through the standard plugin loader. `cordis.patch.yml` mounts the host plugin, and the package metadata registers the browser renderer. `dsh-web-ui-all` already includes both.
+
+## Configure
+
+The model supplies an HTML fragment and can set `mode` to `static` or `interactive` on `render_artifact`. `static` is the default, including when replaying saved artifacts without a `mode`. Use `interactive` for controls that require inline JavaScript after generation finishes.
+
+Set `mcpAppServers` on the Chat Artifact plugin's profile configuration. An app server uses either `stdio` or `streamable-http` with HTTPS or loopback HTTP. Reserve a distinct name for each app server. The pinned DSH MCP plugin drops app metadata on ordinary model tools, so the app connector owns one connection for the model tools and interactive UI of each server in this configuration.
+
+```yaml
+- id: chat-artifacts
+  config:
+    mcpAppServers:
+      reports:
+        transport: stdio
+        command: reports-mcp
+        readOnlyTools: [read_report]
+```
 
 ## Security model
 
-The host rejects unsafe content before it can be projected into the session
-log. The browser validates replayed metadata again and renders only with:
+- The host validates HTML before saving it, and the client validates saved records again before rendering. Invalid records show an error with a bounded source excerpt when available.
+- Static previews disable artifact-authored scripts. The guarded Desktop permits only the host's nonce-authorized sizing and theme bridge in settled static previews. Browser, remote web, streaming, and exported static previews run without a bridge. Settled interactive previews run only in the guarded native DSH Desktop window.
+- Interactive frames have an opaque origin. They cannot access the host DOM, cookies, native credentials, Electron IPC, or Node APIs. The sandbox and native navigation guard block popups and navigation, and the content security policy blocks external network access. Browser storage is in memory and lasts only for the current frame.
+- `window.dshUi.sendAction(action, payload)` requires a trusted user interaction in the frame. The card shows the request for review. Select **Fill message input** to insert it into the conversation draft. Sending the message remains a separate user action.
+- The guarded Desktop renders MCP Apps in two sandboxed frames. Network access is off by default. The card can enable the app's declared network origins and reload its view. The host binds resource and tool requests to the original server, session, and principal.
+- A reverse tool call runs without a prompt only if the profile lists it in `readOnlyTools` and its MCP annotation declares it read-only. The running agent turn uses DSH one-shot approval for other calls. After a turn ends, the guarded Desktop can ask for native one-shot approval. External links and message drafts require separate confirmation.
 
-| Surface | Policy |
-| --- | --- |
-| JavaScript | Rejected by validation and disabled with sandbox="" and script-src 'none' |
-| Network | External URLs, CSS imports, forms, and connection APIs are rejected; CSP uses connect-src 'none' |
-| Browser bridge | No parent access, popup, Electron, Node, or automatic download APIs |
-| Resources | Only inline CSS/SVG and media data: or blob: URLs |
-| Recovery | Invalid metadata becomes a normal error row with bounded source text |
+## Known limitations
 
-The input is an HTML fragment rather than an arbitrary document shell. The
-frame adds its own CSP and theme stylesheet around the validated fragment.
+- A fragment can contain up to 512 KiB of UTF-8 HTML. Titles are limited to 160 characters and descriptions to 500 characters. The initial height hint ranges from 240 to 720 pixels and defaults to 420. The Desktop can expand a settled preview to 3200 pixels. Taller content remains scrollable.
+- **Export static HTML** downloads a static `.html` preview. **Copy HTML** copies the original source, including inline scripts from interactive artifacts.
+- Offscreen frames can unload in long conversations. When a frame reloads, its in-memory state resets. The saved artifact and version history remain available.
+- MCP App cards keep their original result for fallback. Interactive views depend on the current Desktop host and originating server and can expire when the host restarts, the server disconnects, or the app binding expires.
 
-## Limits
-
-- HTML is limited to 512 KiB in UTF-8.
-- Requested frame height must be 240–720 pixels; the default is 420.
-- Titles are limited to 160 characters and descriptions to 500 characters.
-- The first release does not execute arbitrary JavaScript or load external
-  libraries.
-
-## Installation
-
-Add the package to a DSH profile through the normal plugin loader. The
-cordis.patch.yml entry mounts the host half, and the package metadata tells
-the web client loader to include the browser half. The aggregate
-dsh-web-ui-all package includes this plugin as both a patch source and a
-dependency.
-
-## Deferred work
-
-The following are deliberately outside the first release:
-
-- update_artifact and versioned artifact editing;
-- settings-page switches and HTML persistence actions;
-- Mermaid and controlled chart DSL renderers;
-- full-screen artifact workspace, export, and conversation nodes.
-
-These features can reuse the durable artifactId and the same keyed Tool UI
-extension without changing the current conversation protocol.
+See [NOTICE.md](NOTICE.md) for the pinned SEP-1865 SDK and integration references.

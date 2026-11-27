@@ -36,13 +36,22 @@ const REPO_CACHE_TTL_MS = 60_000
 /** TTL for a negative (null) repo-top-level verdict. */
 const NO_REPO_CACHE_TTL_MS = 30_000
 
+const GIT_REPO_OVERRIDE = /^GIT_(?:DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|CONFIG_(?:PARAMETERS|COUNT|KEY_\d+|VALUE_\d+))$/iu
+
 /** Production runner over `ctx.subprocess`: one managed child per command. */
 export function subprocessRunner(ctx: Context): GitRunner {
   return {
     async run(argv, cwd) {
+      // Use Git's repository discovery from the gated cwd. Also drop the
+      // complete indexed config cohort: the SDK strips KEY-shaped names, but
+      // a retained GIT_CONFIG_COUNT makes Git reject the incomplete config.
+      const env = Object.fromEntries(Object.keys(process.env)
+        .filter(name => GIT_REPO_OVERRIDE.test(name))
+        .map(name => [name, undefined]))
       const spec: SubprocessSpawnSpec = {
         argv: ['git', ...argv],
         cwd,
+        env,
         stdio: {
           stdin: 'ignore',
           stdout: { maxBytes: OUTPUT_CAP_BYTES },

@@ -25,6 +25,16 @@ export declare const zh: {
     statsActivated: string;
     statsCacheRefs: string;
     statsSpillSuffix: string;
+    statsAstCalls: string;
+    statsDenoiseTokens: string;
+    astNative: string;
+    astFallback: string;
+    denoiseTitle: string;
+    denoiseDescription: string;
+    denoiseEnabled: string;
+    denoiseGit: string;
+    denoiseTest: string;
+    denoiseBuild: string;
     reclaimAction: string;
     saveAction: string;
     saving: string;

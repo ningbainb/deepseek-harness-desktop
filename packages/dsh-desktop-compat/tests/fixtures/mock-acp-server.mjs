@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 
+const probeFixture = process.argv[2]
 const stateFile = join(
   tmpdir(),
   `dsh-mock-acp-${createHash('sha1').update(process.cwd()).digest('hex')}.json`,
@@ -63,6 +64,7 @@ rl.on('line', async (line) => {
 
   switch (msg.method) {
     case 'initialize':
+      if (probeFixture === '--probe-timeout') break
       send({
         jsonrpc: '2.0',
         id: msg.id,
@@ -84,6 +86,10 @@ rl.on('line', async (line) => {
       send({ jsonrpc: '2.0', id: msg.id, result: {} })
       break
     case 'session/new': {
+      if (probeFixture === '--probe-signed-out') {
+        send({ jsonrpc: '2.0', id: msg.id, error: { code: -32000, message: 'Authentication required' } })
+        break
+      }
       const sid = `acp-sess-${sessions.size + 1}`
       sessions.set(sid, { cwd: msg.params?.cwd, model: 'gemini-pro', effort: 'medium' })
       saveSessions(sessions)
@@ -105,6 +111,12 @@ rl.on('line', async (line) => {
               name: 'Thought Level',
               currentValue: 'medium',
               options: [{ value: 'low', name: 'Low' }, { value: 'high', name: 'High' }],
+            },
+            {
+              id: 'mode',
+              category: 'mode',
+              currentValue: 'ask',
+              options: [{ value: 'ask' }, { value: 'plan' }, { value: 'bypassPermissions' }],
             },
           ],
         },
@@ -209,8 +221,11 @@ rl.on('line', async (line) => {
       const fileRes = await callClient('fs/read_text_file', { sessionId: sid, path: 'note.txt' })
       const permRes = await callClient('session/request_permission', {
         sessionId: sid,
-        toolCall: { title: 'Edit note.txt', kind: 'edit' },
-        options: [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }],
+        toolCall: { title: 'Edit note.txt', kind: 'edit', rawInput: { path: 'note.txt' } },
+        options: [
+          { optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' },
+          { optionId: 'allow-always', name: 'Allow always', kind: 'allow_always' },
+        ],
       })
 
       send({

@@ -12,6 +12,12 @@ export interface FastOpsSettings {
     maxInlineBytes: number;
     resultCacheTtlMs: number;
     maxCachedRefs: number;
+    denoise: {
+        enabled: boolean;
+        git: boolean;
+        test: boolean;
+        build: boolean;
+    };
 }
 export declare function defaultSettings(): FastOpsSettings;
 /** Coerce arbitrary settings input into valid clamped FastOpsSettings. */

@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OfficeAppsComposerTrigger, OfficeStarterDock } from '../src/client/work-mode/OfficeAppsComposerBar.tsx'
 import { workModeEn, workModeZh, type WorkModeLocaleKey } from '../src/client/work-mode/locales.ts'
@@ -68,6 +68,42 @@ const SAMPLE_SNAPSHOT: WorkModeSnapshot = {
 }
 
 describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
+  it('releases the native composer dock as soon as the first turn is admitted', () => {
+    officeAppsStore.seedSnapshot(SAMPLE_SNAPSHOT)
+    officeAppsStore.setExperienceMode('office')
+    let awaitingFirstTurn = false
+    const useSession = (select: (session: { blank: boolean; running: boolean; awaitingFirstTurn: boolean }) => boolean) =>
+      select({ blank: true, running: false, awaitingFirstTurn })
+    const layout = () => <div>
+      <div data-composer-card><OfficeAppsComposerTrigger
+        t={key => workModeZh[key]} locale="zh" useSession={useSession}
+        onOpenExtensions={vi.fn()} onOpenExternalUrl={vi.fn()} onRunPrompt={vi.fn()} />
+      </div>
+      <div data-composer-dock><button type="button">340 tok</button></div>
+    </div>
+    const { container, rerender } = render(layout())
+    const chips = () => container.querySelector('[data-dsh-office-starter-dock]')
+    expect(chips()).not.toBeNull()
+    awaitingFirstTurn = true
+    rerender(layout())
+    expect(chips()).toBeNull()
+    expect(screen.getByRole('button', { name: '340 tok' })).toBeTruthy()
+    expect(container.querySelector('[data-dsh-office-apps-trigger]')).not.toBeNull()
+  })
+
+  it('shows the composer entry only in office mode, including after switching modes', () => {
+    officeAppsStore.seedSnapshot(SAMPLE_SNAPSHOT)
+    const { container } = render(<OfficeAppsComposerTrigger
+      t={key => workModeZh[key]} locale="zh" onOpenExtensions={vi.fn()}
+      onOpenExternalUrl={vi.fn()} onRunPrompt={vi.fn()} />)
+    const trigger = () => container.querySelector('[data-dsh-office-apps-trigger]')
+    expect(trigger()).toBeNull()
+    act(() => officeAppsStore.setExperienceMode('office'))
+    expect(trigger()).not.toBeNull()
+    act(() => officeAppsStore.setExperienceMode('dev'))
+    expect(trigger()).toBeNull()
+  })
+
   it('contains strictly zero emoji in bilingual dictionaries', () => {
     for (const dict of [workModeZh, workModeEn]) {
       for (const value of Object.values(dict)) {
@@ -294,6 +330,7 @@ describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     officeAppsStore.seedSnapshot(SAMPLE_SNAPSHOT)
+    officeAppsStore.setExperienceMode('office')
     render(
       <OfficeAppsComposerTrigger
         t={key => workModeZh[key]}
@@ -368,6 +405,7 @@ describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
     }))
 
     officeAppsStore.seedSnapshot(installedSnap)
+    officeAppsStore.setExperienceMode('office')
     render(
       <OfficeAppsComposerTrigger
         t={key => workModeZh[key]}

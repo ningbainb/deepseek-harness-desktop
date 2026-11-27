@@ -42,6 +42,16 @@
     - id: personal-prompt
       name: '@ningbainb/dsh-personal-prompt'
 
+# from ../dsh-local-search
+- insert:
+    - id: local-search
+      name: '@ningbainb/dsh-local-search'
+
+# from ../dsh-checkpoints
+- insert:
+    - id: checkpoints
+      name: '@ningbainb/dsh-checkpoints'
+
 # from ../dsh-memory
 - insert:
     - id: memory
@@ -115,6 +125,11 @@
 - insert:
     - id: fast-ops
       name: '@ningbainb/dsh-fast-ops'
+
+# from ../dsh-doc-ingest
+- insert:
+    - id: doc-ingest
+      name: '@ningbainb/dsh-doc-ingest'
 
 # from ../dsh-im-hub
 - insert:

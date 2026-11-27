@@ -1,16 +1,16 @@
 import { FRIENDLY_CANCELLED_MESSAGE, createQueueRecoveryScheduler, normalizeCancellationDecision, recoverQueuedTurns } from "./recovery.js";
 import { DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV, isDesktopWorkspaceFileOpenToken, isSafeDesktopWorkspaceFileOpenPath } from "./workspace-file-open-policy.js";
 import { createRequire } from "node:module";
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createPublicKey, randomBytes, randomUUID, timingSafeEqual, verify } from "node:crypto";
 import { installModelSelection } from "@deepseek-ai/dsh-agent";
 import { createUserMessage } from "@deepseek-ai/dsh-llm";
 import { SessionId } from "@deepseek-ai/dsh-session";
 import { defineTool, validateJsonSchemaValue } from "@deepseek-ai/dsh-tools";
 import { accessSync, chmodSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep, win32 } from "node:path";
 import { Service } from "@deepseek-ai/cordis";
-import { chmod, copyFile, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
+import { access, chmod, copyFile, mkdir, readFile, readdir, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
@@ -418,6 +418,7 @@ var DesktopSkinStateService = class extends Service {
 };
 //#endregion
 //#region src/tool-call-normalization.ts
+const ARTIFACT_ARGUMENT_PREFIX = /^\s*\{\s*"(?:title|kind|mode|html|height|description)"\s*:/u;
 function isJsonObject(value) {
 	return value !== null && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
 }
@@ -638,19 +639,31 @@ function* flushRawBufferedToolCall(index, buffered) {
 /**
 * Normalize model tool-call payloads before dsh-agent-loop parses raw JSON.
 * Complete `block-end` calls are transformed in place. Delta-only calls are
-* held until they close so the raw JSON can be assessed as a complete value;
-* non-recovered deltas are replayed byte-for-byte.
+* held until they close for envelope recovery, while canonical Artifact
+* arguments stream live. Non-recovered deltas are preserved byte-for-byte.
 */
 async function* normalizeToolCallArgumentStream(options, source, diagnostic, permissionMode = process.env.DSH_PERMISSION_MODE) {
 	const lookup = buildToolSchemaLookup(options.tools);
 	const buffered = /* @__PURE__ */ new Map();
+	const liveArtifacts = /* @__PURE__ */ new Set();
+	const artifactAvailable = lookup.get("render_artifact")?.kind === "found";
 	try {
 		for await (const chunk of source) {
 			if (chunk.type === "tool-call-delta") {
+				if (liveArtifacts.has(chunk.index)) {
+					yield chunk;
+					continue;
+				}
 				bufferToolCallChunk(buffered, chunk);
+				const call = buffered.get(chunk.index);
+				if (artifactAvailable && call?.name === "render_artifact" && ARTIFACT_ARGUMENT_PREFIX.test(call.arguments)) {
+					liveArtifacts.add(chunk.index);
+					yield* flushRawBufferedToolCall(chunk.index, buffered);
+				}
 				continue;
 			}
 			if (chunk.type === "block-end") {
+				liveArtifacts.delete(chunk.index);
 				if (chunk.block.type === "tool-call") {
 					yield* flushRawBufferedToolCall(chunk.index, buffered);
 					const arguments_ = normalizeToolCall(chunk.block.arguments, chunk.block.name, String(chunk.block.id), "block-end", options, lookup, diagnostic, permissionMode);
@@ -1397,7 +1410,9 @@ function getDynamicService(ctx, key) {
 * sandboxes gated by one-shot prompts.
 */
 function isFullAccessUnattendedSession(ctx, exec) {
-	const session = exec.agent?.session;
+	return isFullAccessUnattendedForSession(ctx, exec.agent?.session);
+}
+function isFullAccessUnattendedForSession(ctx, session) {
 	if (!session) return false;
 	const approval = getDynamicService(ctx, "approval");
 	let policy;
@@ -4089,6 +4104,11 @@ const WORK_OFFICE_PLUGINS = [
 		name: "@deepseek-ai/dsh-skill-office"
 	},
 	{
+		id: "doc-ingest",
+		name: "@ningbainb/dsh-doc-ingest",
+		config: { tools: true }
+	},
+	{
 		id: "tool-bash",
 		name: "@deepseek-ai/dsh-tool-bash",
 		config: { timeoutMs: 3e5 }
@@ -4223,6 +4243,28 @@ function joinSafe(parent, leaf) {
 function isPlainObject(value) {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
+function parseConfigOptions(value) {
+	if (!Array.isArray(value)) return [];
+	return value.filter(isPlainObject).filter((opt) => typeof opt.id === "string").map((opt) => ({
+		id: String(opt.id),
+		name: typeof opt.name === "string" ? opt.name : void 0,
+		category: typeof opt.category === "string" ? opt.category : void 0,
+		currentValue: typeof opt.currentValue === "string" ? opt.currentValue : void 0,
+		options: Array.isArray(opt.options) ? opt.options.filter(isPlainObject).flatMap((entry) => Array.isArray(entry.options) ? entry.options.filter(isPlainObject) : [entry]).filter((entry) => typeof entry.value === "string").map((entry) => ({
+			value: String(entry.value),
+			name: typeof entry.name === "string" ? entry.name : void 0
+		})) : void 0
+	}));
+}
+function toDiff(content) {
+	const item = Array.isArray(content) ? content.filter(isPlainObject).find((item) => item.type === "diff" && typeof item.path === "string") : void 0;
+	if (!item) return void 0;
+	return {
+		path: String(item.path),
+		...typeof item.oldText === "string" ? { oldText: item.oldText } : {},
+		...typeof item.newText === "string" ? { newText: item.newText } : {}
+	};
+}
 function parseLineSlice(content, line, limit) {
 	if (line === void 0 && limit === void 0) return content;
 	const lines = content.split(/\r?\n/u);
@@ -4233,10 +4275,14 @@ function parseLineSlice(content, line, limit) {
 var AcpClient = class {
 	options;
 	child;
+	shutdown;
 	nextId = 0;
 	pending = /* @__PURE__ */ new Map();
 	sessionListeners = /* @__PURE__ */ new Map();
-	stderrTail = "";
+	fileSystem = {
+		readTextFile: false,
+		writeTextFile: false
+	};
 	closed = false;
 	closePromise;
 	negotiated;
@@ -4264,10 +4310,7 @@ var AcpClient = class {
 			]
 		});
 		this.child = child;
-		child.stderr.setEncoding("utf8");
-		child.stderr.on("data", (chunk) => {
-			this.stderrTail = (this.stderrTail + chunk).slice(-16384);
-		});
+		child.stderr.resume();
 		child.stdin.on("error", () => {});
 		const lines = createInterface({
 			input: child.stdout,
@@ -4301,8 +4344,7 @@ var AcpClient = class {
 			child.once("close", (code) => {
 				lines.close();
 				this.closed = true;
-				const suffix = this.stderrTail.trim() ? `: ${this.stderrTail.trim()}` : "";
-				rejectAll(new AcpClientError("PROCESS_EXITED", `ACP server exited with code ${code ?? "null"}${suffix}`));
+				rejectAll(new AcpClientError("PROCESS_EXITED", "ACP process exited with status " + String(code)));
 				resolvePromise();
 			});
 		});
@@ -4369,7 +4411,9 @@ var AcpClient = class {
 			if (isPlainObject(msg.error)) {
 				const errMsg = typeof msg.error.message === "string" ? msg.error.message : "ACP request failed";
 				const errCode = Number(msg.error.code ?? -32e3);
-				entry.reject(new AcpClientError(errCode === -32e3 && /auth/iu.test(errMsg) ? "AUTH_REQUIRED" : "RPC_ERROR", errMsg));
+				const missingSession = errCode === -32004 || /(?:session|thread).*(?:not found|does not exist)/iu.test(errMsg);
+				const failure = errCode === -32e3 && /auth|logged in|login|sign.in|credential/iu.test(errMsg) || errCode === 401 ? "AUTH_REQUIRED" : errCode === 429 || /rate.limit|too many requests/iu.test(errMsg) ? "RATE_LIMITED" : "RPC_ERROR";
+				entry.reject(new AcpClientError(missingSession ? "REMOTE_SESSION_NOT_FOUND" : failure, errMsg));
 			} else entry.resolve(msg.result);
 		}
 	}
@@ -4392,26 +4436,45 @@ var AcpClient = class {
 				...typeof entry.priority === "string" ? { priority: entry.priority } : {}
 			}))
 		}];
-		if (kind === "tool_call") return [{
-			type: "tool_call",
-			toolCallId: String(update.toolCallId ?? ""),
-			...typeof update.title === "string" ? { title: update.title } : {},
-			...typeof update.kind === "string" ? { kind: update.kind } : {},
-			...typeof update.status === "string" ? { status: update.status } : {},
-			...update.rawInput !== void 0 ? { rawInput: update.rawInput } : {}
+		if (kind === "config_option_update" && Array.isArray(update.configOptions)) return [{
+			type: "config_option_update",
+			configOptions: parseConfigOptions(update.configOptions)
 		}];
+		if (kind === "usage_update") {
+			const usage = isPlainObject(update.usage) ? update.usage : update;
+			const cost = isPlainObject(usage.cost) && typeof usage.cost.amount === "number" && typeof usage.cost.currency === "string" ? {
+				amount: usage.cost.amount,
+				currency: usage.cost.currency
+			} : void 0;
+			return [{
+				type: "usage_update",
+				...typeof usage.used === "number" ? { used: usage.used } : {},
+				...typeof usage.size === "number" ? { size: usage.size } : {},
+				...cost ? { cost } : {}
+			}];
+		}
+		if (kind === "tool_call") {
+			if (typeof update.toolCallId !== "string" || !update.toolCallId) return [];
+			const diff = toDiff(update.content);
+			return [{
+				type: "tool_call",
+				toolCallId: update.toolCallId,
+				...typeof update.title === "string" ? { title: update.title } : {},
+				...typeof update.kind === "string" ? { kind: update.kind } : {},
+				...typeof update.status === "string" ? { status: update.status } : {},
+				...update.rawInput !== void 0 ? { rawInput: update.rawInput } : {},
+				...diff ? { diff } : {}
+			}];
+		}
 		if (kind === "tool_call_update") {
-			const diffItem = Array.isArray(update.content) ? update.content.find((item) => isPlainObject(item) && item.type === "diff" && typeof item.path === "string") : void 0;
+			if (typeof update.toolCallId !== "string" || !update.toolCallId) return [];
+			const diff = toDiff(update.content);
 			return [{
 				type: "tool_call_update",
-				toolCallId: String(update.toolCallId ?? ""),
+				toolCallId: update.toolCallId,
 				...typeof update.status === "string" ? { status: update.status } : {},
 				...update.content !== void 0 ? { content: update.content } : {},
-				...isPlainObject(diffItem) ? { diff: {
-					path: String(diffItem.path),
-					...typeof diffItem.oldText === "string" ? { oldText: diffItem.oldText } : {},
-					...typeof diffItem.newText === "string" ? { newText: diffItem.newText } : {}
-				} } : {}
+				...diff ? { diff } : {}
 			}];
 		}
 		return [];
@@ -4453,6 +4516,13 @@ var AcpClient = class {
 			return;
 		}
 		if (method === "fs/read_text_file") {
+			if (!this.fileSystem.readTextFile) {
+				reply({ error: {
+					code: -32601,
+					message: "ACP client filesystem reads are disabled"
+				} });
+				return;
+			}
 			try {
 				reply({ result: { content: parseLineSlice(await readFile(await assertWorkspaceContained(this.options.cwd, String(params.path ?? "")), "utf8"), typeof params.line === "number" ? params.line : void 0, typeof params.limit === "number" ? params.limit : void 0) } });
 			} catch (error) {
@@ -4464,6 +4534,13 @@ var AcpClient = class {
 			return;
 		}
 		if (method === "fs/write_text_file") {
+			if (!this.fileSystem.writeTextFile) {
+				reply({ error: {
+					code: -32601,
+					message: "ACP client filesystem writes are disabled"
+				} });
+				return;
+			}
 			try {
 				const safePath = await assertWorkspaceContained(this.options.cwd, String(params.path ?? ""));
 				const content = typeof params.content === "string" ? params.content : "";
@@ -4474,7 +4551,9 @@ var AcpClient = class {
 					} });
 					return;
 				}
-				await writeFile(safePath, content, "utf8");
+				const confirmedPath = await assertWorkspaceContained(this.options.cwd, String(params.path ?? ""));
+				if (confirmedPath !== safePath) throw new AcpClientError("WORKSPACE_ESCAPE", "ACP file path changed during approval");
+				await writeFile(confirmedPath, content, "utf8");
 				reply({ result: {} });
 			} catch (error) {
 				reply({ error: {
@@ -4498,12 +4577,16 @@ var AcpClient = class {
 			writeTextFile: true
 		},
 		terminal: false
-	}) {
+	}, timeoutMs = 3e4) {
+		this.fileSystem = {
+			readTextFile: clientCapabilities.fs?.readTextFile === true,
+			writeTextFile: clientCapabilities.fs?.writeTextFile === true
+		};
 		const result = await this.request("initialize", {
 			protocolVersion: 1,
 			clientCapabilities,
 			clientInfo
-		}, 3e4);
+		}, timeoutMs);
 		const protocolVersion = Number(result.protocolVersion ?? 0);
 		if (protocolVersion !== 1) throw new AcpClientError("UNSUPPORTED_PROTOCOL", `unsupported ACP protocolVersion: ${String(result.protocolVersion)}`);
 		const caps = isPlainObject(result.agentCapabilities) ? result.agentCapabilities : {};
@@ -4534,31 +4617,28 @@ var AcpClient = class {
 		const acpSessionId = typeof result.sessionId === "string" ? result.sessionId : "";
 		if (!acpSessionId) throw new AcpClientError("INVALID_SESSION", "ACP agent did not return a sessionId");
 		const modelsObj = isPlainObject(result.models) ? result.models : void 0;
-		const availableModels = Array.isArray(modelsObj?.availableModels) ? modelsObj.availableModels.filter(isPlainObject).map((m) => ({
+		const configOptions = parseConfigOptions(result.configOptions);
+		const model = configOptions.find((option) => option.category === "model");
+		const legacyModels = Array.isArray(modelsObj?.availableModels) ? modelsObj.availableModels.filter(isPlainObject).map((m) => ({
 			id: String(m.modelId ?? m.id ?? ""),
 			name: typeof m.name === "string" ? m.name : void 0
 		})) : [];
-		const configOptions = Array.isArray(result.configOptions) ? result.configOptions.filter(isPlainObject).map((opt) => ({
-			id: String(opt.id ?? ""),
-			name: typeof opt.name === "string" ? opt.name : void 0,
-			currentValue: typeof opt.currentValue === "string" ? opt.currentValue : void 0,
-			options: Array.isArray(opt.options) ? opt.options.filter(isPlainObject).map((o) => ({
-				value: String(o.value ?? ""),
-				name: typeof o.name === "string" ? o.name : void 0
-			})) : void 0
-		})) : [];
+		const availableModels = model?.options?.map((option) => ({
+			id: option.value,
+			name: option.name
+		})) ?? legacyModels;
 		return {
 			acpSessionId,
-			currentModelId: typeof modelsObj?.currentModelId === "string" ? modelsObj.currentModelId : void 0,
+			currentModelId: model?.currentValue ?? (typeof modelsObj?.currentModelId === "string" ? modelsObj.currentModelId : void 0),
 			availableModels,
 			configOptions
 		};
 	}
-	async newSession({ cwd, mcpServers = [] }) {
+	async newSession({ cwd, mcpServers = [], timeoutMs = 3e4 }) {
 		const res = await this.request("session/new", {
 			cwd,
 			mcpServers
-		}, 3e4);
+		}, timeoutMs);
 		return this.parseSessionPayload(res);
 	}
 	async loadSession({ sessionId, cwd, mcpServers = [] }) {
@@ -4580,11 +4660,15 @@ var AcpClient = class {
 		}, 15e3);
 	}
 	async setConfigOption(sessionId, configId, value) {
-		await this.request("session/set_config_option", {
+		await this.updateConfigOption(sessionId, configId, value);
+	}
+	async updateConfigOption(sessionId, configId, value) {
+		const result = await this.request("session/set_config_option", {
 			sessionId,
 			configId,
 			value
 		}, 15e3);
+		return Array.isArray(result?.configOptions) ? parseConfigOptions(result.configOptions) : void 0;
 	}
 	async prompt({ sessionId, text, signal, onEvent, timeoutMs }) {
 		signal?.throwIfAborted();
@@ -4620,44 +4704,332 @@ var AcpClient = class {
 		} catch {}
 	}
 	async close() {
+		return this.shutdown ??= this.closeProcess();
+	}
+	async closeProcess() {
 		this.closed = true;
 		const child = this.child;
 		if (!child) return;
 		try {
 			child.stdin.end();
 		} catch {}
-		if (child.exitCode === null && child.signalCode === null) {
-			child.kill("SIGTERM");
-			const killTimer = setTimeout(() => {
-				if (child.exitCode === null && child.signalCode === null) try {
-					child.kill("SIGKILL");
-				} catch {}
-			}, 500);
-			killTimer.unref();
+		const isRunning = () => child.pid !== void 0 && child.exitCode === null && child.signalCode === null;
+		const killChild = () => {
+			if (isRunning()) try {
+				child.kill("SIGKILL");
+			} catch {}
+		};
+		const closeTimer = setTimeout(() => {
+			if (!isRunning()) return;
+			const systemRoot = process.env.SystemRoot;
+			if (process.platform === "win32" && systemRoot && isAbsolute(systemRoot) && child.pid !== void 0) try {
+				const task = spawn(join(systemRoot, "System32", "taskkill.exe"), [
+					"/pid",
+					String(child.pid),
+					"/t",
+					"/f"
+				], {
+					shell: false,
+					windowsHide: true,
+					stdio: "ignore"
+				});
+				task.once("error", killChild);
+				task.once("exit", (code) => {
+					if (code !== 0) killChild();
+				});
+				task.unref();
+				return;
+			} catch {}
+			killChild();
+		}, 100);
+		const pipeTimer = setTimeout(() => {
+			killChild();
+			child.stdout.destroy();
+			child.stderr.destroy();
+		}, 240);
+		try {
 			await this.closePromise;
-			clearTimeout(killTimer);
+		} finally {
+			clearTimeout(closeTimer);
+			clearTimeout(pipeTimer);
 		}
 	}
 };
 //#endregion
-//#region src/acp/acp-agent-manager.ts
-const SAFE_AGENT_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/u;
-var AcpComplianceError = class extends Error {
-	constructor(message) {
-		super(message);
-		this.name = "AcpComplianceError";
+//#region src/acp/acp-transcript.ts
+const MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024;
+const MAX_MESSAGE_CHARS = 2400;
+function scopedAcpSessionKey(principalId, sessionId) {
+	return createHash("sha256").update(JSON.stringify([principalId, sessionId])).digest("hex");
+}
+function summary(text) {
+	const redacted = text.replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/giu, "[redacted private key]").replace(/\bBearer[ \t]+[A-Za-z0-9_.~+\/=-]+/giu, "Bearer [redacted]").replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|client[_-]?secret)["']?[ \t]*[:=][ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s,;]+)/giu, "$1[redacted]").replace(/\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b/gu, "[redacted]").trim();
+	return redacted.length > MAX_MESSAGE_CHARS ? redacted.slice(0, MAX_MESSAGE_CHARS) + "…" : redacted;
+}
+var AcpTranscriptStore = class {
+	directory;
+	constructor(directory) {
+		this.directory = directory;
+	}
+	filename(principalId, sessionId) {
+		const owner = createHash("sha256").update(principalId).digest("hex");
+		return join(this.directory, owner, scopedAcpSessionKey(principalId, sessionId) + ".jsonl");
+	}
+	async read(principalId, sessionId) {
+		const filename = this.filename(principalId, sessionId);
+		try {
+			const info = await stat(filename);
+			if (!info.isFile() || info.size > MAX_TRANSCRIPT_BYTES) throw new Error("ACP transcript size limit exceeded");
+			return (await readFile(filename, "utf8")).split("\n").filter(Boolean).slice(-120).map((line) => {
+				const entry = JSON.parse(line);
+				if (typeof entry.id !== "string" || typeof entry.text !== "string" || entry.role !== "user" && entry.role !== "assistant") throw new Error("ACP transcript contains an invalid record");
+				return {
+					id: entry.id,
+					text: entry.text,
+					role: entry.role
+				};
+			});
+		} catch (error) {
+			if (error?.code === "ENOENT") return [];
+			throw error;
+		}
+	}
+	async append(principalId, sessionId, user, assistant) {
+		const filename = this.filename(principalId, sessionId);
+		const rows = await this.read(principalId, sessionId);
+		rows.push({
+			id: randomUUID(),
+			role: "user",
+			text: summary(user)
+		});
+		if (assistant.trim()) rows.push({
+			id: randomUUID(),
+			role: "assistant",
+			text: summary(assistant)
+		});
+		await mkdir(dirname(filename), {
+			recursive: true,
+			mode: 448
+		});
+		const temp = filename + ".tmp-" + randomUUID();
+		try {
+			await writeFile(temp, rows.slice(-120).map((row) => JSON.stringify(row)).join("\n") + "\n", {
+				encoding: "utf8",
+				mode: 384,
+				flag: "wx"
+			});
+			await rename(temp, filename);
+		} finally {
+			await rm(temp, { force: true });
+		}
 	}
 };
+//#endregion
+//#region src/acp/builtin-presets.ts
 const ANTIGRAVITY_ACP_AGENT = {
 	id: "antigravity",
 	name: "Google Antigravity",
 	command: process.platform === "win32" ? "agy.exe" : "agy",
 	args: ["acp"],
 	authMode: "oauth-personal",
+	compliancePolicy: "human-interactive",
 	custom: false
 };
+const BUILTIN_ACP_PRESETS = [
+	ANTIGRAVITY_ACP_AGENT,
+	{
+		id: "claude-code",
+		name: "Claude Code",
+		command: "claude-agent-acp",
+		args: [],
+		authMode: "custom",
+		custom: false,
+		npmPackage: "@agentclientprotocol/claude-agent-acp",
+		installCommand: "npm install -g @agentclientprotocol/claude-agent-acp"
+	},
+	{
+		id: "codex",
+		name: "OpenAI Codex",
+		command: "codex-acp",
+		args: [],
+		authMode: "custom",
+		custom: false,
+		npmPackage: "@agentclientprotocol/codex-acp",
+		installCommand: "npm install -g @agentclientprotocol/codex-acp"
+	},
+	{
+		id: "opencode",
+		name: "OpenCode",
+		command: "opencode",
+		args: ["acp"],
+		authMode: "custom",
+		custom: false,
+		npmPackage: "opencode-ai",
+		installCommand: "npm install -g opencode-ai"
+	}
+];
+const byId = new Map(BUILTIN_ACP_PRESETS.map((preset) => [preset.id, preset]));
+function getAcpPreset(id) {
+	return byId.get(id);
+}
+async function executable(path, platform) {
+	try {
+		const info = await stat(path);
+		if (!info.isFile()) return void 0;
+		if (platform !== "win32") await access(path, constants.X_OK);
+		return info;
+	} catch {
+		return;
+	}
+}
+function fingerprint(file, info) {
+	return createHash("sha256").update([
+		file,
+		info.mtimeMs,
+		info.size
+	].join("\0")).digest("hex");
+}
+function isChildPath(root, destination) {
+	const child = relative(root, destination);
+	return Boolean(child) && child !== ".." && !child.startsWith(".." + sep) && !isAbsolute(child);
+}
+function isWindowsNetworkPath(path, platform = process.platform) {
+	return platform === "win32" && /^[\\/]{2}(?![?][\\/][a-z]:[\\/])/iu.test(path);
+}
+async function npmEntry(prefix, preset, args, platform, signal) {
+	const packageName = preset.npmPackage;
+	if (!packageName || isWindowsNetworkPath(prefix, platform)) return void 0;
+	try {
+		signal?.throwIfAborted();
+		const root = await realpath(join(prefix, "node_modules", packageName));
+		if (isWindowsNetworkPath(root, platform)) return void 0;
+		signal?.throwIfAborted();
+		const manifest = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+		if (manifest.name !== packageName) return void 0;
+		const entry = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.[preset.command];
+		if (typeof entry !== "string") return void 0;
+		const file = resolve(root, entry);
+		if (!isChildPath(root, file)) return void 0;
+		const resolved = await realpath(file);
+		if (!isChildPath(root, resolved) || isWindowsNetworkPath(resolved, platform)) return void 0;
+		signal?.throwIfAborted();
+		const format = extname(file).toLowerCase();
+		const script = [
+			".js",
+			".cjs",
+			".mjs"
+		].includes(format);
+		if (!script && format !== ".exe" && format !== "") return void 0;
+		const info = await executable(file, script ? "win32" : platform);
+		if (!info) return void 0;
+		return {
+			command: script ? process.execPath : file,
+			args: script ? [file, ...args] : args,
+			fingerprint: fingerprint(file, info)
+		};
+	} catch {
+		signal?.throwIfAborted();
+		return;
+	}
+}
+async function resolveAcpLaunch(agent, options = {}) {
+	const platform = options.platform ?? process.platform;
+	const { env = process.env, signal } = options;
+	const preset = !agent.custom ? getAcpPreset(agent.id) : void 0;
+	const command = options.commandOverride?.trim() || agent.command;
+	const args = agent.args;
+	if (!command || command.includes("\0") || isWindowsNetworkPath(command, platform)) return void 0;
+	const pathEntries = (env.PATH ?? env.Path ?? env.path ?? "").split(platform === "win32" ? ";" : ":").map((entry) => entry.trim().replace(/^"(.*)"$/u, "$1")).filter((entry) => entry && isAbsolute(entry) && !isWindowsNetworkPath(entry, platform));
+	const explicit = /[\\/]/u.test(command) || isAbsolute(command);
+	const directories = explicit ? [dirname(resolve(options.cwd ?? process.cwd(), command))] : [.../* @__PURE__ */ new Set([
+		...preset?.id === "antigravity" && env.LOCALAPPDATA ? [join(env.LOCALAPPDATA, "agy", "bin")] : [],
+		...pathEntries,
+		...platform === "win32" && env.APPDATA ? [join(env.APPDATA, "npm")] : []
+	])];
+	const binary = basename(command);
+	const extensions = platform === "win32" && extname(binary) === "" ? [
+		".exe",
+		".com",
+		""
+	] : [""];
+	for (const directory of directories) {
+		if (isWindowsNetworkPath(directory, platform)) continue;
+		for (const extension of extensions) {
+			signal?.throwIfAborted();
+			const fullPath = join(directory, binary + extension);
+			if (platform === "win32" && /\.(?:cmd|bat|ps1)$/iu.test(fullPath)) continue;
+			const info = await executable(fullPath, platform);
+			if (info) {
+				const resolvedPath = await realpath(fullPath).catch(() => void 0);
+				if (resolvedPath && !isWindowsNetworkPath(resolvedPath, platform) && (platform !== "win32" || !/\.(?:cmd|bat|ps1)$/iu.test(resolvedPath))) return {
+					command: resolvedPath,
+					args,
+					fingerprint: fingerprint(resolvedPath, info)
+				};
+			}
+		}
+		if (platform === "win32" && preset?.npmPackage && binary.replace(/\.(?:cmd|bat|ps1)$/iu, "").toLowerCase() === preset.command) {
+			const installed = await npmEntry(directory, preset, args, platform, signal) ?? await npmEntry(dirname(directory), preset, args, platform, signal);
+			if (installed) return installed;
+		}
+	}
+	if (!explicit && options.managedPrefix && preset?.npmPackage) return npmEntry(options.managedPrefix, preset, args, platform, signal);
+}
+async function getAcpAuthHint(agentId, env = process.env) {
+	if (agentId !== "codex") return void 0;
+	if (env.OPENAI_API_KEY?.trim() || env.CODEX_API_KEY?.trim()) return "credentials-present";
+	const codexHome = env.CODEX_HOME?.trim() || join(homedir(), ".codex");
+	if (isWindowsNetworkPath(codexHome, process.platform)) return void 0;
+	try {
+		return (await stat(join(codexHome, "auth.json"))).isFile() ? "credentials-present" : void 0;
+	} catch {
+		return;
+	}
+}
+//#endregion
+//#region src/acp/acp-agent-manager.ts
+const SAFE_AGENT_ID = /^[a-z0-9][a-z0-9_-]{0,47}$/u;
+const ACP_PROBE_BUDGET_MS = 2200;
+const ACP_QUICK_PROBE_BUDGET_MS = 150;
+const ACP_PROBE_CACHE_MS = 5 * 6e4;
+async function withinProbeBudget(deadline, work) {
+	const remaining = deadline - Date.now();
+	const timeout = new AcpClientError("REQUEST_TIMEOUT", "ACP executable discovery timed out");
+	if (remaining <= 0) throw timeout;
+	const controller = new AbortController();
+	let timer;
+	try {
+		return await Promise.race([new Promise((_, reject) => {
+			timer = setTimeout(() => {
+				controller.abort(timeout);
+				reject(timeout);
+			}, remaining);
+		}), work(controller.signal)]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+function probeTimeout(agentId) {
+	return {
+		agentId,
+		state: "error",
+		error: "REQUEST_TIMEOUT"
+	};
+}
+function isProbeTimeout(error) {
+	return error instanceof AcpClientError && error.code === "REQUEST_TIMEOUT";
+}
+var AcpComplianceError = class extends Error {
+	constructor(message) {
+		super(message);
+		this.name = "AcpComplianceError";
+	}
+};
+function requiresInteractiveAcp(agent) {
+	return agent.compliancePolicy === "human-interactive" || agent.id === ANTIGRAVITY_ACP_AGENT.id || /(?:^|[\\/])agy(?:\.(?:exe|com|cmd|bat|ps1))?$/iu.test(agent.command) || agent.authMode === "oauth-personal" || agent.authMode === "oauth-business";
+}
 function assertAcpUsageAllowed(agent, invocationSource) {
-	if ((agent.id === ANTIGRAVITY_ACP_AGENT.id || /(?:^|[\\/])agy(?:\.exe)?$/iu.test(agent.command) || agent.authMode === "oauth-personal" || agent.authMode === "oauth-business") && invocationSource !== "human-interactive") throw new AcpComplianceError(`ACP agent "${agent.id}" under ${agent.authMode} is restricted to human-interactive sessions only (Google Antigravity Terms Section 6); blocked invocation source "${invocationSource}".`);
+	if (requiresInteractiveAcp(agent) && invocationSource !== "human-interactive") throw new AcpComplianceError(`ACP agent "${agent.id}" under ${agent.authMode} is restricted to human-interactive sessions only (Google Antigravity Terms Section 6); blocked invocation source "${invocationSource}".`);
 }
 function resolveAcpHome(explicitHome) {
 	if (explicitHome && explicitHome.trim().length > 0) return explicitHome;
@@ -4686,35 +5058,74 @@ var AcpAgentManager = class {
 	agentsPath;
 	sessionsPath;
 	launch;
+	launchResolver;
+	transcripts;
+	probes = /* @__PURE__ */ new Map();
 	customAgents = /* @__PURE__ */ new Map();
 	persistedSessions = /* @__PURE__ */ new Map();
+	sessionWrites = Promise.resolve();
 	activeSessions = /* @__PURE__ */ new Map();
-	loaded = false;
+	startingSessions = /* @__PURE__ */ new Set();
+	loading;
 	constructor(ctx, deps = {}) {
 		this.ctx = ctx;
 		this.acpDir = join(resolveAcpHome(deps.dshHome), "acp");
 		this.agentsPath = join(this.acpDir, "agents.json");
 		this.sessionsPath = join(this.acpDir, "sessions.json");
+		this.transcripts = new AcpTranscriptStore(join(this.acpDir, "transcripts"));
 		this.launch = deps.launch;
+		this.launchResolver = deps.resolveLaunch ?? resolveAcpLaunch;
 	}
-	async ensureLoaded() {
-		if (this.loaded) return;
+	ensureLoaded() {
+		return this.loading ??= this.load();
+	}
+	async load() {
+		const legacyAgents = /* @__PURE__ */ new Map();
 		const rawAgents = await readFile(this.agentsPath, "utf8").catch(() => void 0);
 		if (rawAgents) try {
 			const parsed = JSON.parse(rawAgents);
 			if (parsed.version === 1 && Array.isArray(parsed.agents)) {
-				for (const agent of parsed.agents) if (agent && SAFE_AGENT_ID.test(agent.id) && agent.id !== ANTIGRAVITY_ACP_AGENT.id) this.customAgents.set(agent.id, {
-					...agent,
-					custom: true
-				});
+				const existingIds = new Set(parsed.agents.map((agent) => agent?.id));
+				for (const agent of parsed.agents) if (agent && SAFE_AGENT_ID.test(agent.id) && agent.id !== ANTIGRAVITY_ACP_AGENT.id && typeof agent.command === "string" && Array.isArray(agent.args)) {
+					let id = agent.id;
+					if (getAcpPreset(id)) {
+						id = "custom-" + id;
+						for (let suffix = 2; existingIds.has(id); suffix++) id = "custom-" + agent.id + "-" + suffix;
+						existingIds.add(id);
+						legacyAgents.set(agent.id, id);
+					}
+					this.customAgents.set(id, {
+						...agent,
+						id,
+						custom: true
+					});
+				}
 			}
 		} catch {}
 		const rawSessions = await readFile(this.sessionsPath, "utf8").catch(() => void 0);
 		if (rawSessions) try {
 			const parsed = JSON.parse(rawSessions);
-			if (parsed.version === 1 && parsed.sessions) for (const [key, val] of Object.entries(parsed.sessions)) this.persistedSessions.set(key, val);
+			if (parsed.version === 1 && parsed.sessions) for (const [key, val] of Object.entries(parsed.sessions)) {
+				if (!val || typeof val.agentId !== "string" || typeof val.cwd !== "string" || typeof val.acpSessionId !== "string") continue;
+				const migratedAgentId = legacyAgents.get(val.agentId);
+				this.persistedSessions.set(key, migratedAgentId ? {
+					...val,
+					agentId: migratedAgentId
+				} : val);
+			}
 		} catch {}
-		this.loaded = true;
+	}
+	principalId() {
+		const scopes = this.ctx.get?.("userScope");
+		if (!scopes) return "desktop-profile";
+		const current = scopes.currentScope();
+		if (scopes.availabilityState() !== "ready" || current && current.source !== "desktop") throw new AcpClientError("SCOPE_UNAVAILABLE", "ACP is available to the current desktop profile only");
+		const owner = scopes.localPrincipal().id;
+		if (current && current.principalId !== owner) throw new AcpClientError("SCOPE_UNAVAILABLE", "ACP profile scope does not match");
+		return owner;
+	}
+	sessionKey(sessionId) {
+		return scopedAcpSessionKey(this.principalId(), sessionId);
 	}
 	async saveCustomAgents() {
 		await atomicWriteJson(this.agentsPath, {
@@ -4730,18 +5141,19 @@ var AcpAgentManager = class {
 	}
 	async listAgents() {
 		await this.ensureLoaded();
-		return [ANTIGRAVITY_ACP_AGENT, ...this.customAgents.values()];
+		return [...BUILTIN_ACP_PRESETS, ...this.customAgents.values()];
 	}
 	async getAgent(agentId) {
 		await this.ensureLoaded();
-		if (agentId === ANTIGRAVITY_ACP_AGENT.id) return ANTIGRAVITY_ACP_AGENT;
+		const preset = getAcpPreset(agentId);
+		if (preset) return preset;
 		const custom = this.customAgents.get(agentId);
 		if (!custom) throw new AcpClientError("UNKNOWN_AGENT", `unknown ACP agent: ${agentId}`);
 		return custom;
 	}
 	async upsertCustomAgent(agent) {
 		await this.ensureLoaded();
-		if (!SAFE_AGENT_ID.test(agent.id) || agent.id === ANTIGRAVITY_ACP_AGENT.id) throw new AcpClientError("INVALID_AGENT_ID", "invalid or reserved ACP agent id");
+		if (!SAFE_AGENT_ID.test(agent.id) || getAcpPreset(agent.id)) throw new AcpClientError("INVALID_AGENT_ID", "invalid or reserved ACP agent id");
 		if (!agent.command?.trim()) throw new AcpClientError("INVALID_AGENT_COMMAND", "ACP agent command is required");
 		const normalized = {
 			id: agent.id,
@@ -4753,54 +5165,151 @@ var AcpAgentManager = class {
 			...agent.timeoutMs ? { timeoutMs: agent.timeoutMs } : {}
 		};
 		this.customAgents.set(normalized.id, normalized);
+		this.probes.delete(normalized.id);
 		await this.saveCustomAgents();
 		return normalized;
 	}
 	async removeCustomAgent(agentId) {
 		await this.ensureLoaded();
 		if (!this.customAgents.delete(agentId)) return false;
+		this.probes.delete(agentId);
 		await this.saveCustomAgents();
 		return true;
 	}
 	listActiveSessions() {
-		return [...this.activeSessions.values()].map((rec) => rec.info);
+		const principal = this.principalId();
+		return [...this.activeSessions.values()].filter((rec) => rec.principalId === principal).map((rec) => rec.info);
 	}
 	getSessionInfo(sessionId) {
-		return this.activeSessions.get(sessionId)?.info;
+		return this.activeSessions.get(this.sessionKey(sessionId))?.info;
 	}
-	resolveAcpCommand(agent, commandOverride) {
-		const raw = commandOverride?.trim() || agent.command;
-		if (process.platform === "win32" && agent.id === ANTIGRAVITY_ACP_AGENT.id && raw.toLowerCase() === "agy.exe" && process.env.LOCALAPPDATA) {
-			const candidate = join(process.env.LOCALAPPDATA, "agy", "bin", "agy.exe");
-			if (existsSync(candidate)) return candidate;
+	resolveLaunch(agent, cwd, commandOverride, signal) {
+		return this.launchResolver(agent, {
+			cwd,
+			commandOverride,
+			signal,
+			managedPrefix: join(this.acpDir, "packages")
+		});
+	}
+	async probeAllAgents(opts = {}) {
+		if (opts.deep) this.principalId();
+		const deadline = Date.now() + (opts.deep ? ACP_PROBE_BUDGET_MS : ACP_QUICK_PROBE_BUDGET_MS);
+		let agents;
+		try {
+			agents = await withinProbeBudget(deadline, () => this.listAgents());
+		} catch (error) {
+			if (!isProbeTimeout(error)) throw error;
+			return BUILTIN_ACP_PRESETS.map((agent) => probeTimeout(agent.id));
 		}
-		return raw;
+		return Promise.all(agents.map(async (agent) => {
+			if (opts.deep) return this.probeResolvedAgent(agent, deadline, { cwd: opts.cwd });
+			try {
+				const [launch, authHint] = await withinProbeBudget(deadline, (signal) => Promise.all([this.resolveLaunch(agent, opts.cwd, void 0, signal), getAcpAuthHint(agent.id)]));
+				return {
+					agentId: agent.id,
+					state: launch ? "installed" : "not-installed",
+					...authHint ? { authHint } : {}
+				};
+			} catch (error) {
+				if (!isProbeTimeout(error)) throw error;
+				return probeTimeout(agent.id);
+			}
+		}));
 	}
 	async probeAgent(agentId, opts = {}) {
-		const base = await this.getAgent(agentId);
+		const deadline = Date.now() + ACP_PROBE_BUDGET_MS;
+		this.principalId();
+		try {
+			const base = await withinProbeBudget(deadline, () => this.getAgent(agentId));
+			return await this.probeResolvedAgent(base, deadline, opts);
+		} catch (error) {
+			if (!isProbeTimeout(error)) throw error;
+			return probeTimeout(agentId);
+		}
+	}
+	async probeResolvedAgent(base, deadline, opts) {
+		const agentId = base.id;
+		if (opts.cwd && isWindowsNetworkPath(opts.cwd)) return {
+			agentId,
+			state: "error",
+			error: "NETWORK_PATH_UNSUPPORTED"
+		};
+		let launch;
+		try {
+			launch = await withinProbeBudget(deadline, (signal) => this.resolveLaunch(base, opts.cwd, opts.commandOverride, signal));
+		} catch (error) {
+			if (!isProbeTimeout(error)) throw error;
+			return probeTimeout(agentId);
+		}
+		const requested = opts.commandOverride?.trim() || base.command;
+		const resolved = launch?.command ?? requested;
+		if (requiresInteractiveAcp({
+			...base,
+			command: requested
+		}) || requiresInteractiveAcp({
+			...base,
+			command: resolved
+		})) return {
+			agentId,
+			state: launch ? "installed" : "not-installed"
+		};
+		if (!launch && !this.launch) return {
+			agentId,
+			state: "not-installed"
+		};
+		const fingerprint = JSON.stringify([launch?.fingerprint ?? base.command, opts.cwd]);
+		const previous = this.probes.get(agentId);
+		if (!opts.force && previous?.fingerprint === fingerprint && previous.expiresAt > Date.now()) return previous.result;
+		const result = this.runProbe({
+			...base,
+			command: resolved,
+			args: launch?.args ?? base.args
+		}, opts.cwd, deadline);
+		this.probes.set(agentId, {
+			fingerprint,
+			expiresAt: Date.now() + ACP_PROBE_CACHE_MS,
+			result
+		});
+		if ((await result).state !== "ready" && this.probes.get(agentId)?.result === result) this.probes.delete(agentId);
+		return result;
+	}
+	async runProbe(base, cwd, deadline) {
 		const client = new AcpClient({
-			command: this.resolveAcpCommand(base, opts.commandOverride),
+			command: base.command,
 			args: base.args,
-			cwd: opts.cwd || this.acpDir,
+			cwd: cwd || this.acpDir,
 			env: base.env,
-			timeoutMs: 15e3,
 			launch: this.launch
 		});
 		try {
-			await mkdir(opts.cwd || this.acpDir, { recursive: true });
-			const capabilities = await client.initialize();
+			if (isWindowsNetworkPath(cwd || this.acpDir)) throw new AcpClientError("NETWORK_PATH_UNSUPPORTED", "ACP probe workspace must be local");
+			if (!cwd) await withinProbeBudget(deadline, () => mkdir(this.acpDir, { recursive: true }));
+			const remaining = () => {
+				const available = deadline - Date.now();
+				if (available <= 0) throw new AcpClientError("REQUEST_TIMEOUT", "ACP negotiation timed out");
+				return available;
+			};
+			const capabilities = await client.initialize(void 0, {
+				fs: {},
+				terminal: false
+			}, remaining());
+			const { configOptions, availableModels } = await client.newSession({
+				cwd: cwd || this.acpDir,
+				timeoutMs: remaining()
+			});
 			return {
 				agentId: base.id,
 				state: "ready",
-				capabilities
+				capabilities,
+				configOptions,
+				availableModels
 			};
 		} catch (error) {
-			const msg = error instanceof Error ? error.message : String(error);
 			const state = error instanceof AcpClientError && error.code === "SPAWN_FAILED" ? "not-installed" : error instanceof AcpClientError && error.code === "AUTH_REQUIRED" ? "not-authenticated" : "error";
 			return {
 				agentId: base.id,
 				state,
-				error: msg
+				...error instanceof AcpClientError ? { error: error.code } : {}
 			};
 		} finally {
 			await client.close();
@@ -4810,15 +5319,17 @@ var AcpAgentManager = class {
 		if (customHandler) return customHandler(req);
 		const approval = this.ctx.get?.("approval");
 		if (!approval?.request) return { outcome: { outcome: "cancelled" } };
-		const allowOpt = req.options.find((opt) => opt.kind === "allow_once") ?? req.options.find((opt) => opt.kind === "allow_always");
-		if (!allowOpt) return { outcome: { outcome: "cancelled" } };
+		const allowOnce = req.options.find((opt) => opt.kind === "allow_once");
+		const allowAlways = req.options.find((opt) => opt.kind === "allow_always");
+		if (!allowOnce && !allowAlways) return { outcome: { outcome: "cancelled" } };
 		try {
 			const outcome = await approval.request({
 				toolName: req.toolCall?.kind ?? "acp_tool",
 				title: req.toolCall?.title ?? "External ACP Agent action requires confirmation"
 			});
 			const value = typeof outcome === "string" ? outcome : outcome?.outcome;
-			if (value === "allowed-once" || value === "allowed-always" || value === "allow") return { outcome: {
+			const allowOpt = value === "allowed-always" ? allowAlways ?? allowOnce : allowOnce;
+			if (allowOpt && (value === "allowed-once" || value === "allowed-always" || value === "allow")) return { outcome: {
 				outcome: "selected",
 				optionId: allowOpt.optionId
 			} };
@@ -4827,17 +5338,29 @@ var AcpAgentManager = class {
 			return { outcome: { outcome: "cancelled" } };
 		}
 	}
-	async startSession({ agentId, cwd, dshSessionId, resume = false, invocationSource, mcpServers = [], commandOverride, authModeOverride, onPermissionRequest, onFsWriteApprove }) {
+	async startSession({ agentId, cwd, dshSessionId, resume = false, invocationSource, mcpServers = [], commandOverride, authModeOverride, onPermissionRequest, onFsWriteApprove, allowSensitiveOptions = () => false }) {
 		await this.ensureLoaded();
+		const principalId = this.principalId();
 		const base = await this.getAgent(agentId);
-		const agent = {
+		const requestedAgent = {
 			...base,
-			command: this.resolveAcpCommand(base, commandOverride),
+			command: commandOverride?.trim() || base.command,
 			...authModeOverride ? { authMode: authModeOverride } : {}
+		};
+		assertAcpUsageAllowed(requestedAgent, invocationSource);
+		const launch = await this.resolveLaunch(base, cwd, commandOverride);
+		if (!launch && !this.launch) throw new AcpClientError("SPAWN_FAILED", "ACP executable is unavailable");
+		const agent = {
+			...requestedAgent,
+			command: launch?.command ?? requestedAgent.command,
+			args: launch?.args ?? requestedAgent.args
 		};
 		assertAcpUsageAllowed(agent, invocationSource);
 		const sessionId = dshSessionId || randomUUID();
-		if (this.activeSessions.has(sessionId)) await this.closeSession(sessionId);
+		const key = scopedAcpSessionKey(principalId, sessionId);
+		if (this.startingSessions.has(key)) throw new AcpClientError("SESSION_BUSY", "ACP session setup is already in progress");
+		if (this.activeSessions.get(key)?.prompting) throw new AcpClientError("SESSION_BUSY", "ACP session has an active prompt");
+		this.startingSessions.add(key);
 		const client = new AcpClient({
 			command: agent.command,
 			args: agent.args,
@@ -4851,16 +5374,25 @@ var AcpAgentManager = class {
 			}
 		});
 		try {
+			if (this.activeSessions.has(key)) await this.closeSession(sessionId);
 			const caps = await client.initialize();
-			const saved = resume ? this.persistedSessions.get(sessionId) : void 0;
-			const payload = saved?.agentId === agent.id && saved.cwd === cwd && caps.loadSession ? await client.loadSession({
+			const saved = resume ? this.persistedSessions.get(key) ?? this.persistedSessions.get(sessionId) : void 0;
+			const matchingSession = saved?.agentId === agent.id && saved.cwd === cwd;
+			const payload = matchingSession && caps.loadSession ? await client.loadSession({
 				sessionId: saved.acpSessionId,
 				cwd,
 				mcpServers
+			}).catch((error) => {
+				if (error instanceof AcpClientError && error.code === "REMOTE_SESSION_NOT_FOUND") return client.newSession({
+					cwd,
+					mcpServers
+				});
+				throw error;
 			}) : await client.newSession({
 				cwd,
 				mcpServers
 			});
+			const transcript = matchingSession ? await this.transcripts.read(principalId, sessionId) : void 0;
 			const info = {
 				sessionId,
 				acpSessionId: payload.acpSessionId,
@@ -4868,76 +5400,216 @@ var AcpAgentManager = class {
 				cwd,
 				currentModelId: payload.currentModelId,
 				availableModels: payload.availableModels,
-				configOptions: payload.configOptions
+				configOptions: payload.configOptions,
+				...transcript?.length ? { transcript } : {}
 			};
-			const previous = this.persistedSessions.get(sessionId);
-			this.persistedSessions.set(sessionId, {
-				acpSessionId: payload.acpSessionId,
-				agentId: agent.id,
-				cwd,
-				updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+			const save = this.sessionWrites.then(async () => {
+				const previous = this.persistedSessions.get(key);
+				this.persistedSessions.set(key, {
+					acpSessionId: payload.acpSessionId,
+					agentId: agent.id,
+					cwd,
+					updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+				});
+				try {
+					await this.saveSessions();
+				} catch (error) {
+					if (previous) this.persistedSessions.set(key, previous);
+					else this.persistedSessions.delete(key);
+					throw error;
+				}
 			});
-			try {
-				await this.saveSessions();
-			} catch (error) {
-				if (previous) this.persistedSessions.set(sessionId, previous);
-				else this.persistedSessions.delete(sessionId);
-				throw error;
-			}
-			this.activeSessions.set(sessionId, {
+			this.sessionWrites = save.catch(() => {});
+			await save;
+			this.activeSessions.set(key, {
 				client,
 				agent,
-				info
+				info,
+				principalId,
+				prompting: false,
+				allowSensitiveOptions
 			});
 			return info;
 		} catch (error) {
 			await client.close();
 			throw error;
+		} finally {
+			this.startingSessions.delete(key);
 		}
 	}
 	async setModel(sessionId, modelId) {
-		const rec = this.activeSessions.get(sessionId);
+		const rec = this.activeSessions.get(this.sessionKey(sessionId));
 		if (!rec) throw new AcpClientError("SESSION_NOT_FOUND", `no active ACP session: ${sessionId}`);
-		await rec.client.setModel(rec.info.acpSessionId, modelId);
-		rec.info = {
-			...rec.info,
-			currentModelId: modelId
-		};
+		const model = rec.info.configOptions.find((option) => option.category === "model");
+		if (model) await this.setConfigOption(sessionId, model.id, modelId);
+		else {
+			await rec.client.setModel(rec.info.acpSessionId, modelId);
+			rec.info = {
+				...rec.info,
+				currentModelId: modelId
+			};
+		}
 	}
 	async setConfigOption(sessionId, configId, value) {
-		const rec = this.activeSessions.get(sessionId);
+		const rec = this.activeSessions.get(this.sessionKey(sessionId));
 		if (!rec) throw new AcpClientError("SESSION_NOT_FOUND", `no active ACP session: ${sessionId}`);
-		await rec.client.setConfigOption(rec.info.acpSessionId, configId, value);
+		const declared = rec.info.configOptions.find((option) => option.id === configId);
+		if (!declared?.options?.some((option) => option.value === value)) throw new AcpClientError("INVALID_CONFIG_OPTION", "ACP option value is not advertised by the active session");
+		if (declared.currentValue === value) return;
+		const securityOption = /danger|approv|permission|sandbox|bypass|trust|(?:^|[_-])mode(?:$|[_-])/iu.test(configId);
+		const safeCategory = [
+			"model",
+			"thought_level",
+			"speed"
+		].includes(declared.category ?? configId);
+		const restrictedMode = (declared.category === "mode" || configId === "mode") && [
+			"read-only",
+			"readonly",
+			"plan",
+			"ask"
+		].includes(value.toLowerCase());
+		if (!(safeCategory && !securityOption) && !restrictedMode && !rec.allowSensitiveOptions()) throw new AcpClientError("CONFIG_POLICY_DENIED", "The current desktop session does not permit changing this ACP option");
+		const options = await rec.client.updateConfigOption(rec.info.acpSessionId, configId, value);
+		this.applyConfigOptions(rec, options ?? rec.info.configOptions.map((option) => option.id === configId ? {
+			...option,
+			currentValue: value
+		} : option));
+	}
+	applyConfigOptions(rec, configOptions) {
+		const model = configOptions.find((option) => option.category === "model");
+		rec.info = {
+			...rec.info,
+			configOptions,
+			currentModelId: model?.currentValue ?? rec.info.currentModelId,
+			availableModels: model?.options?.map((option) => ({
+				id: option.value,
+				name: option.name
+			})) ?? rec.info.availableModels
+		};
+	}
+	assertPromptAllowed(sessionId, source) {
+		const record = this.activeSessions.get(this.sessionKey(sessionId));
+		if (record) assertAcpUsageAllowed(record.agent, source);
 	}
 	async sendPrompt({ sessionId, text, invocationSource, signal, onEvent }) {
-		const rec = this.activeSessions.get(sessionId);
+		const rec = this.activeSessions.get(this.sessionKey(sessionId));
 		if (!rec) throw new AcpClientError("SESSION_NOT_FOUND", `no active ACP session: ${sessionId}`);
 		assertAcpUsageAllowed(rec.agent, invocationSource);
-		return rec.client.prompt({
-			sessionId: rec.info.acpSessionId,
-			text,
-			signal,
-			onEvent
-		});
+		if (rec.prompting) throw new AcpClientError("SESSION_BUSY", "ACP session has an active prompt");
+		rec.prompting = true;
+		let replyText = "";
+		let finishCheckpoint;
+		try {
+			const checkpoints = this.ctx.get?.("workspaceCheckpoints", false);
+			if (checkpoints?.beginWorkspaceMutation) {
+				const preparation = new AbortController();
+				const preparationSignal = signal ? AbortSignal.any([signal, preparation.signal]) : preparation.signal;
+				rec.preparingPrompt = preparation;
+				try {
+					finishCheckpoint = await checkpoints.beginWorkspaceMutation({
+						sessionId,
+						workspacePath: rec.info.cwd,
+						signal: preparationSignal
+					});
+				} catch (error) {
+					if (!preparationSignal.aborted) {
+						if (error instanceof Error && "code" in error && error.code === "busy") throw new AcpClientError("SESSION_BUSY", "Workspace restoration is running");
+						throw error;
+					}
+				} finally {
+					rec.preparingPrompt = void 0;
+				}
+				if (preparationSignal.aborted) {
+					onEvent?.({
+						type: "turn_finished",
+						stopReason: "cancelled"
+					});
+					return { stopReason: "cancelled" };
+				}
+			}
+			const result = await rec.client.prompt({
+				sessionId: rec.info.acpSessionId,
+				text,
+				signal,
+				onEvent: (event) => {
+					if (event.type === "config_option_update") this.applyConfigOptions(rec, event.configOptions);
+					if (event.type === "message_delta") replyText = (replyText + event.text).slice(0, 16384);
+					onEvent?.(event);
+				}
+			});
+			await this.transcripts.append(rec.principalId, sessionId, text, replyText).catch(() => {
+				this.ctx.logger?.warn?.("dsh-desktop-compat: ACP transcript could not be saved");
+			});
+			return result;
+		} finally {
+			await finishCheckpoint?.().catch(() => this.ctx.logger?.warn?.("dsh-desktop-compat: workspace checkpoint unavailable"));
+			rec.prompting = false;
+		}
 	}
 	cancelSession(sessionId) {
-		const rec = this.activeSessions.get(sessionId);
+		const rec = this.activeSessions.get(this.sessionKey(sessionId));
 		if (!rec) return false;
-		rec.client.cancel(rec.info.acpSessionId);
+		if (rec.preparingPrompt) rec.preparingPrompt.abort();
+		else rec.client.cancel(rec.info.acpSessionId);
 		return true;
 	}
 	async closeSession(sessionId) {
-		const rec = this.activeSessions.get(sessionId);
+		const key = this.sessionKey(sessionId);
+		const rec = this.activeSessions.get(key);
 		if (!rec) return false;
-		this.activeSessions.delete(sessionId);
+		this.activeSessions.delete(key);
+		rec.preparingPrompt?.abort();
 		await rec.client.close();
 		return true;
 	}
 	async dispose() {
-		const closing = [...this.activeSessions.keys()].map((id) => this.closeSession(id));
+		const closing = [...this.activeSessions.values()].map((record) => {
+			record.preparingPrompt?.abort();
+			return record.client.close();
+		});
+		this.activeSessions.clear();
 		await Promise.allSettled(closing);
 	}
 };
+//#endregion
+//#region src/acp/interaction-proof.ts
+const ACP_GESTURE_PUBLIC_KEY_ENV = "DSH_DESKTOP_ACP_GESTURE_PUBLIC_KEY";
+const MAX_PROOF_AGE_MS = 1e4;
+const MAX_TRACKED_PROOFS = 4096;
+const TOKEN_PARTS = /^([A-Za-z0-9_-]{1,512})[.]([A-Za-z0-9_-]{86})$/u;
+const NONCE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+function createAcpInteractionVerifier(publicKey, now = Date.now) {
+	let key;
+	try {
+		const candidate = createPublicKey({
+			key: Buffer.from(publicKey, "base64"),
+			type: "spki",
+			format: "der"
+		});
+		if (candidate.asymmetricKeyType === "ed25519") key = candidate;
+	} catch {}
+	const used = /* @__PURE__ */ new Map();
+	return (operation, requestBody, token) => {
+		if (!key || typeof token !== "string") return false;
+		const match = TOKEN_PARTS.exec(token);
+		if (!match) return false;
+		try {
+			const bytes = Buffer.from(match[1], "base64url");
+			const signature = Buffer.from(match[2], "base64url");
+			if (bytes.toString("base64url") !== match[1] || signature.toString("base64url") !== match[2]) return false;
+			if (!verify(null, bytes, key, signature)) return false;
+			const data = JSON.parse(bytes.toString("utf8"));
+			const currentTime = now();
+			if (typeof data.issuedAt !== "number" || !Number.isSafeInteger(data.issuedAt) || data.issuedAt > currentTime || data.issuedAt <= currentTime - MAX_PROOF_AGE_MS || data.operation !== operation || typeof data.nonce !== "string" || !NONCE.test(data.nonce) || data.bodyHash !== createHash("sha256").update(requestBody, "utf8").digest("hex")) return false;
+			for (const [nonce, expiresAt] of used) if (expiresAt <= currentTime) used.delete(nonce);
+			if (used.has(data.nonce) || used.size >= MAX_TRACKED_PROOFS) return false;
+			used.set(data.nonce, data.issuedAt + MAX_PROOF_AGE_MS);
+			return true;
+		} catch {
+			return false;
+		}
+	};
+}
 //#endregion
 //#region src/acp/types.ts
 const ACP_API_PREFIX = "/api/dsh-acp";
@@ -4966,11 +5638,17 @@ async function readJsonBody(request) {
 		if (total > MAX_BODY_BYTES) throw new Error("request body too large");
 		chunks.push(buf);
 	}
-	const text = Buffer.concat(chunks, total).toString("utf8").trim();
-	if (!text) return {};
-	const parsed = JSON.parse(text);
+	const raw = Buffer.concat(chunks, total).toString("utf8");
+	if (!raw.trim()) return {
+		data: {},
+		raw
+	};
+	const parsed = JSON.parse(raw);
 	if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("request body must be a JSON object");
-	return parsed;
+	return {
+		data: parsed,
+		raw
+	};
 }
 function isAuthorizedRequest(request, peer) {
 	const address = request.socket?.remoteAddress;
@@ -4978,15 +5656,37 @@ function isAuthorizedRequest(request, peer) {
 	if (peer?.principal?.kind !== "owner") return false;
 	if (request.headers["x-dsh-acp"] !== "1") return false;
 	if (request.headers["sec-fetch-site"] === "cross-site") return false;
+	if (request.headers.origin !== void 0) try {
+		if (new URL(request.headers.origin).host !== request.headers.host) return false;
+	} catch {
+		return false;
+	}
 	return true;
 }
-function resolveSessionCwd(rawCwd) {
-	if (typeof rawCwd === "string" && rawCwd.trim().length > 0 && existsSync(rawCwd.trim())) return rawCwd.trim();
-	return homedir();
+function resolveNativeSession(ctx, conversationId) {
+	if (typeof conversationId === "string" && conversationId) try {
+		return ctx.sessions?.get(SessionId(conversationId));
+	} catch {}
+}
+async function resolveSessionCwd(rawCwd, nativeCwd) {
+	let cwd = nativeCwd;
+	if (!cwd && typeof rawCwd === "string") cwd = rawCwd.trim();
+	if (!cwd) return homedir();
+	if (!isAbsolute(cwd)) throw new AcpClientError("INVALID_PATH", "ACP workspace path must be absolute");
+	const explicit = await realpath(cwd);
+	if (!(await stat(explicit)).isDirectory()) throw new AcpClientError("INVALID_PATH", "ACP workspace must be a directory");
+	return explicit;
+}
+function probeCwd(rawCwd) {
+	if (typeof rawCwd !== "string" || !isAbsolute(rawCwd) || rawCwd.includes("\0")) return void 0;
+	return rawCwd;
 }
 function registerAcpRoutes(ctx, manager) {
 	const webServer = ctx.get?.("webServer");
 	if (!webServer?.register) return () => {};
+	const publicKey = process.env[ACP_GESTURE_PUBLIC_KEY_ENV];
+	const verifyInteraction = publicKey === void 0 ? void 0 : createAcpInteractionVerifier(publicKey);
+	const invocationSource = (operation, request, raw) => !verifyInteraction || verifyInteraction(operation, raw, request.headers["x-dsh-acp-interaction"]) ? "human-interactive" : "background";
 	const activeStreamWriters = /* @__PURE__ */ new Map();
 	const pendingPermissions = /* @__PURE__ */ new Map();
 	const pendingFsWrites = /* @__PURE__ */ new Map();
@@ -5014,12 +5714,13 @@ function registerAcpRoutes(ctx, manager) {
 			if (action === "/agents" && request.method === "GET") {
 				sendJson(response, 200, {
 					agents: await manager.listAgents(),
+					probes: await manager.probeAllAgents(),
 					activeSessions: manager.listActiveSessions()
 				});
 				return;
 			}
 			if (action === "/agents/custom" && request.method === "POST") {
-				const body = await readJsonBody(request);
+				const { data: body } = await readJsonBody(request);
 				sendJson(response, 200, { agent: await manager.upsertCustomAgent({
 					id: String(body.id ?? ""),
 					name: String(body.name ?? ""),
@@ -5030,7 +5731,7 @@ function registerAcpRoutes(ctx, manager) {
 				return;
 			}
 			if (action === "/agents/custom" && request.method === "DELETE") {
-				const body = await readJsonBody(request);
+				const { data: body } = await readJsonBody(request);
 				sendJson(response, 200, { removed: await manager.removeCustomAgent(String(body.id ?? "")) });
 				return;
 			}
@@ -5038,23 +5739,57 @@ function registerAcpRoutes(ctx, manager) {
 				response.writeHead(405).end();
 				return;
 			}
-			const body = await readJsonBody(request);
+			const { data: body, raw } = await readJsonBody(request);
+			if (action === "/probe/all") {
+				sendJson(response, 200, { probes: await manager.probeAllAgents({
+					deep: body.deep === true,
+					cwd: probeCwd(body.cwd)
+				}) });
+				return;
+			}
 			if (action === "/probe") {
 				const agentId = typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : "antigravity";
 				sendJson(response, 200, await manager.probeAgent(agentId, {
-					cwd: typeof body.cwd === "string" ? body.cwd : void 0,
-					commandOverride: typeof body.commandOverride === "string" ? body.commandOverride : void 0
+					cwd: probeCwd(body.cwd),
+					commandOverride: agentId === "antigravity" && typeof body.commandOverride === "string" ? body.commandOverride : void 0,
+					force: body.force === true
 				}));
 				return;
 			}
 			if (action === "/session/start") {
 				const agentId = typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : "antigravity";
 				const requestedSessionId = typeof body.dshSessionId === "string" && body.dshSessionId.trim() ? body.dshSessionId.trim() : randomUUID();
-				cancelSessionPermissions(requestedSessionId);
+				const sessionKey = manager.sessionKey(requestedSessionId);
+				const ownerKey = manager.sessionKey("permissions");
+				if (activeStreamWriters.has(sessionKey)) {
+					sendJson(response, 409, { error: "an ACP prompt is already running for this session" });
+					return;
+				}
+				cancelSessionPermissions(sessionKey);
+				const sessionApprovals = /* @__PURE__ */ new Set();
+				const session = resolveNativeSession(ctx, body.conversationId);
+				const canPersistApproval = () => {
+					const current = resolveNativeSession(ctx, body.conversationId);
+					return current === session && isFullAccessUnattendedForSession(ctx, current);
+				};
 				const onPermissionRequest = (req) => {
-					const writer = activeStreamWriters.get(requestedSessionId);
+					const writer = activeStreamWriters.get(sessionKey);
 					if (!writer) return Promise.resolve({ outcome: { outcome: "cancelled" } });
+					const allowOnce = req.options.find((option) => option.kind === "allow_once");
+					const requestIdentity = allowOnce && req.toolCall?.rawInput !== void 0 ? JSON.stringify(req.toolCall) : void 0;
+					const fingerprint = requestIdentity && requestIdentity.length <= MAX_BODY_BYTES ? createHash("sha256").update(requestIdentity).digest("hex") : void 0;
+					const persistentOptionsAllowed = canPersistApproval();
+					if (persistentOptionsAllowed && fingerprint && allowOnce && sessionApprovals.has(fingerprint)) return Promise.resolve({ outcome: {
+						outcome: "selected",
+						optionId: allowOnce.optionId
+					} });
 					const permissionId = randomUUID();
+					const permittedOptions = persistentOptionsAllowed ? req.options : req.options.filter((option) => option.kind === "allow_once" || option.kind === "reject_once" || option.kind === "reject_always");
+					const sessionOptionId = persistentOptionsAllowed && fingerprint && sessionApprovals.size < 128 ? randomUUID() : void 0;
+					const options = sessionOptionId ? [...permittedOptions, {
+						optionId: sessionOptionId,
+						kind: "allow_session"
+					}] : permittedOptions;
 					return new Promise((resolvePromise) => {
 						const timer = setTimeout(() => {
 							pendingPermissions.delete(permissionId);
@@ -5062,8 +5797,27 @@ function registerAcpRoutes(ctx, manager) {
 						}, PERMISSION_TIMEOUT_MS);
 						timer.unref();
 						pendingPermissions.set(permissionId, {
-							sessionId: requestedSessionId,
-							resolve: resolvePromise,
+							sessionId: sessionKey,
+							ownerKey,
+							options: new Set(options.map((option) => option.optionId)),
+							resolve: (decision) => {
+								if (decision.outcome.outcome === "selected") {
+									const optionId = decision.outcome.optionId;
+									if (sessionOptionId && fingerprint && allowOnce && optionId === sessionOptionId) {
+										if (canPersistApproval()) sessionApprovals.add(fingerprint);
+										resolvePromise({ outcome: {
+											outcome: "selected",
+											optionId: allowOnce.optionId
+										} });
+										return;
+									}
+									if (req.options.some((option) => option.optionId === optionId && option.kind === "allow_always") && !canPersistApproval()) {
+										resolvePromise({ outcome: { outcome: "cancelled" } });
+										return;
+									}
+								}
+								resolvePromise(decision);
+							},
 							timer
 						});
 						writer({
@@ -5072,12 +5826,12 @@ function registerAcpRoutes(ctx, manager) {
 							title: req.toolCall?.title,
 							kind: req.toolCall?.kind,
 							rawInput: req.toolCall?.rawInput,
-							options: req.options
+							options
 						});
 					});
 				};
 				const onFsWriteApprove = (path, _content) => {
-					const writer = activeStreamWriters.get(requestedSessionId);
+					const writer = activeStreamWriters.get(sessionKey);
 					if (!writer) return Promise.resolve(false);
 					const permissionId = randomUUID();
 					return new Promise((resolvePromise) => {
@@ -5087,7 +5841,8 @@ function registerAcpRoutes(ctx, manager) {
 						}, PERMISSION_TIMEOUT_MS);
 						timer.unref();
 						pendingFsWrites.set(permissionId, {
-							sessionId: requestedSessionId,
+							sessionId: sessionKey,
+							ownerKey,
 							resolve: resolvePromise,
 							timer
 						});
@@ -5110,19 +5865,22 @@ function registerAcpRoutes(ctx, manager) {
 				};
 				const info = await manager.startSession({
 					agentId,
-					cwd: resolveSessionCwd(body.cwd),
+					cwd: await resolveSessionCwd(body.cwd, session?.header.cwd),
 					dshSessionId: requestedSessionId,
 					resume: Boolean(body.resume),
-					invocationSource: "human-interactive",
+					invocationSource: invocationSource("start", request, raw),
 					commandOverride: typeof body.commandOverride === "string" ? body.commandOverride : void 0,
 					onPermissionRequest,
-					onFsWriteApprove
+					onFsWriteApprove,
+					allowSensitiveOptions: canPersistApproval
 				});
-				if (typeof body.modelId === "string" && body.modelId.trim() && body.modelId.trim() !== info.currentModelId) {
+				if (typeof body.modelId === "string" && body.modelId.trim() && body.modelId.trim() !== info.currentModelId) try {
 					await manager.setModel(info.sessionId, body.modelId.trim());
-					info.currentModelId = body.modelId.trim();
+				} catch (error) {
+					await manager.closeSession(info.sessionId);
+					throw error;
 				}
-				sendJson(response, 200, { session: info });
+				sendJson(response, 200, { session: manager.getSessionInfo(info.sessionId) ?? info });
 				return;
 			}
 			if (action === "/session/model") {
@@ -5135,7 +5893,8 @@ function registerAcpRoutes(ctx, manager) {
 				await manager.setModel(sessionId, modelId);
 				sendJson(response, 200, {
 					ok: true,
-					modelId
+					modelId: manager.getSessionInfo(sessionId)?.currentModelId ?? modelId,
+					configOptions: manager.getSessionInfo(sessionId)?.configOptions
 				});
 				return;
 			}
@@ -5148,15 +5907,23 @@ function registerAcpRoutes(ctx, manager) {
 					return;
 				}
 				await manager.setConfigOption(sessionId, configId, value);
-				sendJson(response, 200, { ok: true });
+				sendJson(response, 200, {
+					ok: true,
+					configOptions: manager.getSessionInfo(sessionId)?.configOptions
+				});
 				return;
 			}
 			if (action === "/session/permission") {
 				const permissionId = String(body.permissionId ?? "").trim();
 				const optionId = typeof body.optionId === "string" ? body.optionId.trim() : "";
 				const cancel = Boolean(body.cancel) || !optionId;
+				const ownerKey = manager.sessionKey("permissions");
 				const permEntry = pendingPermissions.get(permissionId);
-				if (permEntry) {
+				if (permEntry?.ownerKey === ownerKey) {
+					if (!cancel && !permEntry.options.has(optionId)) {
+						sendJson(response, 400, { error: "permission option is invalid" });
+						return;
+					}
 					clearTimeout(permEntry.timer);
 					pendingPermissions.delete(permissionId);
 					permEntry.resolve(cancel ? { outcome: { outcome: "cancelled" } } : { outcome: {
@@ -5167,7 +5934,7 @@ function registerAcpRoutes(ctx, manager) {
 					return;
 				}
 				const writeEntry = pendingFsWrites.get(permissionId);
-				if (writeEntry) {
+				if (writeEntry?.ownerKey === ownerKey) {
 					clearTimeout(writeEntry.timer);
 					pendingFsWrites.delete(permissionId);
 					writeEntry.resolve(!cancel && optionId === "allow");
@@ -5182,6 +5949,13 @@ function registerAcpRoutes(ctx, manager) {
 				const text = typeof body.text === "string" ? body.text.trim() : "";
 				if (!sessionId || !text) {
 					sendJson(response, 400, { error: "sessionId and text are required" });
+					return;
+				}
+				const source = invocationSource("prompt", request, raw);
+				manager.assertPromptAllowed(sessionId, source);
+				const sessionKey = manager.sessionKey(sessionId);
+				if (activeStreamWriters.has(sessionKey)) {
+					sendJson(response, 409, { error: "an ACP prompt is already running for this session" });
 					return;
 				}
 				response.writeHead(200, {
@@ -5199,43 +5973,44 @@ function registerAcpRoutes(ctx, manager) {
 					if (response.writableEnded) return;
 					response.write(`data: ${JSON.stringify(event)}\n\n`);
 				};
-				activeStreamWriters.set(sessionId, writeEvent);
+				activeStreamWriters.set(sessionKey, writeEvent);
 				try {
 					await manager.sendPrompt({
 						sessionId,
 						text,
-						invocationSource: "human-interactive",
+						invocationSource: source,
 						signal: controller.signal,
 						onEvent: writeEvent
 					});
 				} catch (error) {
 					writeEvent({
 						type: "error",
-						message: error instanceof Error ? error.message : String(error)
+						message: error instanceof Error ? error.message : String(error),
+						...error instanceof AcpClientError ? { code: error.code } : {}
 					});
 				} finally {
 					response.off?.("close", onResponseClose);
-					if (activeStreamWriters.get(sessionId) === writeEvent) activeStreamWriters.delete(sessionId);
-					cancelSessionPermissions(sessionId);
+					if (activeStreamWriters.get(sessionKey) === writeEvent) activeStreamWriters.delete(sessionKey);
+					cancelSessionPermissions(sessionKey);
 					if (!response.writableEnded) response.end();
 				}
 				return;
 			}
 			if (action === "/session/cancel") {
 				const sessionId = String(body.sessionId ?? "").trim();
-				cancelSessionPermissions(sessionId);
+				cancelSessionPermissions(manager.sessionKey(sessionId));
 				sendJson(response, 200, { cancelled: manager.cancelSession(sessionId) });
 				return;
 			}
 			if (action === "/session/close") {
 				const sessionId = String(body.sessionId ?? "").trim();
-				cancelSessionPermissions(sessionId);
+				cancelSessionPermissions(manager.sessionKey(sessionId));
 				sendJson(response, 200, { closed: await manager.closeSession(sessionId) });
 				return;
 			}
 			response.writeHead(404).end();
 		} catch (error) {
-			if (!response.headersSent) sendJson(response, 400, { error: error instanceof Error ? error.message : String(error) });
+			if (!response.headersSent) sendJson(response, error instanceof AcpComplianceError ? 403 : 400, { error: error instanceof Error ? error.message : String(error) });
 			else if (!response.writableEnded) response.end();
 		}
 	};
@@ -5531,4 +6306,4 @@ function apply(ctx) {
 	});
 }
 //#endregion
-export { ACP_API_PREFIX, ANTIGRAVITY_ACP_AGENT, AcpAgentManager, AcpClient, AcpClientError, AcpComplianceError, CONNECTOR_API_PREFIX, ConnectorRegistryService, ConnectorSecretVault, DESKTOP_COMPAT_PATCHES, DESKTOP_CONVERSATION_IMPORT_PATH, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, WORK_OFFICE_PRESET_ID, apply, assertAcpUsageAllowed, assertWorkspaceContained, balanceTranscriptMessages, classifyConnectorFailure, connectorToolApprovalDecision, controlToolApprovalDecision, createDesktopConversationImportRoute, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, extractToolCallsFromAssistantMessage, importConversationIntoHost, inject, installAgentWslTool, installControlToolApproval, installToolCallArgumentNormalization, installTranscriptBalanceGuard, loadBuiltinCatalog, name, normalizeCancellationDecision, normalizeRedundantSandboxEscalation, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerAcpRoutes, registerConnectorRoutes, registerDesktopConversationImportRoute, registerDesktopWorkspaceFileOpenRoute, registerWorkOfficePreset, resolveConnectorsHome, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };
+export { ACP_API_PREFIX, ANTIGRAVITY_ACP_AGENT, AcpAgentManager, AcpClient, AcpClientError, AcpComplianceError, BUILTIN_ACP_PRESETS, CONNECTOR_API_PREFIX, ConnectorRegistryService, ConnectorSecretVault, DESKTOP_COMPAT_PATCHES, DESKTOP_CONVERSATION_IMPORT_PATH, DESKTOP_TASK_BOARD_SCHEDULER_OWNERSHIP, DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH, DesktopSkinStateService, DesktopSkinStateStore, FRIENDLY_CANCELLED_MESSAGE, SKIN_STATE_END, SKIN_STATE_START, WORK_OFFICE_PRESET_ID, apply, assertAcpUsageAllowed, assertWorkspaceContained, balanceTranscriptMessages, classifyConnectorFailure, connectorToolApprovalDecision, controlToolApprovalDecision, createDesktopConversationImportRoute, createDesktopTaskBoardHostScheduleRunner, createDesktopWorkspaceFileOpenRoute, createQueueRecoveryScheduler, extractToolCallsFromAssistantMessage, importConversationIntoHost, inject, installAgentWslTool, installControlToolApproval, installToolCallArgumentNormalization, installTranscriptBalanceGuard, loadBuiltinCatalog, name, normalizeCancellationDecision, normalizeRedundantSandboxEscalation, normalizeToolCallArgumentStream, normalizeWrappedToolCallArguments, recoverQueuedTurns, registerAcpRoutes, registerConnectorRoutes, registerDesktopConversationImportRoute, registerDesktopWorkspaceFileOpenRoute, registerWorkOfficePreset, resolveConnectorsHome, resolveDesktopWorkspaceFileOpenTarget, validateCompatPatchRegistry };

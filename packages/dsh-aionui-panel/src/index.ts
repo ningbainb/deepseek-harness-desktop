@@ -47,7 +47,19 @@ export function apply(ctx: Context): void {
     const sessions = scope.get('sessions') as { get(id: string): AttachmentSession | undefined }
     scope.effect(() => scope.webServer.register({
       kind: 'exact', path: '/aionui-panel/attachments',
-      handler: createAttachmentHandler(gate, id => sessions.get(id), isLoopbackRequest),
+      handler: (request, response, route) => createAttachmentHandler(gate, id => sessions.get(id), isLoopbackRequest, {
+        canSummarize(id) {
+          if (route?.principal?.kind !== 'owner') return false
+          const authority = scope.get('userScope' as never, false) as AttachmentSummaryAuthority | undefined
+          const access = authority?.currentScope() ?? authority?.desktopScope()
+          return !!access && authority?.canAccess(access, { kind: 'session', sessionId: id }).allowed === true
+        },
+        async summarize(root, path, signal) {
+          const service = scope.get('documentIngest' as never, false) as AttachmentDocumentService | undefined
+          if (!service) throw new Error('document ingestion unavailable')
+          return (await service.readDocument(root, path, { signal })).markdown
+        },
+      })(request, response),
     }), 'dsh-aionui-panel: session file attachments')
   })
   ctx.effect(() => ctx.systemPrompt.section({
@@ -55,4 +67,14 @@ export function apply(ctx: Context): void {
     order: SECTION_ORDER,
     text: AIONUI_PANEL_GUIDANCE,
   }), 'dsh-aionui-panel: prompt section')
+}
+
+interface AttachmentSummaryAuthority {
+  currentScope(): object | undefined
+  desktopScope(): object | undefined
+  canAccess(scope: object, resource: { kind: 'session'; sessionId: string }): { allowed: boolean }
+}
+
+interface AttachmentDocumentService {
+  readDocument(root: string, path: string, options: { signal: AbortSignal }): Promise<{ markdown: string }>
 }

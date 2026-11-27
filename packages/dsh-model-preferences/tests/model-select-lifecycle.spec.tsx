@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ModelSelect } from '../src/client/ModelSelect.tsx'
@@ -148,8 +148,10 @@ describe('model selector lifecycle', () => {
     }
   })
 
-  it('shows Antigravity (Gemini) ACP group when local OAuth CLI is ready and dispatches frame-in-frame open without touching select()', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+  it('selects the local Gemini model in the current conversation without changing the Host model', async () => {
+    let completeInitialFetch: ((response: Response) => void) | undefined
+    const initialFetch = new Promise<Response>(resolve => { completeInitialFetch = resolve })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockReturnValueOnce(initialFetch).mockResolvedValue(new Response(JSON.stringify({
       state: 'ready',
       harnessLlmAllowed: false,
       models: [
@@ -164,11 +166,14 @@ describe('model selector lifecycle', () => {
       const props = { ...createProps(vi.fn()), sessionCwd: 'D:\\work\\demo' }
       const view = render(<ModelSelect {...props as never} />)
       await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith('/api/dsh-antigravity-cli', { headers: { 'x-dsh-antigravity': '1' } }))
+      window.dispatchEvent(new Event('dsh-antigravity-status-updated'))
 
       fireEvent.click(view.getByRole('button', { name: 'trigger.fallback' }))
       fireEvent.click(view.getByRole('menuitem', { name: /menu.models/ }))
 
       const group = await view.findByRole('group', { name: 'antigravity.group' })
+      await act(async () => { completeInitialFetch?.(Response.json({ state: 'unavailable' })) })
+      expect(view.getByRole('group', { name: 'antigravity.group' })).toBe(group)
       const items = [...group.querySelectorAll('[data-dsh-antigravity-model]')]
       expect(items.map(el => el.getAttribute('data-dsh-antigravity-model'))).toEqual(['gemini-3.8-flash-low', 'gpt-oss-120b'])
 
@@ -177,6 +182,7 @@ describe('model selector lifecycle', () => {
       expect((openSpy.mock.calls[0][0] as CustomEvent).detail).toEqual({
         modelId: 'gemini-3.8-flash-low',
         cwd: 'D:\\work\\demo',
+        conversationId: 'session-a',
       })
       expect(props.select).not.toHaveBeenCalled()
       expect(view.queryByRole('menu')).toBeNull()

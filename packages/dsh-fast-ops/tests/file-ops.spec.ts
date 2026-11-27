@@ -64,6 +64,37 @@ describe('dsh-fast-ops file-ops', () => {
     const grepRes = await searchWorkspace(ws, { mode: 'grep', pattern: 'alpha' })
     expect(grepRes.totalMatches).toBe(1)
     expect(grepRes.items[0]).toMatchObject({ path: 'src/a.ts', line: 1 })
+    expect(grepRes).not.toHaveProperty('context')
+  })
+
+  it('merges nearby context for only the requested match page and returns the matching file revision', async () => {
+    const ws = makeWorkspace()
+    writeFileSync(join(ws, 'src', 'a.ts'), ['first', 'match one', 'middle', 'match two', 'last', '', 'match three'].join('\n'))
+    const result = await searchWorkspace(ws, { mode: 'grep', pattern: 'match', limit: 2, contextLines: 1 })
+    expect(result).toMatchObject({
+      totalMatches: 3, nextOffset: 2,
+      context: [{
+        path: 'src/a.ts', startLine: 1, endLine: 5, matchLines: [2, 4],
+        lines: ['first', 'match one', 'middle', 'match two', 'last'],
+      }],
+    })
+    expect('context' in result && result.context?.[0]?.revision).toBe(
+      (await readFilesBatch(ws, [{ path: 'src/a.ts' }])).items[0].revision,
+    )
+  })
+
+  it('pages large context through a session-scoped reference without changing the match offset', async () => {
+    const ws = makeWorkspace()
+    writeFileSync(join(ws, 'src', 'a.ts'), 'before ' + 'x'.repeat(400) + '\nmatch\n' + 'after ' + 'y'.repeat(400))
+    const cache = new ResultCache()
+    const result = await searchWorkspace(ws, { mode: 'grep', pattern: 'match', contextLines: 1 },
+      { cache, sessionId: 'source', maxInlineBytes: 180 })
+    expect(result).toMatchObject({ items: [{ path: 'src/a.ts', line: 2, text: 'match' }], nextOffset: null, spilled: true })
+    const refId = 'contextRef' in result ? result.contextRef?.refId : undefined
+    expect(refId).toBeDefined()
+    if (!refId) throw new Error('expected a context reference')
+    expect(cache.page({ sessionId: 'other', refId }).ok).toBe(false)
+    expect(cache.page({ sessionId: 'source', refId })).toMatchObject({ items: [{ matchLines: [2], truncated: true }] })
   })
 
   it('enforces SHA-256 CAS and supports dryRun preview on editFilesBatch, replace, diff, stat, and CSV', async () => {

@@ -196,7 +196,11 @@
         "local-cli-model-discovery",
         "stream-json-and-acp",
         "dsh-owned-tool-execution",
-        "cli-diagnostics-settings-and-dock-shortcuts"
+        "cli-diagnostics-settings-and-dock-shortcuts",
+        "four-built-in-acp-engines-and-custom-presets",
+        "bounded-acp-diagnostics-and-shell-free-windows-launch",
+        "antigravity-human-interactive-only",
+        "native-composer-engine-picker-and-independent-side-panes"
       ],
       "patchId": "llm-antigravity",
       "requiredInAggregate": true,
@@ -217,10 +221,42 @@
       "requiredInDesktop": false
     },
     {
+      "id": "local-search",
+      "package": "@ningbainb/dsh-local-search",
+      "path": "packages/dsh-local-search",
+      "description": "本地混合检索为记忆、会话和工作区知识库提供按主体隔离的检索",
+      "patchId": "local-search",
+      "features": [
+        "cjk-and-code-tokenization",
+        "scoped-reciprocal-rank-fusion",
+        "recoverable-derived-index",
+        "conversation-turn-search-and-workspace-knowledge"
+      ],
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "checkpoints",
+      "package": "@ningbainb/dsh-checkpoints",
+      "path": "packages/dsh-checkpoints",
+      "description": "隔离保存工作区文件检查点，按轮次预览和恢复变更",
+      "patchId": "checkpoints",
+      "features": [
+        "shadow-git-checkpoints-with-private-index",
+        "changed-turn-diff-with-split-and-unified-review",
+        "scoped-restore-with-desktop-confirmation-and-undo"
+      ],
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
       "id": "memory",
       "package": "@ningbainb/dsh-memory",
       "path": "packages/dsh-memory",
       "description": "用户隔离本机长期记忆持久化与显式确认审批",
+      "features": ["local-hybrid-recall-with-explicit-memory-write-confirmation"],
       "patchId": "memory",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -232,6 +268,50 @@
       "path": "packages/dsh-chat-artifacts",
       "description": "安全可回放的会话 Artifact 工具与渲染卡片",
       "patchId": "chat-artifacts",
+      "features": [
+        "proactive-diagrams-for-project-and-concept-explanations",
+        "diagram-followups-use-durable-recent-session-artifact-identifiers",
+        "preview-streamed-html-with-scripts-disabled-until-settlement",
+        "desktop-isolates-interactive-preview-and-confirms-draft-actions",
+        "patch-artifact-keeps-durable-per-session-versions",
+        "latest-turn-artifact-replays-at-the-tail-with-version-controls",
+        "sep-1865-mcp-app-theme-and-tool-bridge",
+        "mcp-app-session-server-binding-and-write-approval",
+        "offline-mermaid-and-svg-png-export"
+      ],
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "fast-ops",
+      "package": "@ningbainb/dsh-fast-ops",
+      "path": "packages/dsh-fast-ops",
+      "description": "nbfast 提供渐进式文件工具、语法树检索、仓库地图和可回读原文的终端降噪",
+      "patchId": "fast-ops",
+      "features": [
+        "nbfast-display-name-and-legacy-search",
+        "fast-discover-preserves-existing-tools",
+        "ast-outline-search-and-fallback",
+        "ast-rewrite-dry-run-and-revision-check",
+        "denoised-output-exact-replay-in-owning-session"
+      ],
+      "requiredInAggregate": true,
+      "requiredInCordisPatch": true,
+      "requiredInDesktop": true
+    },
+    {
+      "id": "doc-ingest",
+      "package": "@ningbainb/dsh-doc-ingest",
+      "path": "packages/dsh-doc-ingest",
+      "description": "通过工作模式读取本地文档和经批准的公开网页",
+      "patchId": "doc-ingest",
+      "features": [
+        "work-office-document-inspection-and-markdown-reading",
+        "bounded-worker-inline-excerpt-and-paged-document-output",
+        "workspace-scope-and-approved-public-web-fetch",
+        "approved-document-indexing-in-current-workspace"
+      ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
       "requiredInDesktop": true
@@ -245,7 +325,8 @@
       "features": [
         "aionui-render-failure-isolation",
         "optional-panels-stay-in-content-row-without-implicit-footer-space",
-        "native-collapse-state-remains-authoritative-across-skins"
+        "native-collapse-state-remains-authoritative-across-skins",
+        "path-default-and-explicit-session-owned-document-excerpt"
       ],
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -361,6 +442,7 @@
       "features": [
         "bounded-balance-query-and-retry",
         "native-primary-stats-with-desktop-disclosure",
+        "native-statistics-use-available-office-dock-width",
         "empty-session-has-no-stats-supplement",
         "distinct-rolling-and-peak-throughput",
         "balance-follows-native-model-selection",
@@ -1335,6 +1417,34 @@
         "pwsh-tool-round-trip",
         "assistant-completion",
         "synthetic-provider-no-paid-inference"
+      ]
+    },
+    {
+      "id": "gemini-and-remote-settings",
+      "name": "Gemini 主对话区与移动端远程设置直达",
+      "uiSelector": "[data-antigravity-acp-chat]",
+      "e2eScript": "scripts/verify-gemini-remote-settings.mjs",
+      "features": [
+        "acp-start-in-current-workspace",
+        "acp-confirm-model-switch-on-existing-session",
+        "gemini-native-composer-reopens-during-connection-and-streaming",
+        "office-apps-entry-is-visible-only-in-office-mode",
+        "office-conversation-dock-shows-native-token-statistics-after-first-send",
+        "nbfast-keeps-existing-dock-route-and-supports-legacy-search",
+        "nbfast-core-tools-enabled-by-default",
+        "nbfast-grep-can-return-merged-context-and-file-revisions",
+        "remote-access-opens-exact-plugin-configuration"
+      ]
+    },
+    {
+      "id": "chat-artifacts-native",
+      "name": "对话 Artifact 流式预览与版本回放",
+      "uiSelector": "[data-artifact-turn-tail]",
+      "e2eScript": "scripts/verify-chat-artifacts.mjs",
+      "features": [
+        "settled-inline-artifact-fits-content-height-on-wide-and-narrow-windows",
+        "static-measurement-bridge-runs-without-artifact-scripts",
+        "conversational-followup-patches-the-existing-artifact-after-restart"
       ]
     },
     {

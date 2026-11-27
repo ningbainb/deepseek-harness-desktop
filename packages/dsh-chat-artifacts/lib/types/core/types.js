@@ -5,6 +5,7 @@
  * before a replayed value reaches an iframe. Keeping it DOM-free means the
  * host and browser halves cannot drift on the security boundary.
  */
+import { ARTIFACT_URL_ATTRIBUTE, HTML_ATTRIBUTE, HTML_TAG, isArtifactAttributeUrl, isArtifactResourceUrl, isLegacyRelativeMediaUrl, } from "./html.js";
 export const ARTIFACT_KINDS = [
     'architecture',
     'flow',
@@ -17,6 +18,7 @@ export const ARTIFACT_KINDS = [
     'report',
     'other',
 ];
+export const ARTIFACT_MODES = ['static', 'interactive'];
 export const ARTIFACT_MAX_BYTES = 512 * 1024;
 export const ARTIFACT_DEFAULT_HEIGHT = 420;
 export const ARTIFACT_MIN_HEIGHT = 240;
@@ -35,57 +37,70 @@ export class ArtifactValidationError extends Error {
 export function utf8ByteLength(value) {
     return new TextEncoder().encode(value).byteLength;
 }
-/** Validate the subset of HTML that the safe artifact frame is allowed to host. */
-export function validateArtifactHtml(html) {
+/** Validate artifact markup before it enters the isolated iframe. */
+export function validateArtifactHtml(html, mode = 'static') {
     const issues = [];
-    const add = (message) => {
-        if (!issues.includes(message))
-            issues.push(message);
+    const reasons = new Set();
+    const add = (message, index) => {
+        if (reasons.has(message))
+            return;
+        reasons.add(message);
+        if (index === undefined) {
+            issues.push('html: ' + message);
+            return;
+        }
+        const line = html.slice(0, index).split(/\r\n?|\n/).length;
+        issues.push('html (line ' + line + '): ' + message);
     };
+    if (html.length > ARTIFACT_MAX_BYTES || utf8ByteLength(html) > ARTIFACT_MAX_BYTES) {
+        add('HTML exceeds the ' + ARTIFACT_MAX_BYTES + '-byte limit');
+        return issues;
+    }
     if (html.trim().length === 0)
         add('HTML must not be empty');
-    if (utf8ByteLength(html) > ARTIFACT_MAX_BYTES) {
-        add('HTML exceeds the ' + ARTIFACT_MAX_BYTES + '-byte limit');
+    const reject = (pattern, message) => {
+        const match = pattern.exec(html);
+        if (match)
+            add(message, match.index);
+    };
+    reject(/\u0000/, 'NUL characters are not allowed');
+    reject(/<\s*\/?\s*(?:iframe|frame|frameset|object|embed|applet|portal|fencedframe|base|link)\b/i, 'nested frame, object, embed, base, and link elements are not allowed');
+    reject(/<\s*(?:\/?\s*(?:html|head|body)\b|!doctype\b)/i, 'document shell elements are not allowed');
+    reject(/<\s*meta\b/i, 'meta elements are not allowed');
+    reject(/\bsrcdoc\s*=/i, 'srcdoc attributes are not allowed');
+    if (mode === 'static') {
+        reject(/<\s*\/?\s*(?:script|form)\b/i, 'script and form elements are not allowed in static mode');
+        reject(/\bon[a-z][\w:-]*\s*=/i, 'inline event-handler attributes are not allowed in static mode');
     }
-    if (html.includes('\u0000'))
-        add('NUL characters are not allowed');
-    if (/<\s*\/?\s*(?:script|iframe|object|embed|applet|portal|form|base|link)\b/i.test(html)) {
-        add('script, nested frame, object, embed, form, base, and link elements are not allowed');
-    }
-    if (/<\s*\/?\s*(?:html|head|body)\b/i.test(html))
-        add('document shell elements are not allowed');
-    if (/<\s*meta\b/i.test(html))
-        add('meta elements are not allowed');
-    if (/\bsrcdoc\s*=/i.test(html))
-        add('srcdoc attributes are not allowed');
-    if (/\bon[a-z][\w:-]*\s*=/i.test(html))
-        add('inline event-handler attributes are not allowed');
-    if (/(?:javascript|vbscript)\s*:/i.test(html))
-        add('script URL schemes are not allowed');
-    if (/@import\b/i.test(html))
-        add('CSS @import is not allowed');
-    if (/(?:expression\s*\(|-moz-binding\b|behavior\s*:)/i.test(html)) {
-        add('legacy CSS execution hooks are not allowed');
-    }
-    if (/(?:fetch\s*\(|XMLHttpRequest\b|WebSocket\s*\(|EventSource\s*\(|sendBeacon\s*\(|window\.open\b|document\.cookie\b|parent\.|top\.|opener\b|electron\b|require\s*\(|process\.)/i.test(html)) {
-        add('network, parent-window, Electron, and Node execution APIs are not allowed');
-    }
-    const urlAttribute = /\b(?:src|href|action|formaction|poster|cite|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
-    for (let match = urlAttribute.exec(html); match !== null; match = urlAttribute.exec(html)) {
-        const value = match[1] ?? match[2] ?? match[3] ?? '';
-        if (/^(?:https?:|ftp:|file:|\/\/|javascript:|vbscript:)/i.test(value)
-            || /^data:(?!image\/|font\/|audio\/|video\/)/i.test(value)) {
-            add('external URLs and non-media data URLs are not allowed');
-            break;
+    reject(/(?:javascript|vbscript)\s*:/i, 'script URL schemes are not allowed');
+    reject(/@import\b/i, 'CSS @import is not allowed');
+    reject(/(?:expression\s*\(|-moz-binding\b|behavior\s*:)/i, 'legacy CSS execution hooks are not allowed');
+    reject(/(?:\bfetch\s*\(|\bXMLHttpRequest\b|\bWebSocket\s*\(|\bEventSource\s*\(|\bsendBeacon\s*\(|\bwindow\s*\.\s*open\b|\bdocument\s*\.\s*cookie\b|\b(?:parent|top)\s*[.\[]|\bopener\b|\belectron\b|\brequire\s*\(|\bprocess\s*[.\[]|\b(?:window|document|self)\s*\.\s*location\b|\blocation\s*(?:=|\.\s*(?:assign|replace|href)\b)|\b(?:SharedWorker|Worker|ServiceWorker|RTCPeerConnection|WebTransport|BroadcastChannel)\s*\(|\bimport\s*\()/i, 'network, navigation, parent-window, Electron, and Node execution APIs are not allowed');
+    for (const tag of html.matchAll(HTML_TAG)) {
+        if (tag[1])
+            continue;
+        const tagName = tag[2].toLowerCase();
+        const attributes = tag[3];
+        for (const attribute of attributes.matchAll(HTML_ATTRIBUTE)) {
+            const name = attribute[1].toLowerCase();
+            const value = attribute[2] ?? attribute[3] ?? attribute[4] ?? '';
+            const start = tag.index + 1 + tagName.length + attribute.index;
+            const localUrl = isArtifactAttributeUrl(name, value)
+                || (mode === 'static' && isLegacyRelativeMediaUrl(tagName, name, value));
+            if (ARTIFACT_URL_ATTRIBUTE.test(name) && (!localUrl || (tagName === 'script' && name === 'src'))) {
+                add('external URLs, executable resources, and non-media data URLs are not allowed in ' + name, start);
+            }
+            if (mode === 'interactive' && /^(?:set|animate|animatecolor|animatetransform)$/i.test(tagName)
+                && name === 'attributename' && (ARTIFACT_URL_ATTRIBUTE.test(value.trim()) || /^on/i.test(value.trim()))) {
+                add('SVG animation targeting a URL or event handler is not allowed', start);
+            }
         }
     }
     const cssUrl = /\burl\s*\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]+))\s*\)/gi;
-    for (let match = cssUrl.exec(html); match !== null; match = cssUrl.exec(html)) {
+    for (const match of html.matchAll(cssUrl)) {
         const value = match[1] ?? match[2] ?? match[3] ?? '';
-        if (!/^#/i.test(value)
-            && !/^blob:/i.test(value)
-            && !/^data:(?:image\/|font\/|audio\/|video\/)/i.test(value)) {
-            add('CSS resource URLs must be local fragment, blob, or media data URLs');
+        if (!isArtifactResourceUrl(value)) {
+            add('CSS resource URLs must be local fragment, blob, or media data URLs', match.index);
             break;
         }
     }
@@ -98,6 +113,7 @@ export function normalizeArtifactArgs(args) {
     const html = typeof args.html === 'string' ? args.html : '';
     const kind = args.kind;
     const height = args.height ?? ARTIFACT_DEFAULT_HEIGHT;
+    const mode = args.mode;
     const description = args.description === undefined
         ? undefined
         : typeof args.description === 'string' ? args.description.trim() : '';
@@ -109,13 +125,16 @@ export function normalizeArtifactArgs(args) {
     if (!ARTIFACT_KINDS.includes(kind)) {
         issues.push('kind must be one of ' + ARTIFACT_KINDS.join(', '));
     }
+    if (mode !== undefined && !ARTIFACT_MODES.includes(mode)) {
+        issues.push('mode must be static or interactive');
+    }
     if (!Number.isSafeInteger(height) || height < ARTIFACT_MIN_HEIGHT || height > ARTIFACT_MAX_HEIGHT) {
         issues.push('height must be an integer between ' + ARTIFACT_MIN_HEIGHT + ' and ' + ARTIFACT_MAX_HEIGHT);
     }
     if (description !== undefined && Array.from(description).length > ARTIFACT_MAX_DESCRIPTION_LENGTH) {
         issues.push('description must be at most ' + ARTIFACT_MAX_DESCRIPTION_LENGTH + ' characters');
     }
-    issues.push(...validateArtifactHtml(html));
+    issues.push(...validateArtifactHtml(html, mode));
     if (issues.length > 0)
         throw new ArtifactValidationError(issues);
     return {
@@ -123,24 +142,29 @@ export function normalizeArtifactArgs(args) {
         kind,
         html,
         height,
+        ...(mode === undefined ? {} : { mode }),
         ...(description === undefined || description.length === 0 ? {} : { description }),
     };
+}
+export function isArtifactId(value) {
+    return typeof value === 'string' && value.length <= 80 && /^artifact_[A-Za-z0-9_-]+$/.test(value);
 }
 /** Softly validate a presentationMeta value received from a durable session. */
 export function isArtifactRecord(value) {
     if (typeof value !== 'object' || value === null)
         return false;
     const candidate = value;
-    return (typeof candidate.artifactId === 'string'
-        && /^artifact_[A-Za-z0-9_-]+$/.test(candidate.artifactId)
-        && candidate.artifactId.length <= 80
+    return (isArtifactId(candidate.artifactId)
+        && (candidate.parentArtifactId === undefined || isArtifactId(candidate.parentArtifactId))
+        && (candidate.version === undefined || (Number.isSafeInteger(candidate.version) && candidate.version >= 1))
+        && (candidate.mode === undefined || ARTIFACT_MODES.includes(candidate.mode))
         && typeof candidate.title === 'string'
         && candidate.title.trim().length > 0
         && Array.from(candidate.title).length <= ARTIFACT_MAX_TITLE_LENGTH
         && typeof candidate.kind === 'string'
         && ARTIFACT_KINDS.includes(candidate.kind)
         && typeof candidate.html === 'string'
-        && validateArtifactHtml(candidate.html).length === 0
+        && validateArtifactHtml(candidate.html, candidate.mode).length === 0
         && typeof candidate.height === 'number'
         && Number.isSafeInteger(candidate.height)
         && candidate.height >= ARTIFACT_MIN_HEIGHT

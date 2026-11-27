@@ -9,6 +9,46 @@ afterEach(() => {
 })
 
 describe('installRemoteAccessHintEnhancer', () => {
+  it('waits for the exact remote row configure action to become available', async () => {
+    vi.useFakeTimers()
+    document.body.innerHTML = `
+      <div role="dialog"><div role="alert" data-dsh-remote-lan-required><p>Local LAN access</p></div></div>
+      <main data-plugin-panel aria-busy="true"></main>`
+    const openPluginSettings = vi.fn(() => true)
+    const configure = vi.fn()
+    const toggle = vi.fn()
+    const expand = vi.fn()
+    const dispose = installRemoteAccessHintEnhancer(document, { openPluginSettings })
+    try {
+      const jump = document.querySelector<HTMLButtonElement>('[data-dsh-remote-open-settings]')
+      expect(jump).not.toBeNull()
+      jump?.click()
+      await vi.advanceTimersByTimeAsync(800)
+      expect(openPluginSettings).toHaveBeenCalledOnce()
+      const panel = document.querySelector('main')!
+      panel.innerHTML = '<li data-plugin-row="include:web-ui-remote-web-ui"><button role="switch">On</button></li>'
+      panel.querySelector('button')!.addEventListener('click', toggle)
+      const configureButton = document.createElement('button')
+      configureButton.type = 'button'
+      configureButton.setAttribute('aria-label', 'Configure remote access')
+      configureButton.addEventListener('click', configure)
+      panel.querySelector('li')!.prepend(configureButton)
+      await Promise.resolve()
+      expect(configure).not.toHaveBeenCalled()
+      panel.removeAttribute('aria-busy')
+      await Promise.resolve()
+      expect(configure).toHaveBeenCalledOnce()
+      expect(toggle).not.toHaveBeenCalled()
+      panel.innerHTML = '<section data-plugin-row-detail="@linxin666/dsh-web-all#web-ui-remote-web-ui"><div data-plugin-config><button aria-expanded="false">Remote access settings</button></div></section>'
+      panel.querySelector('button')!.addEventListener('click', expand)
+      await Promise.resolve()
+      expect(expand).toHaveBeenCalledOnce()
+    } finally {
+      dispose()
+      vi.useRealTimers()
+    }
+  })
+
   it('rewrites stale 127.0.0.1 instructions and jumps to plugin settings on click', async () => {
     document.documentElement.lang = 'zh-CN'
     const openPluginSettings = vi.fn(() => true)

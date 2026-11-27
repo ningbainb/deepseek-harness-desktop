@@ -82,6 +82,16 @@ function installOAuthPopupPolicy({ browserWindow, openExternal, onError }) {
 
 export function installNavigationPolicy({ webContents, getRuntimeOrigin, openExternal, onError = () => {} }) {
   installTrustedExternalOpenPolicy({ webContents, getRuntimeOrigin, openExternal })
+  const isSrcdoc = (url) => typeof url === 'string' && /^about:srcdoc(?:[?#]|$)/u.test(url)
+  const blockSrcdocNavigation = (event) => {
+    // An opaque sandbox isolates the host document but does not prevent the
+    // preview from navigating itself. Keep srcdoc renderers in their document.
+    if ((isSrcdoc(event.frame?.url) || isSrcdoc(event.initiator?.url)) && !isSrcdoc(event.url)) {
+      event.preventDefault()
+    }
+  }
+  webContents.on('will-frame-navigate', blockSrcdocNavigation)
+  webContents.on('will-redirect', blockSrcdocNavigation)
   webContents.on('will-navigate', (event, target) => {
     const decision = classifyNavigation(target, getRuntimeOrigin())
     if (decision === 'allow') return

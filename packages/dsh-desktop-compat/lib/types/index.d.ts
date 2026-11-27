@@ -10,7 +10,7 @@ export { registerConnectorRoutes } from './connectors/connector-routes.ts';
 export { registerWorkOfficePreset } from './connectors/work-office-preset.ts';
 export { loadBuiltinCatalog } from './connectors/builtin-catalog.ts';
 export * from './connectors/types.ts';
-export { ANTIGRAVITY_ACP_AGENT, AcpAgentManager, AcpComplianceError, assertAcpUsageAllowed, type AcpAgentManagerDeps, } from './acp/acp-agent-manager.ts';
+export { ANTIGRAVITY_ACP_AGENT, BUILTIN_ACP_PRESETS, AcpAgentManager, AcpComplianceError, assertAcpUsageAllowed, type AcpAgentManagerDeps, } from './acp/acp-agent-manager.ts';
 export { AcpClient, AcpClientError, assertWorkspaceContained, type AcpClientHandlers, type AcpClientLaunchOptions, } from './acp/acp-client.ts';
 export { registerAcpRoutes } from './acp/acp-routes.ts';
 export * from './acp/types.ts';
