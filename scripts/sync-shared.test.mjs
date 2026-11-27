@@ -30,7 +30,7 @@ test('stripHeader accepts a Windows CRLF separator', () => {
 
 test('copies cover the settings trio, two telemetry consumers, and host helpers', () => {
   const entries = copyEntries()
-  assert.equal(entries.length, 25)
+  assert.equal(entries.length, 31)
   const clientTrio = entries.filter(entry => /[\\/]src[\\/]client[\\/]/.test(entry.target) && entry.file !== 'feature-telemetry.ts')
   assert.equal(clientTrio.length, 18)
   const telemetryCopies = entries.filter(entry => entry.file === 'feature-telemetry.ts')
@@ -40,6 +40,13 @@ test('copies cover the settings trio, two telemetry consumers, and host helpers'
   ])
   const hostCopies = entries.filter(entry => /[\\/]src[\\/]host[\\/]/.test(entry.target) || /[\\/]src[\\/]dsh-home\.ts$/.test(entry.target))
   assert.equal(hostCopies.length, 5)
+  for (const file of ['preset-schema.ts', 'preset-registry.ts', 'sync.ts']) {
+    const copies = entries.filter(entry => entry.sourceRel === `shared/host/presets/${file}`)
+    assert.deepEqual(copies.map(copy => copy.target), [
+      join(REPO_ROOT, 'packages/dsh-liangshen/src', file),
+      join(REPO_ROOT, 'packages/dsh-value-mode/src', file),
+    ])
+  }
 })
 
 test('checkSync detects drift and applySync repairs it', async () => {
@@ -56,6 +63,11 @@ test('checkSync detects drift and applySync repairs it', async () => {
     await mkdir(hostDir, { recursive: true })
     await writeFile(join(hostDir, 'poll-guard.ts'), 'export const guard = 1' + String.fromCharCode(10))
     await writeFile(join(hostDir, 'dsh-home.ts'), 'export const home = 1' + String.fromCharCode(10))
+    const presetDir = join(hostDir, 'presets')
+    await mkdir(presetDir, { recursive: true })
+    for (const file of ['preset-registry.ts', 'preset-schema.ts', 'sync.ts']) {
+      await writeFile(join(presetDir, file), 'export {}\n')
+    }
     const targetDir = join(root, 'packages', 'dsh-pet', 'src', 'client')
     await mkdir(targetDir, { recursive: true })
     await writeFile(join(targetDir, 'settings-form.ts'), renderCopy('export const bad = 2' + String.fromCharCode(10), 'settings-form.ts', 'shared/client/settings/settings-form.ts'))

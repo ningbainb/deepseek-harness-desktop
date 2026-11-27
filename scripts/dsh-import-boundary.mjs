@@ -11,6 +11,7 @@ export const BASELINE_PATH = resolve(SCRIPT_DIR, 'dsh-import-boundary.baseline.j
 const SOURCE_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx'])
 const IGNORED_SOURCE_PREFIXES = Object.freeze(['.cache/', '.patch-work/', '.pnpm_patches/'])
 const CONTROLLED_PREFIXES = Object.freeze([
+  'shared/host/presets/preset-registry.ts',
   'apps/dsh-desktop/src/atomic-write-adapter.mjs',
   'apps/dsh-desktop/src/skill-market-sdk-adapter.mjs',
   'apps/dsh-desktop/src/runtime-client-hmr.mjs',

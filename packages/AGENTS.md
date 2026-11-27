@@ -25,7 +25,7 @@
 - **共享构建预设**：所有 tsdown 包 import `shared/tsdown.client.ts`，禁止复制到
   包内；tsconfig 分层（solution + host/client 各自 program，参照
   `dsh-git-graph`/`dsh-aionui-panel`）。
-- **运行时共享模块**：settings 卡三件套、poll-guard、dsh-home 的事实源在
+- **运行时共享模块**：settings 卡三件套、poll-guard、dsh-home 及预设校验、注册与目录同步的事实源在
   `shared/`，包内同名文件是 `scripts/sync-shared.mjs` 生成的同步副本
   （generated 头注释，禁止手改；改 shared 源后重跑同步，test:scripts 含 drift 门禁）。
 - **浏览器 bundle 纯度门**：`@deepseek-ai/*` 只能 type-only 导入；值导入只允许

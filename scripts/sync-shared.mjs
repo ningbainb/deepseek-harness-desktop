@@ -2,14 +2,9 @@
 'use strict'
 
 /**
- * sync-shared — mirror shared/client/settings (the family-shared settings
- * card trio) into the consuming plugin packages.
- *
- * The trio lives exactly once under shared/client/settings and is copied,
- * with a generated-file header, to each consumer's src/client/. The copies
- * are committed (same policy as the dsh-skins built assets) so packages stay
- * self-contained for typecheck, test, and publish. The --check mode fails on
- * any drift and runs in CI through test:scripts.
+ * Mirror family-shared modules into independently published plugin packages.
+ * Edit the source under shared/ and commit its generated consumer copies.
+ * The CI drift check validates the contents of each published copy.
  *
  * Usage:
  *   node scripts/sync-shared.mjs             # rewrite every consumer copy
@@ -27,6 +22,11 @@ export const REPO_ROOT = resolve(SCRIPT_DIR, '..')
  * live exactly once under shared/; consumers import the committed copy.
  */
 const MANIFEST = [
+  ...['preset-schema.ts', 'preset-registry.ts', 'sync.ts'].map(file => ({
+    file,
+    source: `shared/host/presets/${file}`,
+    targets: ['dsh-liangshen', 'dsh-value-mode'].map(pkg => `packages/${pkg}/src/${file}`),
+  })),
   {
     file: 'feature-telemetry.ts',
     source: 'shared/client/feature-telemetry.ts',
