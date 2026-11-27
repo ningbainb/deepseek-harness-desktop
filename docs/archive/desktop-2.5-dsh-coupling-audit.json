@@ -1992,15 +1992,6 @@
       "controlled": false
     },
     {
-      "path": "packages/dsh-git-graph/src/client/chips/BranchChip.tsx",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 18,
-      "typeOnly": true,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
       "path": "packages/dsh-git-graph/src/client/chips/BranchPopover.tsx",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-primitives",
@@ -2073,40 +2064,40 @@
       "controlled": false
     },
     {
-      "path": "packages/dsh-git-graph/src/client/index.ts",
+      "path": "packages/dsh-git-graph/src/client/slot-contracts.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-locale/client",
-      "line": 33,
+      "line": 1,
       "typeOnly": true,
       "classification": "public-experimental",
-      "controlled": false
+      "controlled": true
     },
     {
-      "path": "packages/dsh-git-graph/src/client/index.ts",
+      "path": "packages/dsh-git-graph/src/client/slot-contracts.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-conversation/client",
-      "line": 37,
+      "line": 5,
       "typeOnly": true,
       "classification": "public-experimental",
-      "controlled": false
+      "controlled": true
     },
     {
-      "path": "packages/dsh-git-graph/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
-      "line": 38,
-      "typeOnly": true,
-      "classification": "public-stable",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-git-graph/src/client/index.ts",
+      "path": "packages/dsh-git-graph/src/client/slot-contracts.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
-      "line": 39,
+      "line": 6,
       "typeOnly": true,
       "classification": "public-experimental",
-      "controlled": false
+      "controlled": true
+    },
+    {
+      "path": "packages/dsh-git-graph/src/client/slot-contracts.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 7,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": true
     },
     {
       "path": "packages/dsh-git-graph/src/host/git-service.ts",
@@ -5088,6 +5079,24 @@
       "controlled": false
     },
     {
+      "path": "packages/dsh-tool-describe-image/src/model-capability.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-agent",
+      "line": 2,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": true
+    },
+    {
+      "path": "packages/dsh-tool-describe-image/src/model-capability.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-llm",
+      "line": 4,
+      "typeOnly": true,
+      "classification": "public-stable",
+      "controlled": true
+    },
+    {
       "path": "packages/dsh-tool-describe-image/src/vision-client.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-attachment",
@@ -6526,7 +6535,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 81,
+      "line": 47,
       "operation": "workspace-unknown"
     },
     {
@@ -17482,13 +17491,13 @@
     {
       "category": "slot",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 188,
+      "line": 154,
       "operation": "conversation.input.selector.context"
     },
     {
       "category": "slot",
       "path": "packages/dsh-git-graph/src/client/index.ts",
-      "line": 197,
+      "line": 163,
       "operation": "conversation.input.dock"
     },
     {

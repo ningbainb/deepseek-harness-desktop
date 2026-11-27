@@ -23,6 +23,8 @@ const CONTROLLED_PREFIXES = Object.freeze([
   'packages/dsh-checkpoints/src/core/sdk-adapter.ts',
   'packages/dsh-checkpoints/src/host/sdk-adapter.ts',
   'packages/dsh-local-search/src/host/sdk-adapter.ts',
+  'packages/dsh-git-graph/src/client/slot-contracts.ts',
+  'packages/dsh-tool-describe-image/src/model-capability.ts',
   'packages/dsh-web-ui-settings/src/chatgpt-auth',
   'packages/dsh-web-ui-settings/src/custom-provider-key-sdk-adapter.ts',
   'packages/dsh-web-ui-settings/src/client/desktop-preset-navigation.ts',

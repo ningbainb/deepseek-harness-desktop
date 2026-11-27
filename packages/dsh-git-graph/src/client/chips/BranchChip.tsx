@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { IconBranchOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { BranchSlotProps } from '../slot-contracts.ts'
 import type { BranchesView, GraphView, RepoStatus, SwitchResult } from '../../core/types.ts'
 import { Chip, cx } from './Chip.tsx'
 import { BranchPopover } from './BranchPopover.tsx'
@@ -23,7 +23,7 @@ import { CreateBranchDialog } from './CreateBranchDialog.tsx'
 import { GraphDialog } from '../graph/GraphDialog.tsx'
 import css from './context.module.css'
 
-type SessionId = PropsRuntime<'conversation.input.dock'>['sessionId']
+type SessionId = NonNullable<BranchSlotProps['sessionId']>
 
 /** Injected business face of the branch chip: git verbs, keyed by the current session id. */
 export interface GitGraphInjected {
@@ -42,10 +42,7 @@ export interface GitGraphInjected {
 }
 
 /** Full props of the branch chip: either seat's runtime share (the session-maybe context hole or the session-scoped dock fallback) + the git-graph inject face + the locale seat. */
-export type BranchChipProps =
-  (PropsRuntime<'conversation.input.selector.context'> | PropsRuntime<'conversation.input.dock'>)
-  & GitGraphInjected
-  & PropsLocale<'git-graph'>
+export type BranchChipProps = BranchSlotProps & GitGraphInjected
 
 /** Horizontal gap between the official hero-row chips (WorkspaceChip / AgentPresetSeat). */
 const HERO_CHIP_GAP = 2

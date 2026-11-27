@@ -12,7 +12,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 
 | Classification | Count |
 | --- | ---: |
-| public-stable | 440 |
+| public-stable | 441 |
 | public-experimental | 216 |
 | compatibility-patch | 52 |
 | private-high-risk | 0 |
@@ -241,7 +241,6 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-doc-ingest/tests/registration.spec.ts | 1 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
 | packages/dsh-fast-ops/src/host/tool-registry.ts | 1 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
 | packages/dsh-git-graph/src/client/chips/BranchChip.tsx | 16 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
-| packages/dsh-git-graph/src/client/chips/BranchChip.tsx | 18 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-git-graph/src/client/chips/BranchPopover.tsx | 8 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
 | packages/dsh-git-graph/src/client/chips/BranchPopover.tsx | 10 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-git-graph/src/client/chips/Chip.tsx | 6 | static-import | @deepseek-ai/dsh-client-ui-primitives | yes | public-stable | no |
@@ -250,10 +249,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-git-graph/src/client/graph/GraphDialog.tsx | 7 | static-import | @deepseek-ai/dsh-client-ui-primitives | no | public-stable | no |
 | packages/dsh-git-graph/src/client/graph/GraphDialog.tsx | 9 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
 | packages/dsh-git-graph/src/client/index.ts | 31 | static-import | @deepseek-ai/dsh-client-connection/client | yes | public-experimental | no |
-| packages/dsh-git-graph/src/client/index.ts | 33 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | no |
-| packages/dsh-git-graph/src/client/index.ts | 37 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | no |
-| packages/dsh-git-graph/src/client/index.ts | 38 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
-| packages/dsh-git-graph/src/client/index.ts | 39 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | no |
+| packages/dsh-git-graph/src/client/slot-contracts.ts | 1 | static-import | @deepseek-ai/dsh-client-locale/client | yes | public-experimental | yes |
+| packages/dsh-git-graph/src/client/slot-contracts.ts | 5 | static-import | @deepseek-ai/dsh-client-ui-conversation/client | yes | public-experimental | yes |
+| packages/dsh-git-graph/src/client/slot-contracts.ts | 6 | static-import | @deepseek-ai/dsh-client-ui-renderer/client | yes | public-experimental | yes |
+| packages/dsh-git-graph/src/client/slot-contracts.ts | 7 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | yes |
 | packages/dsh-git-graph/src/host/git-service.ts | 10 | static-import | @deepseek-ai/dsh-subprocess | yes | public-stable | no |
 | packages/dsh-git-graph/src/host/git-service.ts | 14 | static-import | @deepseek-ai/dsh-subprocess | yes | public-stable | no |
 | packages/dsh-git-graph/src/host/routes.ts | 9 | static-import | @deepseek-ai/dsh-host-webserver | yes | public-stable | no |
@@ -585,6 +584,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-tool-describe-image/src/index.ts | 17 | static-import | @deepseek-ai/dsh-settings | yes | public-stable | no |
 | packages/dsh-tool-describe-image/src/index.ts | 19 | static-import | @deepseek-ai/dsh-tools | no | public-stable | no |
 | packages/dsh-tool-describe-image/src/index.ts | 20 | static-import | @deepseek-ai/dsh-tools | yes | public-stable | no |
+| packages/dsh-tool-describe-image/src/model-capability.ts | 2 | static-import | @deepseek-ai/dsh-agent | yes | public-stable | yes |
+| packages/dsh-tool-describe-image/src/model-capability.ts | 4 | static-import | @deepseek-ai/dsh-llm | yes | public-stable | yes |
 | packages/dsh-tool-describe-image/src/vision-client.ts | 11 | static-import | @deepseek-ai/dsh-attachment | yes | public-stable | no |
 | packages/dsh-tool-describe-image/tests/attach-routes.spec.ts | 8 | static-import | @deepseek-ai/dsh-attachment | yes | public-stable | no |
 | packages/dsh-tool-describe-image/tests/attach-routes.spec.ts | 11 | static-import | @deepseek-ai/dsh-attachment | yes | public-stable | no |
@@ -757,7 +758,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-desktop-client-hmr/src/index.ts | 13 | connection.authentication |
 | host-service | packages/dsh-desktop-compat/src/index.ts | 33 | sessions |
 | host-service | packages/dsh-fast-ops/src/client/index.ts | 9 | fast-ops |
-| host-service | packages/dsh-git-graph/src/client/index.ts | 81 | workspace-unknown |
+| host-service | packages/dsh-git-graph/src/client/index.ts | 47 | workspace-unknown |
 | host-service | packages/dsh-git-graph/src/index.ts | 27 | subprocess |
 | host-service | packages/dsh-git-graph/src/invariant.ts | 16 | invariants |
 | host-service | packages/dsh-im-hub/src/client/index.ts | 9 | im-hub |
@@ -2583,8 +2584,8 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-checkpoints/src/client/index.ts | 20 | conversation.chat.turnTail |
 | slot | packages/dsh-data-location/src/client/Panel.tsx | 243 | web-ui.plugin.item |
 | slot | packages/dsh-fast-ops/src/client/index.ts | 25 | web-ui.plugin.item |
-| slot | packages/dsh-git-graph/src/client/index.ts | 188 | conversation.input.selector.context |
-| slot | packages/dsh-git-graph/src/client/index.ts | 197 | conversation.input.dock |
+| slot | packages/dsh-git-graph/src/client/index.ts | 154 | conversation.input.selector.context |
+| slot | packages/dsh-git-graph/src/client/index.ts | 163 | conversation.input.dock |
 | slot | packages/dsh-im-hub/src/client/index.ts | 25 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 85 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 95 | conversation.composer.dock |

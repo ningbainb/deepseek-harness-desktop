@@ -1,5 +1,7 @@
 /** Live image-input verdict from official Host model metadata. */
 import type { Context as HostContext } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-agent'
+import type {} from '@deepseek-ai/dsh-llm'
 
 type Agent = NonNullable<ReturnType<HostContext['agents']['get']>>
 type LlmResolvedModelInfo = Awaited<ReturnType<HostContext['llm']['resolveModelInfo']>>
