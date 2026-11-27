@@ -1,7 +1,8 @@
+import { writeFileAtomic } from '../atomic-write-adapter.mjs'
 import { readFileIfPresent } from '../read-file-if-present.mjs'
 import { EventEmitter } from 'node:events'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { isMap, isSeq, parseDocument } from 'yaml'
 
@@ -24,32 +25,6 @@ function assertCredentials(credentials) {
     throw new TypeError('QQ Bot credentials are invalid')
   }
   return { appId: credentials.appId.trim(), appSecret: credentials.appSecret }
-}
-
-async function atomicWrite(path, content, options = {}) {
-  await mkdir(dirname(path), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', mode: 0o600, flag: 'wx', ...options })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true })
-    if (movedExisting) {
-      await rm(path, { force: true })
-      await rename(backup, path)
-    }
-    throw error
-  }
 }
 
 export function qqBotPatchSection(enabled) {
@@ -177,7 +152,7 @@ export async function setQqBotProfileEnabled({ profileDir, enabled }) {
   })
   const next = mergeQqBotPatch(existing, Boolean(enabled))
   if (next === existing) return false
-  await atomicWrite(patchPath, next)
+  await writeFileAtomic(patchPath, next, { mode: 0o600 })
   return true
 }
 
@@ -219,7 +194,7 @@ export class QqBotCredentialStore {
     }
     const encrypted = this.safeStorage.encryptString(JSON.stringify(normalized))
     const envelope = `${JSON.stringify({ version: 1, payload: encrypted.toString('base64') }, null, 2)}\n`
-    await atomicWrite(this.path, envelope)
+    await writeFileAtomic(this.path, envelope, { mode: 0o600 })
   }
 
   async clear() {

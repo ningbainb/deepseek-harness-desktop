@@ -1,7 +1,7 @@
+import { writeFileAtomic } from './atomic-write-adapter.mjs'
 import { createServer } from 'node:http'
 import { networkInterfaces } from 'node:os'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { readFile } from 'node:fs/promises'
 
 export const DESKTOP_LAN_GATEWAY_BASE_ENV = 'DSH_DESKTOP_LAN_GATEWAY_BASE'
 export const DEFAULT_DESKTOP_LAN_GATEWAY_PORT = 43126
@@ -141,32 +141,6 @@ export function validateDesktopLanGatewayBaseUrl(value, { availableAddresses, re
   return `http://${address}:${String(port)}`
 }
 
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true })
-    if (movedExisting) {
-      await rm(path, { force: true })
-      await rename(backup, path)
-    }
-    throw error
-  }
-}
-
 /** Desktop-owned, atomic local gateway preference store. */
 export class DesktopLanGatewayStore {
   constructor(path) {
@@ -186,9 +160,10 @@ export class DesktopLanGatewayStore {
 
   save(input) {
     const config = normalizeDesktopLanGatewayConfig(input)
-    const operation = this.writeQueue.then(() => atomicWrite(
+    const operation = this.writeQueue.then(() => writeFileAtomic(
       this.path,
       `${JSON.stringify(config, null, 2)}\n`,
+      { mode: 0o600 },
     ))
     this.writeQueue = operation.catch(() => {})
     return operation.then(() => config)

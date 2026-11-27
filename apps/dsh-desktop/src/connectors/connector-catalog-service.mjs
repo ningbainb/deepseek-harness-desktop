@@ -1,6 +1,7 @@
+import { writeFileAtomic } from '../atomic-write-adapter.mjs'
 import { verify as cryptoVerify } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 
 const DEFAULT_FETCH_TIMEOUT_MS = 15_000
 const DEFAULT_MAX_BYTES = 4 * 1024 * 1024
@@ -210,19 +211,6 @@ export function diffConnectorSecurityChanges(previousEntry, nextEntry) {
   return { requiresUserApproval: reasons.length > 0, reasons }
 }
 
-async function atomicWrite(filePath, content) {
-  await mkdir(dirname(filePath), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temp = `${filePath}.tmp-${suffix}`
-  await writeFile(temp, content, { encoding: 'utf8', flag: 'wx' })
-  try {
-    await rename(temp, filePath)
-  } catch (error) {
-    await rm(temp, { force: true })
-    throw error
-  }
-}
-
 async function readBoundedBytes(response, maxBytes) {
   if (!response.body) {
     const buffer = Buffer.from(await response.arrayBuffer())
@@ -349,7 +337,7 @@ export class ConnectorCatalogService {
           ...current.meta,
           lastCheckedAt: new Date().toISOString(),
         }
-        await atomicWrite(this.metaPath, `${JSON.stringify(meta, null, 2)}\n`).catch(() => {})
+        await writeFileAtomic(this.metaPath, `${JSON.stringify(meta, null, 2)}\n`, { mode: 0o666 }).catch(() => {})
         return { ...current, meta }
       }
       if (!response.ok) {
@@ -381,8 +369,8 @@ export class ConnectorCatalogService {
         lastCheckedAt: new Date().toISOString(),
         catalogVersion: parsed.catalogVersion,
       }
-      await atomicWrite(this.cachePath, `${JSON.stringify(parsed, null, 2)}\n`)
-      await atomicWrite(this.metaPath, `${JSON.stringify(meta, null, 2)}\n`)
+      await writeFileAtomic(this.cachePath, `${JSON.stringify(parsed, null, 2)}\n`, { mode: 0o666 })
+      await writeFileAtomic(this.metaPath, `${JSON.stringify(meta, null, 2)}\n`, { mode: 0o666 })
       return this.annotate(parsed, { source: 'remote', meta, previousCatalog: current })
     } catch (error) {
       return {

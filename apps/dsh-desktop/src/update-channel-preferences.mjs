@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writeFileAtomic } from './atomic-write-adapter.mjs'
+import { readFile } from 'node:fs/promises'
 
 import {
   DEFAULT_UPDATE_CHANNEL,
@@ -30,32 +30,6 @@ export function assertUpdateChannel(value) {
     throw new TypeError(`invalid update channel: ${JSON.stringify(value)}`)
   }
   return channel
-}
-
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true })
-    if (movedExisting) {
-      await rm(path, { force: true })
-      await rename(backup, path)
-    }
-    throw error
-  }
 }
 
 /**
@@ -124,9 +98,10 @@ export class DesktopUpdateChannelStore {
       const route = typeof existing.downloadRoute === 'string' && UPDATE_DOWNLOAD_ROUTE_SET.has(existing.downloadRoute.trim().toLowerCase())
         ? existing.downloadRoute.trim().toLowerCase()
         : undefined
-      await atomicWrite(
+      await writeFileAtomic(
         this.path,
         `${JSON.stringify({ schemaVersion: 1, channel: normalized, ...(route ? { downloadRoute: route } : {}) }, null, 2)}\n`,
+        { mode: 0o600 },
       )
     })
     this.writeQueue = operation.catch(() => {})
@@ -138,9 +113,10 @@ export class DesktopUpdateChannelStore {
     const operation = this.writeQueue.then(async () => {
       const existing = await this.#readExistingRaw()
       const channel = normalizeUpdateChannelPreference(existing).channel
-      await atomicWrite(
+      await writeFileAtomic(
         this.path,
         `${JSON.stringify({ schemaVersion: 1, channel, downloadRoute: normalized }, null, 2)}\n`,
+        { mode: 0o600 },
       )
     })
     this.writeQueue = operation.catch(() => {})

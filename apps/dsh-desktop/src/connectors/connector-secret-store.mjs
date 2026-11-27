@@ -1,6 +1,6 @@
+import { writeFileAtomic } from '../atomic-write-adapter.mjs'
 import { readFileIfPresent } from '../read-file-if-present.mjs'
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { rm } from 'node:fs/promises'
 
 const SAFE_SEGMENT_PATTERN = /^[a-zA-Z0-9._-]{1,64}$/u
 const STORE_VERSION = 1
@@ -33,32 +33,6 @@ function normalizeSecretsMap(secrets) {
     if (value.length > 0) normalized[key] = value
   }
   return normalized
-}
-
-async function atomicWrite(filePath, content) {
-  await mkdir(dirname(filePath), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${filePath}.tmp-${suffix}`
-  const backup = `${filePath}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
-  let movedExisting = false
-  try {
-    try {
-      await rename(filePath, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, filePath)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true })
-    if (movedExisting) {
-      await rm(filePath, { force: true })
-      await rename(backup, filePath)
-    }
-    throw error
-  }
 }
 
 export function redactSecretValues(text, secrets) {
@@ -133,7 +107,7 @@ export class ConnectorSecretStore {
     }
     const encrypted = this.safeStorage.encryptString(JSON.stringify(records))
     const envelope = `${JSON.stringify({ version: STORE_VERSION, payload: encrypted.toString('base64') }, null, 2)}\n`
-    await atomicWrite(this.path, envelope)
+    await writeFileAtomic(this.path, envelope, { mode: 0o600 })
   }
 
   async getProfileSecrets(connectorId, profileId = 'default') {

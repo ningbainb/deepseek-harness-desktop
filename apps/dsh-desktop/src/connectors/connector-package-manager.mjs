@@ -1,7 +1,8 @@
+import { writeFileAtomic } from '../atomic-write-adapter.mjs'
 import { readFileIfPresent } from '../read-file-if-present.mjs'
 import { createHash } from 'node:crypto'
-import { access, lstat, mkdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { access, lstat, mkdir, realpath, rename, rm } from 'node:fs/promises'
+import { isAbsolute, join, relative, sep } from 'node:path'
 
 const SAFE_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/u
 const STATE_VERSION = 1
@@ -32,32 +33,6 @@ async function assertContainedPath(rootDir, targetPath) {
   const stat = await lstat(targetPath)
   if (stat.isSymbolicLink()) {
     throw new ConnectorPackageError('SYMLINK_FORBIDDEN', 'symlinks are forbidden in connector package dirs')
-  }
-}
-
-async function atomicWrite(filePath, content) {
-  await mkdir(dirname(filePath), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temp = `${filePath}.tmp-${suffix}`
-  const backup = `${filePath}.bak-${suffix}`
-  await writeFile(temp, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
-  let movedExisting = false
-  try {
-    try {
-      await rename(filePath, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temp, filePath)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temp, { force: true })
-    if (movedExisting) {
-      await rm(filePath, { force: true })
-      await rename(backup, filePath)
-    }
-    throw error
   }
 }
 
@@ -114,7 +89,7 @@ export class ConnectorPackageManager {
   }
 
   async #writeState(state) {
-    await atomicWrite(this.statePath, `${JSON.stringify(state, null, 2)}\n`)
+    await writeFileAtomic(this.statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
   }
 
   async getStatus(connectorId) {

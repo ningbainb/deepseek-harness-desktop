@@ -13,7 +13,15 @@ test('private JSON replacements keep complete formatted documents and clean up f
   await writePrivateJson(path, { value: 0 })
   assert.equal(await readFile(path, 'utf8'), '{\n  "value": 0\n}\n')
   const writes = Array.from({ length: 12 }, (_, i) => ({ value: i + 1 }))
-  await Promise.all(writes.map(value => writePrivateJson(path, value)))
+  const permitted = new Set([{ value: 0 }, ...writes].map(value => JSON.stringify(value, null, 2) + '\n'))
+  // Open and close a finite series of independent readers while writers compete.
+  // Windows may defer replacement while another process holds a file open.
+  async function observeReplacements() {
+    for (let sample = 0; sample < 24; sample += 1) {
+      assert.ok(permitted.has(await readFile(path, 'utf8')), 'reader saw an incomplete or unexpected document')
+    }
+  }
+  await Promise.all([observeReplacements(), ...writes.map(value => writePrivateJson(path, value))])
   const finalDocument = await readFile(path, 'utf8')
   assert.ok(writes.some(value => JSON.stringify(value, null, 2) + '\n' === finalDocument))
   if (process.platform !== 'win32') {

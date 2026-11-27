@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writeFileAtomic } from './atomic-write-adapter.mjs'
+import { readFile } from 'node:fs/promises'
 
 export const CLOSE_BEHAVIORS = Object.freeze({
   QUIT: 'quit',
@@ -60,32 +60,6 @@ export function createCloseBehaviorUpdater(apply) {
   })
 }
 
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true })
-    if (movedExisting) {
-      await rm(path, { force: true })
-      await rename(backup, path)
-    }
-    throw error
-  }
-}
-
 /**
  * Small, Desktop-owned preference store. It intentionally owns only the
  * close behavior so renderer and plugin preferences cannot affect process
@@ -108,9 +82,10 @@ export class DesktopClosePreferencesStore {
 
   saveCloseBehavior(value) {
     const closeBehavior = assertCloseBehavior(value)
-    const operation = this.writeQueue.then(() => atomicWrite(
+    const operation = this.writeQueue.then(() => writeFileAtomic(
       this.path,
       `${JSON.stringify({ closeBehavior }, null, 2)}\n`,
+      { mode: 0o666 },
     ))
     this.writeQueue = operation.catch(() => {})
     return operation.then(() => closeBehavior)

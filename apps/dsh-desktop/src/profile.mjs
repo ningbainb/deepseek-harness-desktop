@@ -1,3 +1,4 @@
+import { writeFileAtomic } from './atomic-write-adapter.mjs'
 import { readFileIfPresent } from './read-file-if-present.mjs'
 import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
@@ -9,7 +10,6 @@ import {
   readFile,
   readlink,
   realpath,
-  rename,
   rm,
   symlink,
   writeFile,
@@ -1354,34 +1354,8 @@ async function writeIfChanged(path, content) {
   } catch (error) {
     if (error?.code !== 'ENOENT') throw error
   }
-  await atomicWrite(path, content)
+  await writeFileAtomic(path, content, { mode: 0o666 })
   return true
-}
-
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true })
-    if (movedExisting) {
-      await rm(path, { force: true })
-      await rename(backup, path)
-    }
-    throw error
-  }
 }
 
 async function pathExists(path) {

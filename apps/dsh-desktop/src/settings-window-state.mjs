@@ -1,5 +1,5 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writeFileAtomic } from './atomic-write-adapter.mjs'
+import { readFile } from 'node:fs/promises'
 
 export const SETTINGS_WINDOW_MIN_WIDTH = 520
 export const SETTINGS_WINDOW_MIN_HEIGHT = 360
@@ -53,32 +53,6 @@ export function normalizeStoredSettingsWindowBounds(input) {
   return output
 }
 
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true })
-  const suffix = `${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx' })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true })
-    if (movedExisting) {
-      await rm(path, { force: true })
-      await rename(backup, path)
-    }
-    throw error
-  }
-}
-
 export class SettingsWindowStateStore {
   constructor(path) {
     this.path = path
@@ -95,7 +69,7 @@ export class SettingsWindowStateStore {
 
   save(input) {
     const bounds = normalizeStoredSettingsWindowBounds(input)
-    const operation = this.writeQueue.then(() => atomicWrite(this.path, `${JSON.stringify(bounds, null, 2)}\n`))
+    const operation = this.writeQueue.then(() => writeFileAtomic(this.path, `${JSON.stringify(bounds, null, 2)}\n`, { mode: 0o666 }))
     this.writeQueue = operation.catch(() => {})
     return operation.then(() => bounds)
   }
