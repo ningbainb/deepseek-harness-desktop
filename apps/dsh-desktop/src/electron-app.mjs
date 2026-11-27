@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { spawnSync } from 'node:child_process'
 import { homedir, release as osRelease } from 'node:os'
 import { randomUUID } from 'node:crypto'
@@ -319,10 +320,7 @@ export async function ensurePnpmCommandShim({ directory, executable, pnpmCli }) 
   await mkdir(directory, { recursive: true })
   const writeShim = async (name, content) => {
     const path = join(directory, name)
-    const existing = await readFile(path, 'utf8').catch(error => {
-      if (error?.code === 'ENOENT') return undefined
-      throw error
-    })
+    const existing = await readFileIfPresent(path, 'utf8')
     if (existing !== content) await writeFile(path, content, { encoding: 'utf8', mode: 0o755 })
   }
   if (process.platform === 'win32') {
