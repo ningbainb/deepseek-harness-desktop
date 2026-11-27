@@ -10,6 +10,11 @@ export async function lstatIfPresent(path) {
   }
 }
 
+/** Count the directory entry even when its link target is missing. */
+export async function pathExists(path) {
+  return (await lstatIfPresent(path)) !== undefined
+}
+
 /** Flush directory changes where the filesystem supports it after a journal write or rename. */
 export async function syncDirectory(path) {
   let handle

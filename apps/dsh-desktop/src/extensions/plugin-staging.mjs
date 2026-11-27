@@ -18,7 +18,7 @@ import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:p
 import { isScalar, parseDocument, visit } from 'yaml'
 
 import { UserPluginArchive } from '../user-plugin-archive.mjs'
-import { lstatIfPresent, syncDirectory } from '../plugin-transaction-files.mjs'
+import { lstatIfPresent, pathExists, syncDirectory } from '../profile-files.mjs'
 
 export const PLUGIN_TRANSACTION_SCHEMA_VERSION = 1
 
@@ -469,7 +469,7 @@ export class PluginStagingManager {
       for (const name of PROFILE_INPUTS) {
         await copyLeafIfPresent(join(this.profileDir, name), join(stageDir, name))
       }
-      if (await lstatIfPresent(join(stageDir, 'package.json')) === undefined) {
+      if (!await pathExists(join(stageDir, 'package.json'))) {
         throw new Error('Desktop plugin profile manifest is missing')
       }
       await normalizeLocalDependencyPaths(stageDir, this.profileDir)
@@ -533,7 +533,7 @@ export class PluginStagingManager {
       })
       await this.#advance(transactionId, 'OLD_ENV_ARCHIVED')
       const liveNodeModules = join(this.profileDir, 'node_modules')
-      if (await lstatIfPresent(liveNodeModules) !== undefined) {
+      if (await pathExists(liveNodeModules)) {
         throw new Error('live plugin dependency tree was not atomically archived')
       }
       await rename(stagedNodeModules, liveNodeModules)

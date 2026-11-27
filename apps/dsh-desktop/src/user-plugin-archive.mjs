@@ -1,5 +1,5 @@
 import { readFileIfPresent } from './read-file-if-present.mjs'
-import { lstatIfPresent, syncDirectory } from './plugin-transaction-files.mjs'
+import { lstatIfPresent, pathExists, syncDirectory } from './profile-files.mjs'
 import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants as fsConstants, createReadStream } from 'node:fs'
@@ -155,10 +155,6 @@ function normalizeProfileArtifacts(value) {
     paths.add(relativePath)
     return Object.freeze({ id, relativePath })
   }))
-}
-
-async function pathPresent(path) {
-  return (await lstatIfPresent(path)) !== undefined
 }
 
 function modeOf(stat) {
@@ -840,7 +836,7 @@ export class UserPluginArchive {
     }
     const archivedNodeModules = join(snapshot.directory, NODE_MODULES_DIRECTORY)
     if (snapshot.inventory.present) {
-      if (!await pathPresent(archivedNodeModules)) {
+      if (!await pathExists(archivedNodeModules)) {
         throw new UserPluginArchiveRecoveryBlockedError(
           USER_PLUGIN_ARCHIVE_RECOVERY_CODES.NODE_MODULES_MISSING,
           'user plugin archive node_modules tree is missing',
@@ -853,7 +849,7 @@ export class UserPluginArchive {
           'user plugin archive node_modules integrity check failed',
         )
       }
-    } else if (await pathPresent(archivedNodeModules)) {
+    } else if (await pathExists(archivedNodeModules)) {
       throw new UserPluginArchiveRecoveryBlockedError(
         USER_PLUGIN_ARCHIVE_RECOVERY_CODES.NODE_MODULES_UNEXPECTED,
         'user plugin archive has an unexpected node_modules tree',
@@ -863,7 +859,7 @@ export class UserPluginArchive {
 
   async #captureSnapshot(journal, nodeModulesTransfer) {
     const directory = this.#snapshotDir(journal.snapshotId)
-    if (await pathPresent(directory)) throw new Error('user plugin archive snapshot id already exists')
+    if (await pathExists(directory)) throw new Error('user plugin archive snapshot id already exists')
     await mkdir(directory, { recursive: false })
     await mkdir(join(directory, PROFILE_FILES_DIRECTORY), { recursive: false })
     const profileArtifacts = await captureProfileArtifacts(this.profileDir, directory, this.profileArtifacts)
@@ -914,8 +910,8 @@ export class UserPluginArchive {
   async #restoreIntentNodeModules(journal) {
     const snapshotDirectory = this.#snapshotDir(journal.snapshotId)
     const archived = join(snapshotDirectory, NODE_MODULES_DIRECTORY)
-    const sourcePresent = await pathPresent(this.nodeModulesPath)
-    const archivedPresent = await pathPresent(archived)
+    const sourcePresent = await pathExists(this.nodeModulesPath)
+    const archivedPresent = await pathExists(archived)
     if (!sourcePresent && archivedPresent) {
       // A tree can be absent only after the same-volume rename path.  Never
       // turn this recovery into a copy/delete fallback; if it cannot atomically
@@ -1000,7 +996,7 @@ export class UserPluginArchive {
           )
         }
       }
-      if (await pathPresent(target)) {
+      if (await pathExists(target)) {
         await rename(target, displaced)
         targetMoved = true
       }
@@ -1012,7 +1008,7 @@ export class UserPluginArchive {
     } catch (error) {
       await rm(staged, { recursive: true, force: true }).catch(() => {})
       if (targetMoved) {
-        if (stagedMoved && await pathPresent(target)) {
+        if (stagedMoved && await pathExists(target)) {
           await rm(target, { recursive: true, force: true }).catch(() => {})
         }
         await rename(displaced, target).catch(() => {})
@@ -1022,17 +1018,17 @@ export class UserPluginArchive {
   }
 
   async #undoNodeModulesReplacement(result) {
-    if (result.stagedMoved && await pathPresent(result.target)) {
+    if (result.stagedMoved && await pathExists(result.target)) {
       await rm(result.target, { recursive: true, force: true })
     }
-    if (result.targetMoved && await pathPresent(result.displaced)) {
+    if (result.targetMoved && await pathExists(result.displaced)) {
       await rename(result.displaced, result.target)
     }
     await rm(result.staged, { recursive: true, force: true }).catch(() => {})
   }
 
   async #finalizeNodeModulesReplacement(result) {
-    if (result.targetMoved && await pathPresent(result.displaced)) {
+    if (result.targetMoved && await pathExists(result.displaced)) {
       await rm(result.displaced, { recursive: true, force: true })
     }
     await rm(result.staged, { recursive: true, force: true }).catch(() => {})

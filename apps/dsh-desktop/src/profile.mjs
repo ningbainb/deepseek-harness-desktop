@@ -1,5 +1,6 @@
 import { writeFileAtomic } from './atomic-write-adapter.mjs'
 import { readFileIfPresent } from './read-file-if-present.mjs'
+import { lstatIfPresent, pathExists } from './profile-files.mjs'
 import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -1358,16 +1359,6 @@ async function writeIfChanged(path, content) {
   return true
 }
 
-async function pathExists(path) {
-  try {
-    await lstat(path)
-    return true
-  } catch (error) {
-    if (error?.code === 'ENOENT') return false
-    throw error
-  }
-}
-
 async function linkTargetsSource(target, source) {
   if (typeof source !== 'string' || source.length === 0) return false
   try {
@@ -1456,11 +1447,11 @@ async function retireManagedPackage({ packageName, profileDir, previous }) {
   const target = join(profileDir, 'node_modules', ...packagePathSegments(packageName))
   let metadata
   try {
-    metadata = await lstat(target)
+    metadata = await lstatIfPresent(target)
   } catch (error) {
-    if (error?.code === 'ENOENT') return false
     throwProfileNodeModulesBootstrapError('desktop profile managed package path is invalid', error)
   }
+  if (metadata === undefined) return false
 
   if (previous.mode === 'link' && metadata.isSymbolicLink()) {
     const owned = await linkTargetsSource(target, previous.source)

@@ -9,8 +9,8 @@
 | Minecraft 两代皮肤的 `mulberry32`、`cloud`、`hill`、`tree`、`house`、`lake`、`mushroom`、`pumpkin`、`ground` | 九个函数服务于同一套种子和像素图形。V1 插件缓存画面，V2 的独立 hooks 在每次启用时绘制，停用时清理。桌面源码准备与打包都校验离线资产散列。继续保留两个可独立装载的入口。 |
 | Trading 两代皮肤的 `trendOf`、`timeoutSignal`、`toNumber`、`parseTencentRow`、`classifyDirectSymbol`、`tzMinutes`、`continuousPhase`、`splitPhase`、`marketSessions`、`placeholderQuote`、`pctText`、`priceText` | 行情解析、开收市与显示的十二个算法对应。V2 只有 hooks 上下文，缺少 V1 的 Longbridge RPC 与工作区服务，走公开数据降级。若决定让两代皮肤共用构建输入，需要界定 npm 版本与桌面散列的发布次序，并测试各自的离线与卸载行为。 |
 | 主窗口、扩展和兼容 preload 的 `createSubscription` | 三个沙箱入口各自固定允许的通道，剥离 Electron event 后转发 payload，并返回原监听器的解绑函数。兼容文件被外部启动器直接引用，沙箱无法 require 同目录模块。在现有直接启动契约下保留本地实现。 |
-| 社区 Home 迁移与旧插件恢复的 `exists`、`writeJsonAtomic` | 恢复模块中私有 `exists` 已无调用，可删除。社区 Home 的同名函数使用 `stat`，会追随链接。两种恢复日志的 UTF-8、换行、默认权限和同目录原子替换可共用桌面写入器。状态机各自负责健康确认、回滚和重启，迁移需重放中断场景。 |
-| Profile 隔离与维护的 `pathExists`，技能导入和事务测试的 `exists`，profile 与集成测试的 `readJsonIfPresent` | 两个 `pathExists` 使用 `lstat`，悬空链接也表示存在，只有 ENOENT 表示缺失。生产代码可复用 `lstatIfPresent`。文件系统测试侧保留独立探针，以实际磁盘结果验证暂存、还原及旧配置迁移。 |
+| 社区 Home 迁移与旧插件恢复的 `exists`、`writeJsonAtomic` | 恢复模块中无调用的私有 `exists` 已删除。社区 Home 的同名函数使用 `stat`，会追随链接。两种恢复日志现共用桌面原子 JSON 写入器，保留 UTF-8、换行和默认权限。状态机各自负责健康确认、回滚和重启。 |
+| Profile 隔离与维护的 `pathExists`，技能导入和事务测试的 `exists`，profile 与集成测试的 `readJsonIfPresent` | Profile 维护、基线隔离、插件暂存和归档通过 `profile-files.mjs` 判断目录项是否存在或读取其元数据。悬空链接算作存在，只有 ENOENT 表示缺失。技能导入负责编排自己的目标冲突检查。文件系统测试保留独立探针，以实际磁盘结果验证暂存、还原及旧配置迁移。 |
 | 桌面和修复插件的 `isWithin` | 三处词法判断都允许根目录自身。可先收拢修复插件的 job 和 tools 两个调用点。桌面物化备份、插件执行工具、校验 incident 的路径各自还有真实路径、链接和权限检查，归相应所有者。 |
 | 桌面与遥测 Worker 的 `exactFields` | 生产者构造事件，value-mode 适配器验证输入。独立部署的 Worker 为历史 schema 2–6 保有自己的字段白名单。可复用测试载荷验证兼容性，接收方仍单独拒绝附带字段。 |
 | 桌面 E2E 的 `rpc`、`createWorkspace`、三组 `dismissStartup` | RPC 的权威测试实现是 `runtime-rpc-fixture.mjs`，覆盖 session.list 的特殊参数、返回 envelope、HTTP 状态及业务失败。创建工作区还要校验 workspaceId 和历史回包形状。四处提示关闭逻辑匹配可见 Continue，另三处会倒查可见弹窗并核对引导正文。合并时必须保存这些选择器和等待条件，确保确认框仍由原用例操作。 |

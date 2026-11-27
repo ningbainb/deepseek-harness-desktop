@@ -3,18 +3,25 @@ import fs from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { lstatIfPresent, syncDirectory } from '../src/plugin-transaction-files.mjs'
+import { lstatIfPresent, pathExists, syncDirectory } from '../src/profile-files.mjs'
 
-test('plugin transactions inspect a link without following it and distinguish absence from errors', async t => {
-  const root = await fs.mkdtemp(join(tmpdir(), 'plugin-transaction-files-'))
+test('profile operations inspect a directory entry, including dangling links, and propagate errors', async t => {
+  const root = await fs.mkdtemp(join(tmpdir(), 'profile-files-'))
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   const target = join(root, 'target')
   const link = join(root, 'link')
   await fs.mkdir(target)
   await fs.symlink(target, link, process.platform === 'win32' ? 'junction' : 'dir')
   assert.equal((await lstatIfPresent(link)).isSymbolicLink(), true)
-  assert.equal(await lstatIfPresent(join(root, 'missing')), undefined)
+  await fs.rmdir(target)
+  assert.equal(await pathExists(link), true)
+  assert.equal((await lstatIfPresent(link)).isSymbolicLink(), true)
+  assert.equal(await lstatIfPresent(target), undefined)
+  assert.equal(await pathExists(target), false)
   await assert.rejects(lstatIfPresent(null), { code: 'ERR_INVALID_ARG_TYPE' })
+  const failure = Object.assign(new Error('access denied'), { code: 'EACCES' })
+  t.mock.method(fs, 'lstat', async () => { throw failure })
+  await assert.rejects(pathExists(link), error => error === failure)
 })
 
 test('directory flush tolerates unsupported operations, closes handles and surfaces I/O failures', async t => {

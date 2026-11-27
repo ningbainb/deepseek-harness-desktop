@@ -1,6 +1,7 @@
 import { readFileIfPresent } from './read-file-if-present.mjs'
+import { pathExists } from './profile-files.mjs'
 import { randomUUID } from 'node:crypto'
-import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 import {
@@ -80,16 +81,6 @@ async function readRaw(path) {
     return Object.freeze({ present: true, content: await readFile(path) })
   } catch (error) {
     if (error?.code === 'ENOENT') return Object.freeze({ present: false })
-    throw error
-  }
-}
-
-async function pathExists(path) {
-  try {
-    await lstat(path)
-    return true
-  } catch (error) {
-    if (error?.code === 'ENOENT') return false
     throw error
   }
 }
