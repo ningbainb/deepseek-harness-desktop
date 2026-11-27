@@ -1,12 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { IncomingMessage } from 'node:http'
 import { homedir } from 'node:os'
 import { isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { isFullAccessUnattendedForSession } from '../control-tool-approval.ts'
+import { sendJson } from '../json-response.ts'
 import { AcpComplianceError, type AcpAgentManager } from './acp-agent-manager.ts'
 import { AcpClientError } from './acp-client.ts'
 import { ACP_GESTURE_PUBLIC_KEY_ENV, ACP_INTERACTION_HEADER, createAcpInteractionVerifier, type AcpInteractionOperation } from './interaction-proof.ts'
@@ -22,14 +23,6 @@ import {
 const MAX_BODY_BYTES = 128 * 1024
 const PERMISSION_TIMEOUT_MS = 5 * 60_000
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
-
-function sendJson(response: ServerResponse, statusCode: number, body: unknown): void {
-  response.writeHead(statusCode, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-  })
-  response.end(JSON.stringify(body))
-}
 
 async function readJsonBody(request: IncomingMessage): Promise<{ data: Record<string, unknown>; raw: string }> {
   const chunks: Buffer[] = []

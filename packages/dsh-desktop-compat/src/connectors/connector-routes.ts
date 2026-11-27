@@ -1,19 +1,12 @@
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { IncomingMessage } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
+import { sendJson } from '../json-response.ts'
 import type { ConnectorRegistryService } from './connector-registry-service.ts'
 import { CONNECTOR_API_PREFIX } from './types.ts'
 
 const MAX_BODY_BYTES = 128 * 1024
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
-
-function sendJson(response: ServerResponse, statusCode: number, body: unknown): void {
-  response.writeHead(statusCode, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-  })
-  response.end(JSON.stringify(body))
-}
 
 async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = []

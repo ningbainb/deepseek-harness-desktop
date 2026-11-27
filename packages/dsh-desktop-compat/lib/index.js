@@ -3890,6 +3890,15 @@ var ConnectorRegistryService = class {
 	}
 };
 //#endregion
+//#region src/json-response.ts
+function sendJson(response, statusCode, body) {
+	response.writeHead(statusCode, {
+		"content-type": "application/json; charset=utf-8",
+		"cache-control": "no-store"
+	});
+	response.end(JSON.stringify(body));
+}
+//#endregion
 //#region src/connectors/connector-routes.ts
 const MAX_BODY_BYTES$1 = 128 * 1024;
 const LOOPBACK_HOSTS$1 = /* @__PURE__ */ new Set([
@@ -3897,13 +3906,6 @@ const LOOPBACK_HOSTS$1 = /* @__PURE__ */ new Set([
 	"::1",
 	"::ffff:127.0.0.1"
 ]);
-function sendJson$1(response, statusCode, body) {
-	response.writeHead(statusCode, {
-		"content-type": "application/json; charset=utf-8",
-		"cache-control": "no-store"
-	});
-	response.end(JSON.stringify(body));
-}
 async function readJsonBody$1(request) {
 	const chunks = [];
 	let total = 0;
@@ -3938,16 +3940,16 @@ function registerConnectorRoutes(ctx, service) {
 		const action = new URL(request.url ?? "/", "http://localhost").pathname.slice(19);
 		try {
 			if (action === "/state" && request.method === "GET") {
-				sendJson$1(response, 200, await service.snapshot());
+				sendJson(response, 200, await service.snapshot());
 				return;
 			}
 			if (action === "/login-status" && request.method === "GET") {
 				const connectorId = new URL(request.url ?? "/", "http://localhost").searchParams.get("connectorId")?.trim() ?? "";
 				if (!connectorId) {
-					sendJson$1(response, 400, { error: "connectorId is required" });
+					sendJson(response, 400, { error: "connectorId is required" });
 					return;
 				}
-				sendJson$1(response, 200, {
+				sendJson(response, 200, {
 					login: await service.getLoginStatus(connectorId),
 					snapshot: await service.snapshot()
 				});
@@ -3960,29 +3962,29 @@ function registerConnectorRoutes(ctx, service) {
 			const body = await readJsonBody$1(request);
 			const connectorId = typeof body.connectorId === "string" ? body.connectorId.trim() : "";
 			if (!connectorId) {
-				sendJson$1(response, 400, { error: "connectorId is required" });
+				sendJson(response, 400, { error: "connectorId is required" });
 				return;
 			}
 			if (action === "/detect") {
-				sendJson$1(response, 200, await service.detectEnvironment(connectorId));
+				sendJson(response, 200, await service.detectEnvironment(connectorId));
 				return;
 			}
 			if (action === "/install") {
-				sendJson$1(response, 200, {
+				sendJson(response, 200, {
 					result: await service.installConnector(connectorId),
 					snapshot: await service.snapshot()
 				});
 				return;
 			}
 			if (action === "/login") {
-				sendJson$1(response, 200, {
+				sendJson(response, 200, {
 					login: await service.startLogin(connectorId),
 					snapshot: await service.snapshot()
 				});
 				return;
 			}
 			if (action === "/configure") {
-				sendJson$1(response, 200, await service.configure(connectorId, {
+				sendJson(response, 200, await service.configure(connectorId, {
 					enabled: typeof body.enabled === "boolean" ? body.enabled : void 0,
 					selectedDriverId: typeof body.selectedDriverId === "string" ? body.selectedDriverId : void 0,
 					customBinaryPath: typeof body.customBinaryPath === "string" ? body.customBinaryPath : void 0,
@@ -3995,19 +3997,19 @@ function registerConnectorRoutes(ctx, service) {
 				return;
 			}
 			if (action === "/verify") {
-				sendJson$1(response, 200, {
+				sendJson(response, 200, {
 					diagnostic: await service.verifyConnection(connectorId),
 					snapshot: await service.snapshot()
 				});
 				return;
 			}
 			if (action === "/disconnect") {
-				sendJson$1(response, 200, await service.disconnect(connectorId));
+				sendJson(response, 200, await service.disconnect(connectorId));
 				return;
 			}
 			response.writeHead(404).end();
 		} catch (error) {
-			sendJson$1(response, 400, { error: error instanceof Error ? error.message : String(error) });
+			sendJson(response, 400, { error: error instanceof Error ? error.message : String(error) });
 		}
 	};
 	return webServer.register({
@@ -5556,13 +5558,6 @@ const LOOPBACK_HOSTS = /* @__PURE__ */ new Set([
 	"::1",
 	"::ffff:127.0.0.1"
 ]);
-function sendJson(response, statusCode, body) {
-	response.writeHead(statusCode, {
-		"content-type": "application/json; charset=utf-8",
-		"cache-control": "no-store"
-	});
-	response.end(JSON.stringify(body));
-}
 async function readJsonBody(request) {
 	const chunks = [];
 	let total = 0;
