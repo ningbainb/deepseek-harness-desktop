@@ -29,6 +29,10 @@
 2. 安装时由 pnpm 拒绝它识别的工作区循环；源码级静态环由 TypeScript AST 检查。引入新的包级依赖前，可沿报告中的导入路径找到已有的反向依赖。类型引用、动态加载与运行时服务注入有不同的初始化语义，分别记录。
 3. 移动 App 持有导航和 MuxClient 生命周期，三个视图直接消费 API 和展示函数。将查询留在根组件再向下传递会扩大视图参数。将共享操作放回已有 API 后，子视图可独立测试。包通过 src 子路径导出源码，因此 App.tsx 继续导出旧名称，内部调用方已完成迁移。
 4. 路由清单必须指向仓库实际存在的文件或目录。兼容跨包复合路由的多个来源以及显式的官方 SDK 包引用。缺失迁移测试、失效本地源路径和缺少所有者均会使门禁失败。
+5. 两个预设插件分别发布到 npm，各自携带注册、目录同步和格式校验代码。权威源码位于 `shared/host/presets`。沿用已有生成机制可保留旧导入路径，且无需让任一插件依赖另一个插件，或给用户额外安装运行时包。CI 核对每份副本的内容和归属，并检查发布依赖及旧声明入口。
+6. 输入框的行布局、键盘焦点和菜单定位由官方会话工具栏与菜单组件负责。Git 图标挂入 `conversation.input.left`，分支名进入菜单、原生提示和无障碍名称。ACP 工作台通过当前会话的原生命令入口打开，实际启动与发送仍使用 Electron 的交互证明。
+
+依赖图中的 `duplicateFunctions` 保留所有物理重复位置。`independentDuplicateFunctions` 将同一源码和受管副本折算为一个修改位置，`mirroredDuplicateFunctions` 给出已匹配的源与目标。只有同步清单和函数体同时匹配才能折算。从另一代皮肤移植的像素绘制和行情函数仍作为独立实现列出。
 
 变更批次、证据和需产品决策的事项记录在[治理进度与任务池](../archive/architecture-governance-5.7.md)。
 
@@ -41,7 +45,14 @@
 | 私有桌面 JSON | atomic-write-adapter.mjs 的 writePrivateJson | 四个使用相同编码、文件权限 0600、创建目录权限 0700 的状态存储共用该入口。视图、数据结构和更新队列由各状态所有者维护。 |
 | 其他已迁移文件 | 对应的状态所有者调用适配器的 writeFileAtomic | 窗口偏好、profile 和连接器目录缓存沿用默认文件权限 0666 再应用 umask。网关、更新偏好、连接器状态/密文与 QQ 配置明确指定 0600。保持现有目录创建规则和序列化字节。 |
 | 模型目录与设置选项目录 | value-mode 的 model-catalog 和 web-ui-settings 的 plugin-options-directory | 视图和加载器从数据所有者取得同一契约。原有视图子路径继续导出公开类型。 |
-| Git 分支芯片 | dsh-git-graph 的 slot-contracts 与 BranchChip | slot-contracts 定义官方插槽和历史兼容插槽的类型，组件拥有注入的 Git 操作契约，注册入口负责接线。 |
+| Git 分支选择器 | dsh-git-graph 的 BranchChip 与 slot-contracts | 工具栏使用当前会话的工作区。切换、创建、搜索分支和打开图谱沿用原宿主接口。历史源码类型仍从原位置导出。 |
+| 工作区 Git 子进程 | shared/host/workspace-git-env.ts | AionUI 和 Git 图谱分别保留执行、错误及重试策略。共享实现清除继承的仓库定位和整组索引配置变量，让 Git 使用所选目录。 |
+| Profile 文件与目录项 | 桌面 profile-files.mjs | Profile 准备、隔离恢复、插件暂存与归档共用目录项存在性判定。检查保留断链，只有 ENOENT 表示缺失。事务路径另按原有平台策略刷盘，各自负责回滚次序。 |
+| 首次提示与版本引导 | 桌面 version-prompt-state.mjs | 星标提示和更新引导各自串行处理自己的状态文件，共用已展示的版本历史、原子写入及认领规则。升级引导独立处理 pending 状态。 |
+| 桌面主进程授权的 JSON 请求 | dsh-desktop-compat 的 desktop-json-post.ts | 会话导入和工作区文件打开在读取请求体前核验本地来源和启动令牌，分别保留 32 MiB 和 1 MiB 上限。业务校验、响应状态和工作区所有者仍由各自路由决定。 |
+| Electron 源码验收中的 Host RPC | 桌面 scripts/runtime-rpc-fixture.mjs | 统一请求信封与 HTTP 状态检查。成功路径读取值，负面用例可检查宿主返回的错误；工作区创建夹具支持两种历史回包。 |
+| 桌面与插件的修复路径边界 | shared/host/repair-path.mjs | 四个调用点共用词法包含检查，分别保留真实路径、链接与权限校验。 |
+| 可选的 Cordis 服务查询 | shared/host/get-host-service.ts | nbfast、IM Hub、Win Control 共用运行时获取策略。插件保留自己的服务注册和不可用时的业务行为。 |
 | 图片输入能力 | dsh-tool-describe-image 的 model-capability | 探测器从 Cordis 注入的 Agent 与 LLM 服务读取元数据。公开包源码子路径单独编译，以验证调用方可以只导入探测器或 Git 芯片。 |
 
 磁盘原子替换、单个 store 的更新队列、跨进程锁和迁移日志解决不同的问题。一次替换成功仅保证读者看到完整文件。涉及读改写的所有者仍负责其原有的串行化、冲突检查或回滚。版本迁移、修复目录以及用户文件恢复保留专门的备份和故障处理。
