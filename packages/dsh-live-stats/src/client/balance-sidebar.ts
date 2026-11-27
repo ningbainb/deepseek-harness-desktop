@@ -2,6 +2,7 @@
  * LLM Balance Sidebar Entry.
  * Injects a sidebar button that shows live balance and opens the balance overview.
  */
+import { newSessionAnchor, sessionRowSelector, sidebarColumnSelector, sidebarRoot } from './sidebar-entry-anchor.ts'
 import type { BalanceController } from './balance-controller.ts'
 import css from './balance.module.css'
 import { zh, type SettingsCardKey } from './locales.ts'
@@ -13,13 +14,6 @@ const SURFACE_NAVIGATION_EVENT = 'dsh-web-ui:surface-navigation'
 const SURFACE_ID = 'balance'
 
 const BALANCE_ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 13.5h11"/><path d="M4 11V7.5"/><path d="M8 11V3.5"/><path d="M12 11V6"/></svg>`
-
-function sidebarRoot(): HTMLElement | undefined {
-  const column = document.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
-  if (column === null) return undefined
-  const logoOwner = column.querySelector<HTMLElement>('[class*="logoRow"]')?.parentElement
-  return logoOwner ?? (column.firstElementChild as HTMLElement | undefined)
-}
 
 function createEntry(controller: BalanceController, t: Translate): HTMLButtonElement {
   const entry = document.createElement('button')
@@ -66,22 +60,7 @@ function updateEntryAmount(entry: HTMLButtonElement, state: ReturnType<BalanceCo
 }
 
 function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
-  // Anchor directly below the shell's New Session row, ahead of entries
-  // injected by sibling plugins, so the usage entry is always the first
-  // custom row. On current desktop shells the "新开会话" button is a direct
-  // child of the sidebar root sitting right after the logo row (NOT nested
-  // inside it), so prefer the button itself as the anchor; older shells that
-  // nest it in the logo row anchor on that row instead.
-  const newSession = root.querySelector<HTMLButtonElement>('button[class*="newSession"]')
-  const newSessionRow = newSession?.closest('[class*="logoRow"]')
-  const base = newSessionRow instanceof HTMLElement && newSessionRow.parentElement === root
-    ? newSessionRow
-    : newSession !== null && newSession.parentElement === root
-      ? newSession
-      : (() => {
-          const logoRow = root.querySelector<HTMLElement>('[class*="logoRow"]')
-          return logoRow !== null && logoRow.parentElement === root ? logoRow : undefined
-        })()
+  const base = newSessionAnchor(root, 'logo-row')
   if (base === undefined) return false
 
   // Sibling plugins (task board / ssh / skill center) insert their own rows
@@ -105,7 +84,7 @@ export function mountBalanceSidebarEntry(controller: BalanceController, t: Trans
   const ensureEntry = (): void => {
     if (!root?.isConnected) root = sidebarRoot()
     if (root === undefined) return
-    const sidebar = root.closest('[data-pane="sidebar"], [class*="sidebarCol"]') ?? root
+    const sidebar = root.closest(sidebarColumnSelector) ?? root
     footer = sidebar.querySelector<HTMLButtonElement>(USAGE_FOOTER_SELECTOR) ?? undefined
     if (footer !== undefined) {
       entry?.remove()
@@ -140,8 +119,8 @@ export function mountBalanceSidebarEntry(controller: BalanceController, t: Trans
       return
     }
     if (entry.parentElement !== root || records.some(record =>
-      record.target === root || (record.target.parentElement === root
-        && record.target instanceof Element && record.target.matches('[class*="logoRow"]')))) {
+      record.target === root || (record.target instanceof Element && root?.contains(record.target)
+        && record.target.closest(sessionRowSelector)?.parentElement === root))) {
       placeEntry(root, entry)
     }
   })

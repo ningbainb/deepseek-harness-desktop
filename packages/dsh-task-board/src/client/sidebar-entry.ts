@@ -1,11 +1,9 @@
 /**
  * Sidebar entry injection.
  *
- * dsh's sidebar shell exposes no slot an external plugin can register into
- * (`sidebar.workspaces` / `sidebar.settings` are single-occupant and already
- * taken), so — following the skin precedent of DOM-level extension — the
- * entry row is injected between the shell's New Session button and the
- * workspace browser. The injection self-heals: a MutationObserver watches the
+ * Desktop opens Task Board through the native tools bridge. Web shells use
+ * a full navigation row below New Session, alongside SSH and above the
+ * workspace browser. A MutationObserver watches the
  * sidebar root and re-inserts the row whenever a React re-render displaces it
  * (re-insertion happens in the same frame, before paint, so no flicker).
  *
@@ -13,6 +11,7 @@
  * reconciliation; the board view it toggles is a separate React root mounted
  * in the center column (see board-mount.ts).
  */
+import { newSessionAnchor, sidebarRoot } from './sidebar-entry-anchor.ts'
 import type { BoardController } from '../core/controller.ts'
 import { t } from './locales.ts'
 import css from './board.module.css'
@@ -26,27 +25,6 @@ const SURFACE_ID = 'task-board'
 
 /** Inline icon (matches the shell's 16px nav-icon look). */
 const ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6.5h12M6.5 6.5v7"/></svg>`
-
-/** Find the sidebar shell root element, or undefined while not yet mounted. */
-function sidebarRoot(): HTMLElement | undefined {
-  const column = document.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
-  if (column === null) return undefined
-  // Current shells wrap the sidebar UI: column > wrapper > root(logoRow owner).
-  // Prefer the element that owns the logo row — the real sidebar UI root —
-  // and fall back to the column's first child for legacy shells.
-  const logoOwner = column.querySelector<HTMLElement>('[class*="logoRow"]')?.parentElement
-  return logoOwner ?? (column.firstElementChild as HTMLElement | undefined)
-}
-
-/** The New Session button: nested in the logo row on current shells, a direct child on legacy shells. */
-function newSessionButton(root: HTMLElement): HTMLButtonElement | undefined {
-  const nested = root.querySelector<HTMLButtonElement>('button[class*="newSession"]')
-  if (nested !== null) return nested
-  for (const child of root.children) {
-    if (child.tagName === 'BUTTON') return child as HTMLButtonElement
-  }
-  return undefined
-}
 
 /** Build the entry row (a detached button; insert once the shell is up). */
 function createEntry(controller: BoardController): HTMLButtonElement {
@@ -69,8 +47,8 @@ function createEntry(controller: BoardController): HTMLButtonElement {
 
 /** Re-insert the entry after the New Session row (before the browser region). */
 function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
-  const button = newSessionButton(root)
-  if (button === undefined) return false
+  const base = newSessionAnchor(root, 'first-button')
+  if (base === undefined) return false
   if (entry.parentElement !== root) {
     // Position relative to the family block (entries injected by sibling
     // plugins), never relative to transient logoRow geometry: every family
@@ -79,8 +57,6 @@ function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
     // observer callback order or of shell wrapper changes. There is no
     // append-to-end fallback: appending at the end would randomly reorder
     // the block after a shell re-render.
-    const row = button.closest('[class*="logoRow"]')
-    const base = (row !== null && row.parentElement === root) ? row : button
     const family = Array.from(root.children).filter(
       (el): el is HTMLElement => el instanceof HTMLElement && el.matches('[data-dsh-taskboard-entry], [data-dsh-ssh-entry]'),
     )

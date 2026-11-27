@@ -143,6 +143,22 @@ describe('balance sidebar entry', () => {
     return { wrapper, main: wrapper.querySelectorAll('button')[0]!, toggle: wrapper.querySelectorAll('button')[1]! }
   }
 
+  it('prefers the complete session row and falls back to the logo before unrelated controls', async () => {
+    document.body.innerHTML = '<aside data-pane="sidebar"><div><div class="x_logoRow"></div><div class="x_newSessionRow"><button class="x_newSession">New</button></div><button>Other</button></div></aside>'
+    const row = document.querySelector('.x_newSessionRow')!
+    const logo = document.querySelector('.x_logoRow')!
+    const dispose = mountBalanceSidebarEntry(stubController())
+    try {
+      const entry = document.querySelector('[data-dsh-balance-entry]')!
+      expect(entry.previousElementSibling).toBe(row)
+      row.remove()
+      await flushObserver()
+      expect(entry.previousElementSibling).toBe(logo)
+    } finally {
+      dispose()
+    }
+  })
+
   it('retains only Today spending and preserves its navigation and collapse controls', async () => {
     mountShell()
     const { main, toggle } = mountFooter()

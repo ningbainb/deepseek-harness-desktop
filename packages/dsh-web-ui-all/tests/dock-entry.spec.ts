@@ -23,6 +23,16 @@ afterEach(() => {
 })
 
 describe('sidebar Dock bridge', () => {
+  it('waits for an empty sidebar column and inserts after the native New Session row', async () => {
+    document.body.innerHTML = '<aside data-pane="sidebar"></aside>'
+    dispose = mountDockEntry()
+    const sidebar = document.querySelector('aside')!
+    sidebar.innerHTML = '<div><div class="shell_logoRow"></div><div class="shell_newSessionRow"><button class="shell_newSession">New</button><span></span></div><nav></nav></div>'
+    await vi.waitFor(() => expect(entry()).not.toBeNull())
+    expect(entry().previousElementSibling).toBe(sidebar.querySelector('.shell_newSessionRow'))
+    expect(entry().nextElementSibling).toBe(sidebar.querySelector('nav'))
+  })
+
   it('retains only the footer Dock when it is already mounted', () => {
     shell()
     const footer = document.createElement('div')

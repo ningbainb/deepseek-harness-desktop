@@ -1,15 +1,15 @@
 /**
  * Desktop Extension Dock sidebar entry.
  *
- * The dsh web shell exposes no official slot for a Dock shortcut, so we
- * follow the same DOM-injection pattern used by task-board and ssh: a
- * self-healing button row inserted between the New Session button and the
- * workspace browser. The button prefers the main-window desktop bridge and
+ * The footer Dock takes precedence when mounted. Older shells receive a
+ * navigation row between New Session and the workspace browser alongside
+ * Task Board and SSH. The button prefers the main-window desktop bridge and
  * retains the runtime transport bridge for older desktop shells.
  *
  * This file is part of the aggregate plugin; it does not modify DSH source
  * and can be removed without affecting the core runtime.
  */
+import { newSessionAnchor, sidebarRoot } from './sidebar-entry-anchor.ts'
 
 /** Stable data attribute identifying the injected entry row. */
 export const ENTRY_SELECTOR = '[data-dsh-dock-entry]'
@@ -17,24 +17,6 @@ export const FOOTER_ENTRY_SELECTOR = '[data-dsh-extension-dock-entry] button'
 
 /** Inline icon (matches the shell's 16px nav-icon look): a dock/panel glyph. */
 const ICON = `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2.5" width="7" height="11" rx="1.5"/><rect x="11" y="2.5" width="3" height="4" rx="1"/><rect x="11" y="9.5" width="3" height="4" rx="1"/></svg>`
-
-/** Find the sidebar shell root element, or undefined while not yet mounted. */
-function sidebarRoot(): HTMLElement | undefined {
-  const column = document.querySelector<HTMLElement>('[data-pane="sidebar"], [class*="sidebarCol"]')
-  if (column === null) return undefined
-  const logoOwner = column.querySelector<HTMLElement>('[class*="logoRow"]')?.parentElement
-  return logoOwner ?? (column.firstElementChild as HTMLElement | undefined)
-}
-
-/** The New Session button: nested in the logo row on current shells, a direct child on legacy shells. */
-function newSessionButton(root: HTMLElement): HTMLButtonElement | undefined {
-  const nested = root.querySelector<HTMLButtonElement>('button[class*="newSession"]')
-  if (nested !== null) return nested
-  for (const child of root.children) {
-    if (child.tagName === 'BUTTON') return child as HTMLButtonElement
-  }
-  return undefined
-}
 
 /** Build the entry row (a detached button; insert once the shell is up). */
 function createEntry(): HTMLButtonElement {
@@ -68,11 +50,9 @@ function createEntry(): HTMLButtonElement {
 
 /** Re-insert the entry after the New Session row (before the browser region). */
 function placeEntry(root: HTMLElement, entry: HTMLButtonElement): boolean {
-  const button = newSessionButton(root)
-  if (button === undefined) return false
+  const base = newSessionAnchor(root, 'first-button')
+  if (base === undefined) return false
   if (entry.parentElement !== root) {
-    const row = button.closest('[class*="logoRow"]')
-    const base = (row !== null && row.parentElement === root) ? row : button
     const family = Array.from(root.children).filter(
       (el): el is HTMLElement => el instanceof HTMLElement && el.matches('[data-dsh-taskboard-entry], [data-dsh-ssh-entry], [data-dsh-dock-entry]'),
     )

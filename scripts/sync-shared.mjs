@@ -22,6 +22,12 @@ export const REPO_ROOT = resolve(SCRIPT_DIR, '..')
  * live exactly once under shared/; consumers import the committed copy.
  */
 const MANIFEST = [
+  {
+    file: 'sidebar-entry-anchor.ts',
+    source: 'shared/client/sidebar-entry-anchor.ts',
+    targets: ['dsh-ssh', 'dsh-task-board', 'dsh-web-ui-all', 'dsh-live-stats']
+      .map(pkg => `packages/${pkg}/src/client/sidebar-entry-anchor.ts`),
+  },
   ...['preset-schema.ts', 'preset-registry.ts', 'sync.ts'].map(file => ({
     file,
     source: `shared/host/presets/${file}`,
