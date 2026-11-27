@@ -295,6 +295,7 @@ describe('gitSpawnArgv', () => {
 describe('subprocessRunner no-Git degradation', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
   })
 
   it('treats a missing Windows git.exe as unavailable instead of crashing the service', async () => {
@@ -319,7 +320,11 @@ describe('subprocessRunner no-Git degradation', () => {
     expect(log).toHaveBeenCalledWith('[dsh-git-graph] git spawn failed:', spawnError)
   })
 
-  it('returns collected output unchanged for a completed subprocess', async () => {
+  it('uses the selected workspace despite ambient Git overrides and returns the collected output', async () => {
+    vi.stubEnv('GIT_DIR', '/different/repository')
+    vi.stubEnv('GIT_CONFIG_COUNT', '1')
+    vi.stubEnv('GIT_CONFIG_KEY_0', 'core.autocrlf')
+    vi.stubEnv('GIT_CONFIG_VALUE_0', 'false')
     const ctx = {
       subprocess: {
         spawn: vi.fn(() => ({
@@ -340,6 +345,9 @@ describe('subprocessRunner no-Git degradation', () => {
     })
     expect(ctx.subprocess.spawn).toHaveBeenCalledWith(expect.objectContaining({
       argv: ['git.exe', 'branch', '--show-current'],
+      env: expect.objectContaining({
+        GIT_DIR: undefined, GIT_CONFIG_COUNT: undefined, GIT_CONFIG_KEY_0: undefined, GIT_CONFIG_VALUE_0: undefined,
+      }),
     }))
   })
 

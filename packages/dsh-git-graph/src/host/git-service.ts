@@ -7,6 +7,7 @@
  * @module dsh-git-graph/host/git-service
  */
 
+import { workspaceGitEnv } from './workspace-git-env.ts'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -77,6 +78,7 @@ export function subprocessRunner(ctx: Context, platform: NodeJS.Platform = proce
       const spec: SubprocessSpawnSpec = {
         argv: gitSpawnArgv(platform, argv),
         cwd,
+        env: workspaceGitEnv(),
         stdio: {
           stdin: 'ignore',
           stdout: { maxBytes: OUTPUT_CAP_BYTES },

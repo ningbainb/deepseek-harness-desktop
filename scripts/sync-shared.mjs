@@ -51,6 +51,11 @@ const MANIFEST = [
       .map(pkg => `packages/${pkg}/src/client/settings-card.module.css`),
   },
   {
+    file: 'workspace-git-env.ts',
+    source: 'shared/host/workspace-git-env.ts',
+    targets: ['dsh-aionui-panel', 'dsh-git-graph'].map(pkg => `packages/${pkg}/src/host/workspace-git-env.ts`),
+  },
+  {
     file: 'poll-guard.ts',
     source: 'shared/host/poll-guard.ts',
     targets: [

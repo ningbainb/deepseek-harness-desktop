@@ -1,0 +1,12 @@
+const GIT_REPO_OVERRIDE = /^GIT_(?:DIR|WORK_TREE|INDEX_FILE|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|CONFIG_(?:PARAMETERS|COUNT|KEY_\d+|VALUE_\d+))$/iu
+
+/**
+ * Run Git against the selected workspace. Undefined entries remove inherited
+ * overrides from the SDK subprocess environment. Drop indexed config as a
+ * unit because the SDK can redact KEY entries while retaining their count.
+ */
+export function workspaceGitEnv(): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.keys(process.env)
+    .filter(name => GIT_REPO_OVERRIDE.test(name))
+    .map(name => [name, undefined]))
+}
