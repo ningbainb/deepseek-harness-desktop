@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -11,6 +11,7 @@ import { createIsolatedFreshSessionInWorkspace } from './agent-workspace-navigat
 import { openDockSetting, openDockTools, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { prepareWorkspaceStateProbe, readWorkspaceStateProbe } from './workspace-state-probe-fixture.mjs'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
 import { createOfficeFixtures } from './verify-office-runtime.mjs'
 
@@ -20,6 +21,7 @@ const temporary = await mkdtemp(join(tmpdir(), 'dsh-gemini-remote-settings-'))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
 const workspacePath = join(temporary, 'workspace')
+const branchName = 'feat/5.6.0-ssh-and-updater-fixes'
 const timeout = 60_000
 let app
 let page
@@ -49,28 +51,21 @@ const modelServer = createServer(async (request, response) => {
   response.end('data: [DONE]\n\n')
 })
 
-async function rpc(target, operation, request) {
-  const result = await target.evaluate(async ({ method, request, rpcId }) => {
-    const field = method === 'session/list' ? '_request' : 'request'
-    const response = await fetch(`/api/${method}`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId, method, payload: { args: { [field]: request } } }),
-    })
-    return (await response.json()).result
-  }, { method: operation.replace('.', '/'), request, rpcId: randomUUID() })
-  assert.equal(result?.ok, true, `${operation} must succeed on the isolated host`)
-  return result.value
-}
-
 try {
   await new Promise((resolve, reject) => {
     modelServer.once('error', reject)
     modelServer.listen(0, '127.0.0.1', resolve)
   })
   await Promise.all([mkdir(userData), mkdir(dshHome), mkdir(workspacePath)])
+  const gitEnv = { ...process.env }
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR']) delete gitEnv[key]
+  const gitOptions = { cwd: workspacePath, env: gitEnv, windowsHide: true }
+  execFileSync('git', ['init', '--quiet', '-b', branchName], gitOptions)
+  execFileSync('git', ['-c', 'user.name=Composer Fixture', '-c', 'user.email=fixture@example.test',
+    '-c', 'commit.gpgSign=false', '-c', 'core.hooksPath=.git/no-fixture-hooks', 'commit', '--allow-empty', '-qm', 'Fixture'], gitOptions)
   await writeFile(join(userData, 'star-prompt-state.json'), JSON.stringify({ schemaVersion: 1, shownVersions: [STAR_PROMPT_VERSION] }))
   await writeFile(join(dshHome, 'settings.yaml'), JSON.stringify({
-    'llm-pi-ai': { providers: { 'gemini-fixture': { baseURL: `http://127.0.0.1:${modelServer.address().port}/v1`, apiKeyEnv: 'DSH_GEMINI_FIXTURE_KEY', api: 'openai-completions', models: [{ id: 'fixture', name: 'Fixture' }] } } },
+    'llm-pi-ai': { providers: { 'gemini-fixture': { baseURL: `http://127.0.0.1:${modelServer.address().port}/v1`, apiKeyEnv: 'DSH_GEMINI_FIXTURE_KEY', api: 'openai-completions', models: [{ id: 'fixture', name: 'DeepSeek V4.1 Flash', reasoningEfforts: { high: 'high' } }] } } },
   }))
   await prepareWorkspaceStateProbe({ home: dshHome })
   await seedPrimaryRuntimePermissionForTest({ userData })
@@ -158,10 +153,68 @@ try {
     await modelTrigger.locator('xpath=self::*[@data-dsh-relay-provider="gemini-fixture"]').waitFor({ timeout })
   }
 
+  const commands = nativeComposer.getByRole('button', { name: /^(?:指令|命令|添加文件或调用指令|添加文件或运行命令)$/u })
+  const branch = nativeComposer.locator('[data-gitgraph-chip]')
+  const officeApps = nativeComposer.locator('[data-dsh-office-apps-trigger]')
+  const send = nativeComposer.locator('button[aria-busy]')
+  async function verifyToolbar(mode, state = 'empty') {
+    await branch.waitFor({ timeout })
+    assert.equal(await nativeComposer.locator('[data-dsh-acp-engines]').count(), 0)
+    assert.equal(await nativeComposer.getByText(/^ACP 引擎$/u).count(), 0)
+    await modelTrigger.getByText('供应商默认', { exact: true }).waitFor({ timeout })
+    const controls = {
+      commands, branch, model: modelTrigger, send,
+      skills: nativeComposer.getByRole('button', { name: '技能库' }),
+      permissions: nativeComposer.getByRole('button', { name: /^访问模式/u }),
+    }
+    if (mode === 'office') controls.office = officeApps
+    const buttons = Object.fromEntries(await Promise.all(Object.entries(controls).map(async ([id, locator]) => {
+      const metrics = await locator.evaluate(element => {
+        const style = getComputedStyle(element)
+        return {
+          label: element.getAttribute('aria-label') || element.textContent,
+          radius: style.borderTopLeftRadius, cornerShape: style.cornerShape,
+          bounds: element.getBoundingClientRect().toJSON(),
+        }
+      })
+      return [id, metrics]
+    })))
+    const card = await nativeComposer.boundingBox()
+    const bounds = Object.values(buttons).map(button => button.bounds).sort((left, right) => left.x - right.x)
+    const native = buttons.commands
+    const middle = native.bounds.y + native.bounds.height / 2
+    for (const box of bounds) {
+      assert.ok(box.width > 0 && box.height > 0, 'each toolbar action is visible')
+      assert.ok(Math.abs(box.y + box.height / 2 - middle) <= 2, 'actions belong on one row: ' + JSON.stringify(buttons))
+      assert.ok(box.x >= card.x && box.right <= card.x + card.width + 1, 'each action fits inside the card')
+    }
+    for (let i = 1; i < bounds.length; i++) assert.ok(bounds[i - 1].right <= bounds[i].x + 1, 'toolbar actions must not overlap')
+    for (const button of [buttons.branch, buttons.office].filter(Boolean)) {
+      assert.equal(button.bounds.width, native.bounds.width)
+      assert.equal(button.bounds.height, native.bounds.height)
+      assert.equal(button.radius, native.radius)
+      assert.equal(button.cornerShape, native.cornerShape)
+    }
+    await writeFile(join(temporary, `composer-${mode}-${state}.json`), JSON.stringify({ card, buttons }, null, 2))
+    await nativeComposer.screenshot({ path: join(temporary, `composer-${mode}-${state}.png`) })
+  }
+
   await page.locator('[data-mode-tab="dev"]').waitFor({ timeout })
+  await selectNative()
+  await verifyToolbar('dev')
+  const [branchList] = await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === '/git/branches', { timeout }),
+    branch.click({ timeout }),
+  ])
+  const branchResult = await branchList.json()
+  assert.equal(branchResult.value?.branch, branchName, 'the session must list its actual workspace branches: ' + JSON.stringify(branchResult))
+  await page.getByRole('menuitem', { name: branchName, exact: true }).waitFor({ timeout })
+  await page.keyboard.press('Escape')
+  assert.equal(await branch.getAttribute('aria-expanded'), 'false')
   assert.equal(await nativeComposer.locator('[data-dsh-office-apps-trigger]').count(), 0)
   await page.locator('[data-mode-tab="office"]').click()
-  await nativeComposer.locator('[data-dsh-office-apps-trigger]').waitFor({ timeout })
+  await officeApps.waitFor({ timeout })
+  await verifyToolbar('office')
   await page.locator('[data-mode-tab="dev"]').click()
   await nativeComposer.locator('[data-dsh-office-apps-trigger]').waitFor({ state: 'detached', timeout })
   console.log('PASS Office Apps composer entry appears only in office mode')
@@ -216,12 +269,20 @@ try {
   await transcript.waitFor({ state: 'detached', timeout })
   console.log('PASS Gemini reuses the native editor and model picker for clicks, Enter, and streaming')
 
-  const enginePicker = nativeComposer.locator('[data-dsh-acp-engines]')
-  await enginePicker.click({ timeout })
+  async function openEngines() {
+    await commands.click({ timeout })
+    await page.locator('[data-trigger-menu]').getByRole('option').filter({ hasText: /ACP/iu }).click({ timeout })
+    await page.locator('[data-dsh-acp-workbench]').waitFor({ timeout })
+  }
+  await openEngines()
+  await page.keyboard.press('Escape')
+  await page.locator('[data-dsh-acp-workbench]').waitFor({ state: 'hidden', timeout })
+  assert.ok(await nativeEditor.evaluate(element => element.ownerDocument.activeElement === element), 'closing ACP returns focus to the native editor')
+  await openEngines()
   await page.locator('[data-dsh-acp-agent="codex"]').click({ timeout })
   await page.waitForFunction(() => window.geminiFixture.starts.some(start => start.agentId === 'codex'), undefined, { timeout })
   assert.equal(await nativeEditor.evaluate(element => element === window.originalGeminiComposer), true)
-  await enginePicker.click({ timeout })
+  await openEngines()
   await page.getByRole('button', { name: /使用 DeepSeek 对话|Use DeepSeek chat/u }).click({ timeout })
   console.log('PASS native ACP workbench selects a second engine with the same composer')
 
@@ -262,6 +323,7 @@ try {
   const statisticsDock = conversation.locator('[data-composer-dock]')
   const nativeUsage = statisticsDock.getByRole('button', { name: /340 tok/u })
   await nativeUsage.waitFor({ timeout })
+  await verifyToolbar('office', 'active')
   await statisticsDock.locator('[data-composer-stat="activity"] button').waitFor({ timeout })
   const nativeStatLabels = statisticsDock.locator('[data-composer-stat] button > span:last-child')
   const statsGeometry = await nativeStatLabels.evaluateAll(labels => labels.map(label => ({

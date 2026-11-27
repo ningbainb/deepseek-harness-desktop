@@ -200,7 +200,7 @@
         "four-built-in-acp-engines-and-custom-presets",
         "bounded-acp-diagnostics-and-shell-free-windows-launch",
         "antigravity-human-interactive-only",
-        "native-composer-engine-picker-and-independent-side-panes"
+        "session-acp-engine-picker-in-native-commands-and-independent-side-panes"
       ],
       "patchId": "llm-antigravity",
       "requiredInAggregate": true,
@@ -353,6 +353,9 @@
       "package": "@linxin666/dsh-client-ui-git-graph",
       "path": "packages/dsh-git-graph",
       "description": "本地 Git 分支树图谱展示面板",
+      "features": [
+        "native-composer-branch-icon-opens-current-branch-and-git-actions"
+      ],
       "patchId": "ui-git-graph",
       "requiredInAggregate": true,
       "requiredInCordisPatch": true,
@@ -1429,6 +1432,8 @@
         "acp-confirm-model-switch-on-existing-session",
         "gemini-native-composer-reopens-during-connection-and-streaming",
         "office-apps-entry-is-visible-only-in-office-mode",
+        "branch-office-model-and-send-actions-share-one-native-toolbar-row",
+        "acp-engine-selection-via-native-command-menu-preserves-the-editor",
         "office-conversation-dock-shows-native-token-statistics-after-first-send",
         "nbfast-keeps-existing-dock-route-and-supports-legacy-search",
         "nbfast-core-tools-enabled-by-default",
