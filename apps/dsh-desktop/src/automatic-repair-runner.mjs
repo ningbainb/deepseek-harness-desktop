@@ -1,16 +1,9 @@
+import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { randomUUID } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 
 import { resolveEnabledRepairRoots } from './repair-workspace.mjs'
-
-function immutable(value) {
-  if (Array.isArray(value)) return Object.freeze(value.map(immutable))
-  if (value !== null && typeof value === 'object') {
-    return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, immutable(item)])))
-  }
-  return value
-}
 
 const TOOLS_CAPABILITIES = new Set(['auto', 'native', 'none'])
 
@@ -52,7 +45,7 @@ export async function writeAutomaticRepairJob({
     flag: 'wx',
     mode: 0o600,
   })
-  return immutable({ jobPath, resultPath })
+  return immutableSnapshot({ jobPath, resultPath })
 }
 
 export async function discoverAutomaticRepairCommands({ staged, pnpmCli, executable = process.execPath } = {}) {
@@ -80,7 +73,7 @@ export async function discoverAutomaticRepairCommands({ staged, pnpmCli, executa
       })
     }
   }
-  return immutable(commands)
+  return immutableSnapshot(commands)
 }
 
 async function safelyRollback(transaction) {
@@ -132,10 +125,10 @@ export class AutomaticRepairRunner {
     this.repairRuntime = repairRuntime
     this.createVerifier = createVerifier
     this.publishState = publishState
-    this.commands = immutable(commands)
+    this.commands = immutableSnapshot(commands)
     this.createCommands = createCommands ?? (async () => this.commands)
     if (typeof this.createCommands !== 'function') throw new TypeError('automatic repair command factory is invalid')
-    this.fallbackModels = immutable(fallbackModels.slice(0, 1))
+    this.fallbackModels = immutableSnapshot(fallbackModels.slice(0, 1))
   }
 
   async #recordResult(fingerprint, repairResult) {
@@ -182,9 +175,9 @@ export class AutomaticRepairRunner {
       await this.incidentStore
         .transition(fingerprint, 'exhausted', 'profile-unresolved')
         .catch(() => {})
-      return immutable({ status: 'failed', reason: 'profile-unresolved', fingerprint })
+      return immutableSnapshot({ status: 'failed', reason: 'profile-unresolved', fingerprint })
     }
-    return immutable({ status: 'failed', reason: 'profile-unresolved' })
+    return immutableSnapshot({ status: 'failed', reason: 'profile-unresolved' })
   }
 
   async run({
@@ -212,7 +205,7 @@ export class AutomaticRepairRunner {
       bundles: resolved.bundles,
     })
     if (claimed.claimed !== true) {
-      return immutable({ status: 'unavailable', reason: 'budget-exhausted' })
+      return immutableSnapshot({ status: 'unavailable', reason: 'budget-exhausted' })
     }
     const fingerprint = claimed.incident.fingerprint
     await this.incidentStore.transition(fingerprint, 'running')
@@ -237,7 +230,7 @@ export class AutomaticRepairRunner {
       await this.#recordResult(fingerprint, repairResult)
       if (repairResult.status !== 'candidate-ready') {
         await this.#exhaust(fingerprint, transaction, repairResult.status)
-        return immutable({
+        return immutableSnapshot({
           status: repairResult.status === 'model-unavailable' ? 'unavailable' : 'failed',
           reason: repairResult.status,
         })
@@ -264,7 +257,7 @@ export class AutomaticRepairRunner {
       } catch {
         const detail = verification?.category ?? 'candidate-verification-failed'
         await this.#exhaust(fingerprint, transaction, detail)
-        return immutable({ status: 'failed', reason: detail })
+        return immutableSnapshot({ status: 'failed', reason: detail })
       }
       await Promise.resolve(this.incidentStore.recordVerification?.(fingerprint, {
         changedFiles: verifiedFiles,
@@ -278,7 +271,7 @@ export class AutomaticRepairRunner {
           await safelyRollback(transaction).catch(() => {})
         }
         await this.incidentStore.transition(fingerprint, 'exhausted', 'apply-failed')
-        return immutable({ status: 'failed', reason: 'apply-failed' })
+        return immutableSnapshot({ status: 'failed', reason: 'apply-failed' })
       }
       let settled = false
       const incidentStore = this.incidentStore
@@ -311,7 +304,7 @@ export class AutomaticRepairRunner {
       } else {
         await this.incidentStore.transition(fingerprint, 'exhausted', 'repair-host-failed').catch(() => {})
       }
-      return immutable({ status: 'failed', reason: 'repair-host-failed' })
+      return immutableSnapshot({ status: 'failed', reason: 'repair-host-failed' })
     }
   }
 }

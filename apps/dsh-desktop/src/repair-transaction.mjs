@@ -1,16 +1,9 @@
+import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { isAbsolute } from 'node:path'
 
 import { RepairWorkspace } from './repair-workspace.mjs'
 
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u
-
-function immutable(value) {
-  if (Array.isArray(value)) return Object.freeze(value.map(immutable))
-  if (value !== null && typeof value === 'object') {
-    return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, immutable(item)])))
-  }
-  return value
-}
 
 class RepairTransaction {
   constructor({ archiveTransaction, workspace, incidentFingerprint }) {
@@ -44,7 +37,7 @@ class RepairTransaction {
     }
     if (typeof check !== 'function') throw new TypeError('repair verification callback must be a function')
     const changedFiles = await this.workspaceController.changedFiles()
-    const result = await check(immutable({
+    const result = await check(immutableSnapshot({
       incidentFingerprint: this.incidentFingerprint,
       workspace: this.workspace,
       changedFiles,
@@ -52,7 +45,7 @@ class RepairTransaction {
     if (result === false || result?.ok === false) throw new Error('repair candidate verification failed')
     this.changedFiles = changedFiles
     this.phase = 'verified'
-    return immutable({ verified: true, changedFiles })
+    return immutableSnapshot({ verified: true, changedFiles })
   }
 
   async apply() {
@@ -74,7 +67,7 @@ class RepairTransaction {
       await this.archiveTransaction.markApplied()
       this.changedFiles = applied.changedFiles
       this.phase = 'applied'
-      return immutable({ phase: this.phase, changedFiles: this.changedFiles })
+      return immutableSnapshot({ phase: this.phase, changedFiles: this.changedFiles })
     } catch (error) {
       const rollbackErrors = []
       try {
@@ -101,7 +94,7 @@ class RepairTransaction {
     if (this.phase !== 'applied') throw new Error(`repair transaction cannot commit from ${this.phase}`)
     await this.archiveTransaction.commit()
     this.phase = 'committed'
-    return immutable({ phase: this.phase, changedFiles: this.changedFiles })
+    return immutableSnapshot({ phase: this.phase, changedFiles: this.changedFiles })
   }
 
   async rollback() {
@@ -126,7 +119,7 @@ class RepairTransaction {
       throw new Error('repair rollback did not fully converge', { cause: new AggregateError(errors) })
     }
     this.phase = 'rolled-back'
-    return immutable({ phase: this.phase, changedFiles: this.changedFiles })
+    return immutableSnapshot({ phase: this.phase, changedFiles: this.changedFiles })
   }
 }
 

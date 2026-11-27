@@ -1,3 +1,4 @@
+import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants as fsConstants, createReadStream } from 'node:fs'
 import {
@@ -152,14 +153,6 @@ function normalizeProfileArtifacts(value) {
     paths.add(relativePath)
     return Object.freeze({ id, relativePath })
   }))
-}
-
-function immutable(value) {
-  if (Array.isArray(value)) return Object.freeze(value.map((item) => immutable(item)))
-  if (value !== null && typeof value === 'object') {
-    return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, immutable(item)])))
-  }
-  return value
 }
 
 async function lstatIfPresent(path) {
@@ -324,7 +317,7 @@ function assertSafeChildName(name, root) {
 export async function inventoryUserPluginTree(root) {
   const initial = await lstatIfPresent(root)
   if (initial === undefined) {
-    return immutable({ present: false, entries: [], fileCount: 0, totalBytes: 0 })
+    return immutableSnapshot({ present: false, entries: [], fileCount: 0, totalBytes: 0 })
   }
 
   const entries = []
@@ -361,7 +354,7 @@ export async function inventoryUserPluginTree(root) {
   }
 
   await visit(root, '')
-  return immutable({ present: true, entries, fileCount, totalBytes })
+  return immutableSnapshot({ present: true, entries, fileCount, totalBytes })
 }
 
 function inventoriesEqual(first, second) {
@@ -559,7 +552,7 @@ function assertInventory(inventory) {
   if (inventory.present === true && inventory.entries.length === 0) {
     throw new Error('present user plugin archive inventory cannot be empty')
   }
-  return immutable({
+  return immutableSnapshot({
     present: inventory.present,
     entries: inventory.entries,
     fileCount: inventory.fileCount,
@@ -594,7 +587,7 @@ function assertSnapshotMetadata(value, snapshotId) {
   if (nodeModules.present && nodeModules.storage === 'none') {
     throw new Error('present node_modules archive has invalid storage metadata')
   }
-  return immutable({
+  return immutableSnapshot({
     schemaVersion: value.schemaVersion,
     snapshotId: value.snapshotId,
     createdAt: value.createdAt,
@@ -651,7 +644,7 @@ function assertJournal(value) {
       candidateSha256: entry.candidateSha256,
     }
   })
-  return immutable({
+  return immutableSnapshot({
     schemaVersion: value.schemaVersion,
     transactionId: value.transactionId,
     snapshotId: value.snapshotId,
@@ -851,7 +844,7 @@ export class UserPluginArchive {
         'user plugin archive snapshot node_modules state disagrees with inventory',
       )
     }
-    return immutable({ directory, metadata, inventory })
+    return immutableSnapshot({ directory, metadata, inventory })
   }
 
   async #verifySnapshot(snapshot) {
@@ -907,7 +900,7 @@ export class UserPluginArchive {
     const archivedNodeModules = join(directory, NODE_MODULES_DIRECTORY)
     const nodeModulesStat = await lstatIfPresent(this.nodeModulesPath)
     let storage = 'none'
-    let inventory = immutable({ present: false, entries: [], fileCount: 0, totalBytes: 0 })
+    let inventory = immutableSnapshot({ present: false, entries: [], fileCount: 0, totalBytes: 0 })
     if (nodeModulesStat !== undefined) {
       if (nodeModulesTransfer === 'copy') {
         await copyTreeWithoutFollowingLinks(this.nodeModulesPath, archivedNodeModules)
@@ -985,7 +978,7 @@ export class UserPluginArchive {
     }
 
     const transactionId = makeTransactionId()
-    const journal = immutable({
+    const journal = immutableSnapshot({
       schemaVersion: USER_PLUGIN_ARCHIVE_SCHEMA_VERSION,
       transactionId,
       snapshotId: transactionId,
@@ -1141,22 +1134,22 @@ export class UserPluginArchive {
       await this.#restoreSnapshot(snapshot, journal.transactionId)
     }
     await this.#writePhase(journal, 'rolled-back')
-    return immutable({ transactionId: journal.transactionId, snapshotId: journal.snapshotId, phase: 'rolled-back' })
+    return immutableSnapshot({ transactionId: journal.transactionId, snapshotId: journal.snapshotId, phase: 'rolled-back' })
   }
 
   async #recover() {
     await this.#ensureArchiveLayout()
     const journal = await this.#readActiveJournal()
-    if (journal === undefined) return immutable({ recovered: false })
+    if (journal === undefined) return immutableSnapshot({ recovered: false })
     if (journal.phase === 'committed' || journal.phase === 'rolled-back') {
       await this.#clearActiveJournal(journal.transactionId)
-      return immutable({ recovered: false, transactionId: journal.transactionId, phase: journal.phase })
+      return immutableSnapshot({ recovered: false, transactionId: journal.transactionId, phase: journal.phase })
     }
     try {
       await this.#rollback(journal.transactionId)
     } catch (error) {
       if (!(error instanceof UserPluginArchiveRecoveryBlockedError)) throw error
-      return immutable({
+      return immutableSnapshot({
         recovered: false,
         blocked: true,
         code: error.code,
@@ -1165,7 +1158,7 @@ export class UserPluginArchive {
         phase: journal.phase,
       })
     }
-    return immutable({ recovered: true, transactionId: journal.transactionId, snapshotId: journal.snapshotId })
+    return immutableSnapshot({ recovered: true, transactionId: journal.transactionId, snapshotId: journal.snapshotId })
   }
 
   /**
@@ -1184,7 +1177,7 @@ export class UserPluginArchive {
     return this.#enqueue(async () => {
       await this.#ensureArchiveLayout()
       const active = await this.#readActiveJournal()
-      return immutable({
+      return immutableSnapshot({
         active: active === undefined ? undefined : {
           transactionId: active.transactionId,
           snapshotId: active.snapshotId,
@@ -1210,14 +1203,14 @@ export class UserPluginArchive {
     return this.#enqueue(async () => {
       await this.#ensureArchiveLayout()
       const status = await lstatIfPresent(this.activeJournalPath)
-      if (status === undefined) return immutable({ quarantined: false })
+      if (status === undefined) return immutableSnapshot({ quarantined: false })
       const quarantinePath = join(
         this.journalDir,
         `blocked-active-${Date.now()}-${randomUUID()}.json`,
       )
       await rename(this.activeJournalPath, quarantinePath)
       await syncDirectory(this.journalDir)
-      return immutable({ quarantined: true })
+      return immutableSnapshot({ quarantined: true })
     })
   }
 
@@ -1237,7 +1230,7 @@ export class UserPluginArchive {
         await this.#restoreSnapshot(source, transaction.transactionId)
         await this.#writePhase(await this.#readActiveJournal(), 'applied')
         const committed = await this.#writePhase(await this.#readJournal(transaction.transactionId), 'committed')
-        return immutable({
+        return immutableSnapshot({
           transactionId: committed.transactionId,
           snapshotId,
           phase: committed.phase,
@@ -1254,7 +1247,7 @@ export class UserPluginArchive {
     return this.#enqueue(async () => {
       await this.#ensureArchiveLayout()
       const snapshot = await this.#readSnapshot(snapshotId)
-      return immutable({
+      return immutableSnapshot({
         snapshotId: snapshot.metadata.snapshotId,
         createdAt: snapshot.metadata.createdAt,
         profileArtifacts: snapshot.metadata.profileArtifacts,
@@ -1284,7 +1277,7 @@ export class UserPluginArchive {
           profileArtifactCount: snapshot.metadata.profileArtifacts.length,
         })
       }
-      return immutable(snapshots)
+      return immutableSnapshot(snapshots)
     })
   }
 
@@ -1300,7 +1293,7 @@ export class UserPluginArchive {
         throw new Error(`user plugin archive transaction cannot mark applied from ${journal.phase}`)
       }
       const applied = await this.#writePhase(journal, 'applied')
-      return immutable({ transactionId: applied.transactionId, snapshotId: applied.snapshotId, phase: applied.phase })
+      return immutableSnapshot({ transactionId: applied.transactionId, snapshotId: applied.snapshotId, phase: applied.phase })
     })
   }
 
@@ -1314,7 +1307,7 @@ export class UserPluginArchive {
         throw new Error(`user plugin archive transaction cannot record repair metadata from ${journal.phase}`)
       }
       const written = await this.#writeJournal({ ...journal, affectedExternalFiles: entries })
-      return immutable({
+      return immutableSnapshot({
         transactionId: written.transactionId,
         snapshotId: written.snapshotId,
         affectedExternalFiles: written.affectedExternalFiles,
@@ -1332,7 +1325,7 @@ export class UserPluginArchive {
         throw new Error(`user plugin archive transaction cannot commit from ${journal.phase}`)
       }
       const committed = await this.#writePhase(journal, 'committed')
-      return immutable({ transactionId: committed.transactionId, snapshotId: committed.snapshotId, phase: committed.phase })
+      return immutableSnapshot({ transactionId: committed.transactionId, snapshotId: committed.snapshotId, phase: committed.phase })
     })
   }
 

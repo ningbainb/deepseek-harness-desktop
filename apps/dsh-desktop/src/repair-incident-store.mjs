@@ -1,3 +1,4 @@
+import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
@@ -31,14 +32,6 @@ function stableJson(value) {
 
 function sha256(value) {
   return createHash('sha256').update(value).digest('hex')
-}
-
-function immutable(value) {
-  if (Array.isArray(value)) return Object.freeze(value.map(immutable))
-  if (value !== null && typeof value === 'object') {
-    return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, immutable(item)])))
-  }
-  return value
 }
 
 function normalizedVersion(value, label) {
@@ -149,7 +142,7 @@ function assertIncident(value, fingerprint) {
     || checks.some(name => typeof name !== 'string' || !/^[a-z0-9][a-z0-9-]{0,79}$/u.test(name))) {
     throw new Error('repair incident verification summary is invalid')
   }
-  return immutable({ ...value, changedFiles, checks })
+  return immutableSnapshot({ ...value, changedFiles, checks })
 }
 
 export class RepairIncidentStore {
@@ -272,7 +265,7 @@ export class RepairIncidentStore {
       if (claimHandle === undefined) {
         const existing = await this.#read(fingerprint)
         if (existing === undefined) throw new Error('repair incident claim is incomplete')
-        return immutable({ claimed: false, incident: existing })
+        return immutableSnapshot({ claimed: false, incident: existing })
       }
       try {
         await claimHandle.writeFile(`${JSON.stringify({ pid: process.pid, startedAt: this.now() })}\n`, 'utf8')
@@ -301,7 +294,7 @@ export class RepairIncidentStore {
         changedFiles: [],
         checks: [],
       })
-      return immutable({ claimed: true, incident })
+      return immutableSnapshot({ claimed: true, incident })
     })
   }
 

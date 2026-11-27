@@ -1,3 +1,4 @@
+import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import {
@@ -27,14 +28,6 @@ const PROFILE_REPAIR_FILES = Object.freeze([
 ])
 const EXCLUDED_DIRECTORIES = new Set(['.git'])
 const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u
-
-function immutable(value) {
-  if (Array.isArray(value)) return Object.freeze(value.map(immutable))
-  if (value !== null && typeof value === 'object') {
-    return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, immutable(item)])))
-  }
-  return value
-}
 
 function isWithin(candidate, parent) {
   const result = relative(parent, candidate)
@@ -124,7 +117,7 @@ export async function resolveEnabledRepairRoots({ profileDir, builtInBundles = [
     version: await installedBundleVersion(resolvedProfile, name),
     enabled: true,
   })))
-  return immutable({ roots, bundles })
+  return immutableSnapshot({ roots, bundles })
 }
 
 async function hashFile(path, budget) {
@@ -436,7 +429,7 @@ export class RepairWorkspace {
       record.candidateInitialInventory = await inventory(record.stageRoot, this.#budget())
     }
     this.records = records
-    return immutable({
+    return immutableSnapshot({
       workspace: this.workspace,
       roots: records.map((record) => ({
         id: record.id,
@@ -495,7 +488,7 @@ export class RepairWorkspace {
         })
       }
     }
-    return immutable(changes.sort((left, right) => left.path.localeCompare(right.path, 'en')))
+    return immutableSnapshot(changes.sort((left, right) => left.path.localeCompare(right.path, 'en')))
   }
 
   async #currentSourceInventory(record) {
@@ -563,16 +556,16 @@ export class RepairWorkspace {
       throw error
     }
     this.appliedChanges = changes
-    return immutable({ changedFiles: changes })
+    return immutableSnapshot({ changedFiles: changes })
   }
 
   async rollbackApplied({ externalOnly = false } = {}) {
-    if (this.appliedChanges === undefined) return immutable({ rolledBack: false })
+    if (this.appliedChanges === undefined) return immutableSnapshot({ rolledBack: false })
     const changes = externalOnly
       ? this.appliedChanges.filter((change) => change.external)
       : this.appliedChanges
     await this.#applyChanges(changes, 'original')
     this.appliedChanges = undefined
-    return immutable({ rolledBack: true, changedFiles: changes })
+    return immutableSnapshot({ rolledBack: true, changedFiles: changes })
   }
 }
