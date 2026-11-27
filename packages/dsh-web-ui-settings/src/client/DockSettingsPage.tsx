@@ -7,7 +7,8 @@ import { AgentTeamSettingsCard } from './AgentTeamSettingsCard.tsx'
 import { PromptCustomizerSettingsCard } from './PromptCustomizerSettingsCard.tsx'
 import { ControlCenterSettingsCard } from './ControlCenterSettingsCard.tsx'
 import css from './dock-settings.module.css'
-import { DockPluginOptions, type PluginOptionsDirectory } from './DockPluginOptions.tsx'
+import { DockPluginOptions } from './DockPluginOptions.tsx'
+import type { PluginOptionsDirectory } from './plugin-options-directory.ts'
 
 export const DOCK_SETTINGS = ['control-center', 'shared-browser', 'agent-team', 'win-control', 'fast-ops', 'im-hub', 'relay', 'value-mode', 'prompt-customizer', 'personal-prompt', 'memory', 'particle-theme', 'describe-image', 'appearance', 'models', 'usage', 'sessions', 'plugin-options', 'skill-market'] as const
 export type DockSetting = typeof DOCK_SETTINGS[number]

@@ -1,12 +1,8 @@
 import React from 'react';
-import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client';
+import type { ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client';
 import { BAI_PROVIDER_ID, type ModelRouteSelection } from '../core/config.ts';
-export interface ValueModeModelCatalog {
-    /** Models exposed by currently registered provider routes. */
-    groups: readonly ModelProviderGroup[];
-    /** Provider-local lookup failures; successful groups remain selectable. */
-    failures?: readonly ModelCatalogFailure[];
-}
+import { type ValueModeModelCatalog } from './model-catalog.ts';
+export type { ValueModeModelCatalog } from './model-catalog.ts';
 export interface ModelPickerProps {
     title: string;
     current?: ModelRouteSelection;

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ValueModeConfig, SessionOverrideConfig, ModelRouteSelection, ValueModeSettingsScope } from '../core/config.ts';
-import { type ValueModeModelCatalog } from './ModelPicker.tsx';
+import type { ValueModeModelCatalog } from './model-catalog.ts';
 export interface ConsultationHistoryItem {
     id: string;
     timestamp: number;

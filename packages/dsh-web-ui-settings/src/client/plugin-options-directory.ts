@@ -1,4 +1,7 @@
-import type { PluginOptionsDirectory } from './DockPluginOptions.tsx'
+export interface PluginOptionsDirectory {
+  keys(): string[]
+  subscribe(listener: () => void): () => void
+}
 
 // These packages publish native settings sections rather than plugin row forms.
 // Advertise only live entries; unloading a plugin must remove its settings too.

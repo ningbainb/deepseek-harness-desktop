@@ -1,8 +1,14 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
-import type { ValueModeModelCatalog } from './ModelPicker.tsx'
 import type { ValueModeLocaleKey } from './locales.ts'
+
+export interface ValueModeModelCatalog {
+  /** Models exposed by currently registered provider routes. */
+  groups: readonly ModelProviderGroup[]
+  /** Provider-local lookup failures; successful groups remain selectable. */
+  failures?: readonly ModelCatalogFailure[]
+}
 
 export const MODEL_CATALOG_TIMEOUT_MS = 10_000
 export const CODEX_MODEL_CATALOG_CHANGED = 'dsh-codex-model-catalog-changed'

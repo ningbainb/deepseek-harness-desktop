@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { PropsLocale, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SafePluginBoundary } from './SafePluginBoundary.tsx'
-import { nativePluginSettingsSection } from './plugin-options-directory.ts'
+import { nativePluginSettingsSection, type PluginOptionsDirectory } from './plugin-options-directory.ts'
 import css from './dock-settings.module.css'
 
-export interface PluginOptionsDirectory {
-  keys(): string[]
-  subscribe(listener: () => void): () => void
-}
+export type { PluginOptionsDirectory } from './plugin-options-directory.ts'
 
 export function pluginOptionsKeys(keys: readonly string[], plugin?: string): string[] {
   return [...new Set(keys.filter(key => typeof key === 'string' && key.includes('#') && (!plugin || key.startsWith(`${plugin}#`))))].sort()

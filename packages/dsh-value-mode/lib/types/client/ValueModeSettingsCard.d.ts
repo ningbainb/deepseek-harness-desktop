@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ModelRouteSelection, ValueModeConfig, ValueModeSettingsScope } from '../core/config.ts';
-import { type ValueModeModelCatalog } from './ModelPicker.tsx';
+import type { ValueModeModelCatalog } from './model-catalog.ts';
 export interface ValueModeSettingsCardProps {
     config: ValueModeConfig;
     settingsScope?: ValueModeSettingsScope<ValueModeConfig>;
