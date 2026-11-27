@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
+import { rpc, rpcResult } from './runtime-rpc-fixture.mjs'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -89,33 +89,6 @@ async function launch() {
     throw error
   }
   return { instance, page, rendererErrors }
-}
-
-async function rpcResult(page, method, payload) {
-  const response = await page.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const endpoint = rpcMethod.replace('.', '/')
-    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
-    const result = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'client-request',
-        rpcId,
-        method: endpoint,
-        payload: { args: { [requestField]: rpcPayload } },
-      }),
-    })
-    return { status: result.status, body: await result.json().catch(() => undefined) }
-  }, { rpcMethod: method, rpcPayload: payload, rpcId: randomUUID() })
-  assert.equal(response.status, 200, `${method}: HTTP ${response.status}`)
-  assert.equal(response.body?.type, 'server-response', `${method}: missing response envelope`)
-  return response.body.result
-}
-
-async function rpc(page, method, payload) {
-  const result = await rpcResult(page, method, payload)
-  assert.equal(result?.ok, true, `${method}: ${JSON.stringify(result)}`)
-  return result.value
 }
 
 async function seedHistory(sessionId) {

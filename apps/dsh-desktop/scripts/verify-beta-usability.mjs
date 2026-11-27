@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -86,22 +87,6 @@ const server = createServer(async (request, response) => {
 })
 await new Promise(resolveListen => server.listen(0, '127.0.0.1', resolveListen))
 const port = server.address().port
-
-async function rpc(method, payload) {
-  const response = await page.evaluate(async ({ method, payload, rpcId }) => {
-    const endpoint = method.replace('.', '/')
-    const requestField = method === 'session.list' ? '_request' : 'request'
-    const result = await fetch(`/api/${endpoint}`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId, method: endpoint,
-        payload: { args: { [requestField]: payload } } }),
-    })
-    return { status: result.status, body: await result.json() }
-  }, { method, payload, rpcId: randomUUID() })
-  assert.equal(response.status, 200, method)
-  assert.equal(response.body.result?.ok, true, JSON.stringify(response.body))
-  return response.body.result.value
-}
 
 async function launch() {
   app = await electron.launch({ executablePath: executable ?? electronPath, timeout: 600_000,
@@ -340,12 +325,11 @@ try {
   })
   await writeFile(join(output, 'sidebar-dom.html'), await page.locator('[data-pane="sidebar"]').evaluate(element => element.outerHTML))
   await page.screenshot({ path: join(output, 'initial.png') })
-  const workspace = await rpc('workspace.create', { path: workspacePath })
-  const workspaceId = workspace.workspace?.workspaceId ?? workspace.workspaceId
+  const workspaceId = await createFixtureWorkspace(page, workspacePath)
   const group = page.locator(`[role="treeitem"][data-row-key="workspace:${workspaceId}"]`)
   await group.waitFor({ state: 'visible' })
   const sessionId = await createSession(group)
-  const selectedModel = await rpc('session.selectModel', { sessionId, provider: 'beta-fixture', model: 'beta-fixture' })
+  const selectedModel = await rpc(page, 'session.selectModel', { sessionId, provider: 'beta-fixture', model: 'beta-fixture' })
   assert.equal(selectedModel.selected.provider, 'beta-fixture')
   assert.equal(selectedModel.selected.model, 'beta-fixture')
   const pet = page.locator('[data-dsh-pet-root] [role="button"]').first()

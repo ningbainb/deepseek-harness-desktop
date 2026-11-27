@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import sharp from 'sharp'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -381,20 +383,9 @@ try {
   await settings.screenshot({ path: resolve(output, 'memory-editor.png') })
   const workspacePath = resolve(temporary, 'memory-workspace')
   await mkdir(workspacePath)
-  const workspace = await main.evaluate(async path => {
-    const response = await fetch('/api/workspace/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'workspace/create', payload: { args: { request: { path } } } }) })
-    const value = await response.json()
-    if (!response.ok || !value.result?.ok) throw new Error('test workspace creation failed')
-    return value.result.value
-  }, workspacePath)
-  const workspaceId = workspace.workspace?.workspaceId ?? workspace.workspaceId
-  assert.equal(typeof workspaceId, 'string')
+  const workspaceId = await createFixtureWorkspace(main, workspacePath)
   // User-scope proves a workspace through an owned session (or explicit grant).
-  await main.evaluate(async workspaceId => {
-    const response = await fetch('/api/session/create', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method: 'session/create', payload: { args: { request: { workspaceId } } } }) })
-    const value = await response.json()
-    if (!response.ok || !value.result?.ok) throw new Error('test session creation failed')
-  }, workspaceId)
+  await rpc(main, 'session/create', { workspaceId })
   await new Promise(resolve => setTimeout(resolve, 300))
   const scopedSave = await settings.evaluate(async workspaceId => {
     const response = await fetch('/api/dsh-memory/items', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ operation: 'save', scope: 'workspace', workspaceId, content: 'Workspace-only verification.' }) })

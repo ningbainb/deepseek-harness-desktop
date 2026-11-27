@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
-import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { createFixtureWorkspace, createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
@@ -82,19 +82,6 @@ const model = createServer(async (request, response) => {
 const cleanGitEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_/iu.test(name)))
 const git = (...args) => runFile('git', ['-C', workspace, ...args], { cwd: temporary, env: cleanGitEnv, windowsHide: true })
 
-async function createWorkspace() {
-  const result = await page.evaluate(async path => {
-    const method = 'workspace/create'
-    const response = await fetch('/api/' + method, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method, payload: { args: { request: { path } } } }) })
-    return (await response.json()).result
-  }, workspace)
-  assert.equal(result?.ok, true, JSON.stringify(result))
-  const workspaceId = (result.value.workspace ?? result.value).workspaceId
-  assert.equal(typeof workspaceId, 'string')
-  return workspaceId
-}
-
 async function decideNativeRestore(confirm, response, expectedCount, expectedContent) {
   await confirm.click({ timeout })
   const prompts = await app.evaluate(async () => {
@@ -148,7 +135,7 @@ try {
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: launchTimeout })
   await page.locator('[data-dsh-frame]').waitFor({ timeout: launchTimeout })
   await dismissRuntimeOnboarding(page)
-  const sessionId = await createSessionInWorkspace(page, await createWorkspace())
+  const sessionId = await createSessionInWorkspace(page, await createFixtureWorkspace(page, workspace))
   const conversation = page.locator(`[data-conversation-content][data-conversation-session="${sessionId}"]`)
   const composer = conversation.locator('[data-composer-card]')
   await composer.locator('button[data-dsh-relay-model-entry]').click({ timeout })

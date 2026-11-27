@@ -7,7 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
-import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { createFixtureWorkspace, createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
@@ -205,19 +205,6 @@ async function clickMcpControl(window, iframe, id, caption) {
   throw new Error(`MCP fixture control ${caption} could not be brought into view`)
 }
 
-async function createWorkspace() {
-  const result = await page.evaluate(async path => {
-    const method = 'workspace/create'
-    const response = await fetch('/api/' + method, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method, payload: { args: { request: { path } } } }) })
-    return (await response.json()).result
-  }, workspace)
-  assert.equal(result?.ok, true, JSON.stringify(result))
-  const workspaceId = (result.value.workspace ?? result.value).workspaceId
-  assert.equal(typeof workspaceId, 'string')
-  return workspaceId
-}
-
 async function verifyOfflineExports(conversation, composer) {
   const external = /^https?:\/\//u
   const block = route => route.abort('blockedbyclient')
@@ -357,7 +344,7 @@ try {
   await dismissRuntimeOnboarding(page)
   const window = await app.browserWindow(page)
   await window.evaluate(window => window.setSize(1280, 920))
-  const sessionId = await createSessionInWorkspace(page, await createWorkspace())
+  const sessionId = await createSessionInWorkspace(page, await createFixtureWorkspace(page, workspace))
   const conversation = page.locator(`[data-conversation-content][data-conversation-session="${sessionId}"]`)
   const composer = conversation.locator('[data-composer-card]')
   await composer.locator('button[data-dsh-relay-model-entry]').click({ timeout })

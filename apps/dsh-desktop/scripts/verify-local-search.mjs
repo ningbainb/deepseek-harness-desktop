@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
-import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { createFixtureWorkspace, createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
@@ -102,19 +102,6 @@ const model = createServer(async (request, response) => {
   }
 })
 
-async function createWorkspace(path) {
-  const result = await page.evaluate(async path => {
-    const method = 'workspace/create'
-    const response = await fetch('/api/' + method, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method, payload: { args: { request: { path } } } }) })
-    return (await response.json()).result
-  }, path)
-  assert.equal(result?.ok, true, JSON.stringify(result))
-  const workspaceId = (result.value.workspace ?? result.value).workspaceId
-  assert.equal(typeof workspaceId, 'string')
-  return workspaceId
-}
-
 async function post(path, data, authenticated = true) {
   return page.evaluate(async ({ path, data, authenticated }) => {
     const headers = { 'content-type': 'application/json' }
@@ -163,7 +150,7 @@ try {
   await dismissRuntimeOnboarding(page)
 
   for (const workspace of workspaces) {
-    workspace.workspaceId = await createWorkspace(workspace.path)
+    workspace.workspaceId = await createFixtureWorkspace(page, workspace.path)
     workspace.sessionId = await createSessionInWorkspace(page, workspace.workspaceId)
     const composer = page.locator(`[data-conversation-content][data-conversation-session="${workspace.sessionId}"] [data-composer-card]`)
     await composer.locator('button[data-dsh-relay-model-entry]').click({ timeout })

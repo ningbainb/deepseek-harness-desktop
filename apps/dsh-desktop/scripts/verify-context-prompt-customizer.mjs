@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -81,14 +82,6 @@ const json = async (path, init) => main.evaluate(async ({ path, init }) => {
   if (!response.ok) throw Error(`${path}: HTTP ${response.status}`)
   return response.json()
 }, { path, init })
-const rpc = async (method, request) => {
-  const endpoint = method.replace('.', '/')
-  const field = method === 'session.list' ? '_request' : 'request'
-  const body = await json(`/api/${endpoint}`, { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method: endpoint, payload: { args: { [field]: request } } }) })
-  assert.equal(body.result?.ok, true, JSON.stringify(body))
-  return body.result.value
-}
 const p1 = async () => {
   const body = await json('/api/dsh-web-ui-settings/describe', { method: 'POST' })
   return body.value?.namespaces?.find(item => item.ns === 'personal-prompt')?.value ?? null
@@ -129,10 +122,10 @@ const openContextSidebar = async () => {
 try {
   await launch()
   stage = 'new-session-context-sidebar'
-  const { workspace: createdWorkspace } = await rpc('workspace.create', { path: workspace })
-  const { sessionId } = await rpc('session.create', { workspaceId: createdWorkspace.workspaceId })
+  const { workspace: createdWorkspace } = await rpc(main, 'workspace.create', { path: workspace })
+  const { sessionId } = await rpc(main, 'session.create', { workspaceId: createdWorkspace.workspaceId })
   report.sessionId = sessionId
-  await rpc('session.selectModel', { sessionId, provider: 'context-p2-fixture', model: 'context-p2-fixture' })
+  await rpc(main, 'session.selectModel', { sessionId, provider: 'context-p2-fixture', model: 'context-p2-fixture' })
   await navigateNativeBrowserSession(await app.browserWindow(main), sessionId)
   await main.locator(`[data-row-key="session:${sessionId}"][aria-selected="true"]`).waitFor()
   await openContextSidebar()
@@ -239,12 +232,12 @@ try {
   await waitForAsyncPageFunction(main, async () => (await fetch('/api/prompt-customizer/config')).status === 404)
   const historyWorkspace = join(temporary, 'long-history-workspace')
   await mkdir(historyWorkspace)
-  const { workspace: longWorkspace } = await rpc('workspace.create', { path: historyWorkspace })
-  const { sessionId: longSessionId } = await rpc('session.create', { workspaceId: longWorkspace.workspaceId })
+  const { workspace: longWorkspace } = await rpc(main, 'workspace.create', { path: historyWorkspace })
+  const { sessionId: longSessionId } = await rpc(main, 'session.create', { workspaceId: longWorkspace.workspaceId })
   assert.notEqual(longSessionId, sessionId, 'long history must not overwrite the original fresh session')
-  await rpc('session.selectModel', { sessionId: longSessionId, provider: 'context-p2-fixture', model: 'context-p2-fixture' })
+  await rpc(main, 'session.selectModel', { sessionId: longSessionId, provider: 'context-p2-fixture', model: 'context-p2-fixture' })
   const markerPrefix = 'Context long history'
-  await rpc('session.rename', { sessionId: longSessionId, title: `${markerPrefix} 40` })
+  await rpc(main, 'session.rename', { sessionId: longSessionId, title: `${markerPrefix} 40` })
   await waitForSessionLog(join(home, 'sessions'), longSessionId)
   await closeIsolatedElectron(app); app = undefined
   const originalFreshLog = await readSessionLogText(contextLog)
@@ -257,11 +250,11 @@ try {
     provenance: 'Existing G02.5 official Session/createUserMessage/assistant-stream SDK fixture, appended only while Runtime is stopped; no provider generation.' }
   await launch()
   await reopenNativeSession({ page: main, workspaceId: longWorkspace.workspaceId, sessionId: longSessionId,
-    listSessions: () => rpc('session.list', {}) })
+    listSessions: () => rpc(main, 'session.list', {}) })
   // The official Session constructor completes a replay with one end-seed
   // event. Establish the read-only Context baseline after ordinary Session
   // projection loading, separately verifying this exact lifecycle append.
-  const restoredProjection = await rpc('session.projections', { sessionId: longSessionId })
+  const restoredProjection = await rpc(main, 'session.projections', { sessionId: longSessionId })
   assert.equal(restoredProjection.asOfSeq, seeded.asOfSeq + 1)
   let restoredHistoryText
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -338,7 +331,7 @@ try {
   stage = 'original-session-reopen'
   await navigateNativeBrowserSession(await app.browserWindow(main), sessionId)
   await reopenNativeSession({ page: main, workspaceId: createdWorkspace.workspaceId, sessionId,
-    listSessions: () => rpc('session.list', {}) })
+    listSessions: () => rpc(main, 'session.list', {}) })
   await openContextSidebar()
   assert.equal(await readSessionLogText(contextLog), originalFreshLog, 'original session stays intact and can reopen after long-history Context')
   assert.equal(report.modelRequests, 0)

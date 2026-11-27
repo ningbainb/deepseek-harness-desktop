@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
+import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
-import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
@@ -25,27 +25,6 @@ const sharedSkillName = 'desktop-conversation-secondary'
 let electronApp
 let page
 let verified = false
-
-async function rpc(runtimePage, method, payload) {
-  const response = await runtimePage.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const endpoint = rpcMethod.replace('.', '/')
-    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
-    const result = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'client-request',
-        rpcId,
-        method: endpoint,
-        payload: { args: { [requestField]: rpcPayload } },
-      }),
-    })
-    return { status: result.status, body: await result.json().catch(() => undefined) }
-  }, { rpcMethod: method, rpcPayload: payload, rpcId: randomUUID() })
-  assert.equal(response.status, 200, `${method}: HTTP ${response.status}`)
-  assert.equal(response.body?.result?.ok, true, `${method}: ${JSON.stringify(response.body?.result)}`)
-  return response.body.result.value
-}
 
 try {
   const skillRoot = resolve(dshHome, 'skills', skillName)
@@ -98,9 +77,7 @@ try {
     await continueButton.waitFor({ state: 'hidden', timeout: 10_000 })
   }
   await dismissIntro(5_000)
-  const workspace = await rpc(page, 'workspace.create', { path: workspacePath })
-  const workspaceId = workspace?.workspace?.workspaceId ?? workspace?.workspaceId
-  assert.equal(typeof workspaceId, 'string', JSON.stringify(workspace))
+  const workspaceId = await createFixtureWorkspace(page, workspacePath)
   const newSession = page.locator('button[aria-label*="中新建会话"], button[aria-label^="New session in"]').first()
   await newSession.waitFor({ state: 'attached', timeout: 20_000 })
   await newSession.dispatchEvent('click')

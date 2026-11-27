@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
-import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { createFixtureWorkspace, createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { waitForSessionLog } from './session-log-fixture.mjs'
@@ -225,18 +225,8 @@ async function launch() {
 async function verifyFastOps() {
   await (await app.browserWindow(page)).evaluate(window => window.setSize(1280, 820))
   await page.waitForFunction(() => innerWidth >= 1100)
-  const project = await page.evaluate(async path => {
-    const method = 'workspace/create'
-    const result = await fetch('/api/' + method, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method, payload: { args: { request: { path } } } }),
-    })
-    return (await result.json()).result
-  }, fastOpsWorkspace)
-  assert.equal(project?.ok, true)
-  const workspace = project.value.workspace ?? project.value
-  const id = await createSessionInWorkspace(page, workspace.workspaceId)
+  const workspaceId = await createFixtureWorkspace(page, fastOpsWorkspace)
+  const id = await createSessionInWorkspace(page, workspaceId)
   const active = page.locator('[data-conversation-content][data-conversation-session="' + id + '"]')
   const composer = active.locator('[data-composer-card]')
   await composer.locator('button[data-dsh-relay-model-entry]').click({ timeout })

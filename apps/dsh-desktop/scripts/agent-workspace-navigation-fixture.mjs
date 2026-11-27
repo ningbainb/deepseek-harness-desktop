@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict'
 import { prepareFreshNativeSession } from './native-session-blank-fixture.mjs'
+import { rpc as runtimeRpc } from './runtime-rpc-fixture.mjs'
+
+/** Create a fixture workspace and return its ID across both host response shapes. */
+export async function createFixtureWorkspace(page, path) {
+  const value = await runtimeRpc(page, 'workspace/create', { path })
+  const workspaceId = value?.workspace?.workspaceId ?? value?.workspaceId
+  assert.equal(typeof workspaceId, 'string', 'workspace/create must return a workspace ID')
+  return workspaceId
+}
 
 async function selectCreatedSession(page, workspaceId, click, expectedSessionId) {
   const [createdResponse] = await Promise.all([

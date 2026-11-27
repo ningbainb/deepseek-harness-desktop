@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
+import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 
 import electronPath from 'electron'
@@ -184,28 +185,6 @@ async function launch() {
     throw error
   }
   return { instance, page, rendererErrors, rendererConsole }
-}
-
-async function rpc(page, method, payload) {
-  const response = await page.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const endpoint = rpcMethod.replace('.', '/')
-    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
-    const result = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'client-request',
-        rpcId,
-        method: endpoint,
-        payload: { args: { [requestField]: rpcPayload } },
-      }),
-    })
-    return { status: result.status, body: await result.json().catch(() => undefined) }
-  }, { rpcMethod: method, rpcPayload: payload, rpcId: randomUUID() })
-  assert.equal(response.status, 200, `${method}: HTTP ${response.status}`)
-  assert.equal(response.body?.type, 'server-response', `${method}: missing response envelope`)
-  assert.equal(response.body?.result?.ok, true, `${method}: ${JSON.stringify(response.body?.result)}`)
-  return response.body.result.value
 }
 
 async function seedConversationLog(sessionId) {
@@ -452,9 +431,7 @@ try {
 
   const first = await launch()
   activeApp = first.instance
-  const workspace = await rpc(first.page, 'workspace.create', { path: workspacePath })
-  const workspaceId = workspace?.workspace?.workspaceId ?? workspace?.workspaceId
-  assert.equal(typeof workspaceId, 'string', JSON.stringify(workspace))
+  const workspaceId = await createFixtureWorkspace(first.page, workspacePath)
   const openFixtureSession = (page, id) => openSeededSession(page, id, workspaceId)
   const created = await rpc(first.page, 'session.create', { workspaceId })
   assert.equal(typeof created?.sessionId, 'string', JSON.stringify(created))

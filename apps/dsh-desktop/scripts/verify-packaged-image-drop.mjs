@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict'
+import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { execFile } from 'node:child_process'
-import { randomFillSync, randomUUID } from 'node:crypto'
+import { randomFillSync } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -61,28 +63,6 @@ async function dismissStartup(page) {
     }
     if (attempt >= 7) break
   }
-}
-
-async function rpc(page, method, payload) {
-  const response = await page.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const endpoint = rpcMethod.replace('.', '/')
-    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
-    const result = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'client-request',
-        rpcId,
-        method: endpoint,
-        payload: { args: { [requestField]: rpcPayload } },
-      }),
-    })
-    return { status: result.status, body: await result.json().catch(() => undefined) }
-  }, { rpcMethod: method, rpcPayload: payload, rpcId: randomUUID() })
-  assert.equal(response.status, 200, `${method}: HTTP ${response.status}`)
-  assert.equal(response.body?.type, 'server-response', `${method}: missing response envelope`)
-  assert.equal(response.body?.result?.ok, true, `${method}: ${JSON.stringify(response.body?.result)}`)
-  return response.body.result.value
 }
 
 async function openCreatedSession(page, sessionId) {
@@ -446,9 +426,7 @@ try {
     throw new Error(`${error.message}\nRecent runtime log:\n${runtimeLog.slice(-8_000)}`, { cause: error })
   }
 
-  const workspace = await rpc(page, 'workspace.create', { path: workspacePath })
-  const workspaceId = workspace?.workspace?.workspaceId ?? workspace?.workspaceId
-  assert.equal(typeof workspaceId, 'string', JSON.stringify(workspace))
+  const workspaceId = await createFixtureWorkspace(page, workspacePath)
   const session = await rpc(page, 'session.create', { workspaceId })
   assert.equal(typeof session?.sessionId, 'string', JSON.stringify(session))
   await openCreatedSession(page, session.sessionId)

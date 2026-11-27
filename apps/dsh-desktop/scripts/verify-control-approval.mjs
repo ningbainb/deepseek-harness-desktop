@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -63,17 +63,6 @@ const server = createServer(async (req, res) => {
     res.end()
   }
 })
-async function rpc(method, request) {
-  const value = await page.evaluate(async ({ method, request, id }) => {
-    const endpoint = method.replace('.', '/')
-    const response = await fetch(`/api/${endpoint}`, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId: id, method: endpoint, payload: { args: { request } } }) })
-    if (!response.ok) throw Error(`RPC HTTP ${response.status}`)
-    return (await response.json()).result
-  }, { method, request, id: randomUUID() })
-  assert.equal(value?.ok, true, JSON.stringify(value))
-  return value.value
-}
 try {
   assert.equal(process.platform, 'win32', 'native Windows approval acceptance only')
   await Promise.all([home, userData, workspace, documents].map(path => mkdir(path, { recursive: true })))
@@ -104,9 +93,9 @@ try {
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
   await page.locator('[data-dsh-frame]').waitFor({ state: 'visible', timeout: 600_000 })
   await dismissRuntimeOnboarding(page)
-  const created = await rpc('workspace.create', { path: workspace })
-  const { sessionId } = await rpc('session.create', { workspaceId: created.workspace.workspaceId })
-  await rpc('session.selectModel', { sessionId, provider: 'control-fixture', model: 'control-fixture' })
+  const created = await rpc(page, 'workspace.create', { path: workspace })
+  const { sessionId } = await rpc(page, 'session.create', { workspaceId: created.workspace.workspaceId })
+  await rpc(page, 'session.selectModel', { sessionId, provider: 'control-fixture', model: 'control-fixture' })
   await navigateNativeBrowserSession(await app.browserWindow(page), sessionId)
   await page.locator(`[data-row-key="session:${sessionId}"][aria-selected="true"]`).waitFor({ timeout: 30_000 })
   const overlay = await readFile(join(userData, 'runtime-overlays/primary-full-user.yml'), 'utf8')

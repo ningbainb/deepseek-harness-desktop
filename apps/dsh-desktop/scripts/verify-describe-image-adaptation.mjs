@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import childProcess from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -84,20 +86,8 @@ async function installClientProbe() {
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2))
 }
 
-async function rpc(method, request) {
-  return main.evaluate(async ({ method, request }) => {
-    const response = await fetch('/api/' + method, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method, payload: { args: { request } } }),
-    })
-    const envelope = await response.json()
-    if (!response.ok || envelope.result?.ok !== true) throw new Error(method + ': ' + JSON.stringify(envelope))
-    return envelope.result.value
-  }, { method, request })
-}
-
 async function selectModel(sessionId, model) {
-  await rpc('session/selectModel', { sessionId, provider: 'image-fixture', model })
+  await rpc(main, 'session/selectModel', { sessionId, provider: 'image-fixture', model })
   const capability = await main.evaluate(async id => (await fetch('/describe-image/capability?session=' + encodeURIComponent(id))).json(), sessionId)
   assert.deepEqual(capability, { ok: true, value: { acceptsImages: model === 'vision', known: true } })
   capabilities.push({ model, ...capability.value })
@@ -167,9 +157,7 @@ try {
   await main.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120000 })
   await main.waitForFunction(() => globalThis.__imageAdaptation?.hookInstalled() === true, undefined, { timeout: 60000 })
   stage = 'create-session'
-  const created = await rpc('workspace/create', { path: workspace })
-  const workspaceId = created.workspace?.workspaceId ?? created.workspaceId
-  assert.equal(typeof workspaceId, 'string')
+  const workspaceId = await createFixtureWorkspace(main, workspace)
   const sessionId = await main.evaluate(id => globalThis.__imageAdaptation.create(id), workspaceId)
   const attachRequests = []
   main.on('request', request => { if (new URL(request.url()).pathname === '/describe-image/attach') attachRequests.push(request) })

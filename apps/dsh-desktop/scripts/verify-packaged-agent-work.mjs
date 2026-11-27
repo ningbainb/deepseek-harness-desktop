@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { rpc } from './runtime-rpc-fixture.mjs'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -173,28 +174,6 @@ async function listen() {
   const address = server.address()
   assert.ok(address && typeof address === 'object')
   return address.port
-}
-
-async function rpc(page, method, payload) {
-  const response = await page.evaluate(async ({ rpcMethod, rpcPayload, rpcId }) => {
-    const endpoint = rpcMethod.replace('.', '/')
-    const requestField = rpcMethod === 'session.list' ? '_request' : 'request'
-    const result = await fetch(`/api/${endpoint}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        type: 'client-request',
-        rpcId,
-        method: endpoint,
-        payload: { args: { [requestField]: rpcPayload } },
-      }),
-    })
-    return { status: result.status, body: await result.json().catch(() => undefined) }
-  }, { rpcMethod: method, rpcPayload: payload, rpcId: randomUUID() })
-  assert.equal(response.status, 200, `${method}: HTTP ${response.status}`)
-  assert.equal(response.body?.type, 'server-response', `${method}: missing response envelope`)
-  assert.equal(response.body?.result?.ok, true, `${method}: ${JSON.stringify(response.body?.result)}`)
-  return response.body.result.value
 }
 
 function createFixtureFreshSession(page, workspaceId, workspacePath) {

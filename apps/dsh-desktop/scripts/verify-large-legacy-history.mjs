@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { createHash, randomUUID } from 'node:crypto'
+import { rpc } from './runtime-rpc-fixture.mjs'
+import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -201,18 +202,6 @@ async function finishProfiler() {
   } finally { await session.detach().catch(() => {}) }
 }
 const stamp = () => performance.now()
-async function rpc(page, method, request) {
-  const result = await page.evaluate(async ({ method, request, id }) => {
-    const endpoint = method.replace('.', '/')
-    const response = await fetch(`/api/${endpoint}`, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'client-request', rpcId: id, method: endpoint,
-        payload: { args: { [method === 'session.list' ? '_request' : 'request']: request } } }) })
-    return { status: response.status, body: await response.json() }
-  }, { method, request, id: randomUUID() })
-  assert.equal(result.status, 200, 'local RPC HTTP failure')
-  assert.equal(result.body?.result?.ok, true, 'local RPC application failure')
-  return result.body.result.value
-}
 async function launch() {
   await seedPrimaryRuntimePermissionForTest({ userData })
   const start = stamp()

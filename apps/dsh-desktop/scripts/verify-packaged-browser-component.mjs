@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { createHash, randomUUID } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
@@ -15,7 +15,7 @@ import { _electron as electron } from 'playwright'
 import { FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
 import { sameProcess, updateOwnedProcesses, qualifyElectronMainProcess } from './packaged-browser-owners.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
-import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
+import { createFixtureWorkspace, createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 import { dismissRuntimeOnboarding } from './dismiss-onboarding-fixture.mjs'
 import { assertNativeFixtureExecutable, assertNativeFixtureStorage } from './native-fixture-storage.mjs'
@@ -216,17 +216,6 @@ async function browser(owner, operation) {
   assert.equal(result.ok, true, JSON.stringify(result))
   return result.value
 }
-async function rpc(owner, method, request) {
-  return owner.page.evaluate(async ({ method, request, rpcId }) => {
-    const endpoint = method.replace('.', '/')
-    const response = await fetch(`/api/${endpoint}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-      type: 'client-request', rpcId, method: endpoint, payload: { args: { [method === 'session.list' ? '_request' : 'request']: request } },
-    }) })
-    const body = await response.json()
-    if (!response.ok || body.result?.ok !== true) throw Error(JSON.stringify(body))
-    return body.result.value
-  }, { method, request, rpcId: randomUUID() })
-}
 async function verifyActivation() {
   const receipt = JSON.parse(await readFile(join(component, '.desktop-component.json'), 'utf8'))
   assert.equal(receipt.version, artifact.version); assert.equal(receipt.platform, 'win32'); assert.equal(receipt.arch, 'x64')
@@ -394,8 +383,7 @@ try {
   await settings.screenshot({ path: join(output, 'component-ui-ready.png') })
   check('native-ui-retry-visible-bytes-and-ready', retryProgress)
   check('real-manager-progress-and-complete-persistent-activation', activated)
-  const workspace = await rpc(owner, 'workspace.create', { path: join(temporary, 'workspace') })
-  const workspaceId = workspace.workspace?.workspaceId ?? workspace.workspaceId
+  const workspaceId = await createFixtureWorkspace(owner.page, join(temporary, 'workspace'))
   const sessionId = await createSessionInWorkspace(owner.page, workspaceId)
   const composer = owner.page.locator('[data-composer-card] textarea, [data-composer-card] [contenteditable="true"]').first()
   const draft = 'This isolated chat draft must survive the browser process.'
