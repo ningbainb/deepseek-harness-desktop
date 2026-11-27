@@ -38,7 +38,7 @@
   },
   "lockfile": {
     "path": "pnpm-lock.yaml",
-    "sha256": "bb9233ee21743c9ac651d75cdb027aac5d5ef912868f39dab2061dcf6b8b460a"
+    "sha256": "74f1b8470d0b279c1b242693b7cf12448adb57fc18931e29563cc2b748acff01"
   },
   "provider": {
     "providerId": "dsh-cli-provider-v1",
@@ -114,7 +114,6 @@
       "conversation.input.left",
       "conversation.input.model",
       "conversation.input.right",
-      "conversation.input.selector.context",
       "conversation.session.header.actions",
       "plugins.row.config",
       "root",
