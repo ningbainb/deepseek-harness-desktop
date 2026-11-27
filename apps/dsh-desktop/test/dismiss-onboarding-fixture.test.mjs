@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
 import { chromium } from 'playwright'
 import { dismissKnownStartupNotices, dismissRuntimeOnboarding, dismissStartupContinuationDialogs, onboardingControlsReady } from '../scripts/dismiss-onboarding-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown } from '../scripts/dock-settings-fixture.mjs'
 
 test('onboarding readiness never accepts a visible disabled continuation', () => {
   const previousDocument = globalThis.document
@@ -124,6 +125,25 @@ describe('desktop startup prompts in the renderer', () => {
     await dismissStartupContinuationDialogs(page)
     assert.deepEqual(await page.evaluate(() => window.clicked), [])
     assert.equal(page.waitForTimeout.mock.callCount(), 8)
+  })
+
+  test('defers a late first-run chooser before the native account click', async t => {
+    const page = await startupPage(t, `<button id="account">Account menu</button>
+      <button id="unrelated">Maybe later</button>`)
+    await dismissFirstRunModelChooserWhenShown(page)
+    await dismissStartupContinuationDialogs(page)
+    await page.evaluate(() => {
+      const backdrop = document.createElement('div')
+      backdrop.dataset.dshFirstRunRoot = 'true'
+      backdrop.style.cssText = 'position:fixed;inset:0;z-index:10'
+      backdrop.innerHTML = '<section role="region" data-dsh-first-run-chooser><button id="login">Sign in</button><button id="defer">Maybe later</button></section>'
+      backdrop.querySelector('#defer').addEventListener('click', event => {
+        if (event.isTrusted) backdrop.remove()
+      })
+      document.body.append(backdrop)
+    })
+    await page.getByRole('button', { name: 'Account menu' }).click({ timeout: 5000 })
+    assert.deepEqual(await page.evaluate(() => window.clicked), ['defer', 'account'])
   })
 
   test('checks notice text and visibility in reverse dialog order before continuing', async t => {

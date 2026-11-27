@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { dismissStartupContinuationDialogs } from './dismiss-onboarding-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown } from './dock-settings-fixture.mjs'
 import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { waitForBackgroundSettings } from './skin-state-fixture.mjs'
 import { existsSync } from 'node:fs'
@@ -67,6 +68,7 @@ async function launch(scaleFactor) {
       state: 'attached',
       timeout: runtimeReadyTimeoutMs,
     })
+    await dismissFirstRunModelChooserWhenShown(page)
     await dismissStartupContinuationDialogs(page)
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
