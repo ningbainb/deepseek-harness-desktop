@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import { json } from 'node:stream/consumers'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
 
@@ -16,12 +16,14 @@ const sourceEntries = new Set(workspaces.flatMap(({ directory, manifest }) => {
   return [relative(process.cwd(), resolve(directory, manifest.main)).split(sep).join('/')]
 }))
 
-// Input is the tracked tree, including staged files. Run at repository root.
-const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+// Include local packages before their first commit. Ignore generated and deleted files.
+const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--deduplicate'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
   .split('\0')
   .filter(file => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !file.endsWith('.d.ts'))
   .filter(file => sourceEntries.has(file) || !/(^|\/)(?:vendor|dist|lib|node_modules|fixtures)\//.test(file))
-const tracked = new Set(files)
+  .filter(file => existsSync(file))
+  .sort()
+const sourceFiles = new Set(files)
 const localImports = []
 const bodies = new Map()
 const options = { allowJs: true, moduleResolution: ts.ModuleResolutionKind.Bundler }
@@ -38,7 +40,7 @@ for (const file of files) {
     const result = ts.resolveModuleName(specifier.text, resolve(file), options, ts.sys, moduleCache)
     if (!result.resolvedModule) return
     const target = relative(process.cwd(), result.resolvedModule.resolvedFileName).split(sep).join('/')
-    if (tracked.has(target)) localImports.push({ file, target, kind })
+    if (sourceFiles.has(target)) localImports.push({ file, target, kind })
   }
   function visit(node) {
     if (ts.isImportDeclaration(node)) {
@@ -99,7 +101,7 @@ if (process.argv.includes('--check')) {
     finished.add(file)
   }
   for (const file of files) check(file)
-  console.log(`Checked static relative imports across ${files.length} tracked source files.`)
+  console.log(`Checked static relative imports across ${files.length} source files.`)
 } else {
   process.stdout.write(JSON.stringify({ packages, files, localImports, duplicateFunctions }, null, 2) + '\n')
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -13,10 +13,13 @@ test('architecture check distinguishes a type reference from a circular value im
   writeFileSync(join(cwd, 'a.ts'), "import { b } from './b.ts'\nexport const a = b\n")
   writeFileSync(join(cwd, 'b.ts'), "import type { a } from './a.ts'\nexport const b = 1\n")
   execFileSync('git', ['init', '--quiet'], { cwd })
-  execFileSync('git', ['add', '.'], { cwd })
+  writeFileSync(join(cwd, 'removed.ts'), 'export {}')
+  execFileSync('git', ['add', 'a.ts', 'removed.ts'], { cwd })
+  unlinkSync(join(cwd, 'removed.ts'))
   const script = fileURLToPath(new URL('./architecture-map.mjs', import.meta.url))
   const options = { cwd, input: JSON.stringify([{ path: cwd }]), encoding: 'utf8' }
   const report = JSON.parse(execFileSync(process.execPath, [script], options))
+  assert.deepEqual(report.files, ['a.ts', 'b.ts'])
   assert.deepEqual(report.localImports, [
     { file: 'a.ts', target: 'b.ts', kind: 'static' },
     { file: 'b.ts', target: 'a.ts', kind: 'type' },
