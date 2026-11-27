@@ -7,6 +7,80 @@ export const RELEASE_GUIDE_VERSION = JSON.parse(readFileSync(new URL('../package
 export const RELEASE_GUIDE_SURFACE_ID = 'dsh-desktop-release-guide'
 
 export const RELEASE_GUIDES = Object.freeze({
+  '5.7.0-test.1': Object.freeze({
+    zh: Object.freeze({
+      badge: '版本新功能',
+      title: '欢迎使用 DeepSeek Harness Desktop',
+      subtitle: '在对话中使用本机 Agent、读取资料和运行工具，并通过检查点审查工作区改动。',
+      hint: '可在顶部「帮助 → 本版本新功能」随时查看',
+      done: '开始使用',
+      closeLabel: '关闭版本新功能引导',
+      items: Object.freeze([
+        Object.freeze({
+          id: 'acp-and-nbfast',
+          icon: 'terminal',
+          title: '会话级 ACP 与 nbfast',
+          description: '在对话中选择本机 Agent。用 nbfast 查看代码大纲、搜索语法结构、预览改写，并按需读取完整命令输出。',
+          actionLabel: '查看模型设置',
+          actionKind: 'models',
+        }),
+        Object.freeze({
+          id: 'documents-and-search',
+          icon: 'inbox',
+          title: '文档读取与本地搜索',
+          description: '拖入 Office 或 PDF 文档，也可提取已授权的网页。按工作区或日期检索记忆、本人会话和选入知识库的资料。',
+        }),
+        Object.freeze({
+          id: 'apps-and-diagrams',
+          icon: 'layout',
+          title: 'MCP Apps 与图表导出',
+          description: '在聊天卡片中与已配置的 MCP 工具交互。Mermaid 图表可离线渲染，并导出 SVG 或 PNG。',
+        }),
+        Object.freeze({
+          id: 'workspace-checkpoints',
+          icon: 'sparkles',
+          title: '工作区检查点',
+          description: '在轮次结束后对比文件改动。确认后可恢复单个文件或整轮改动，也可撤销恢复。',
+        }),
+      ]),
+    }),
+    en: Object.freeze({
+      badge: "What's New",
+      title: 'Welcome to DeepSeek Harness Desktop',
+      subtitle: 'Use local agents, read documents, and run tools in a conversation. Review workspace changes with checkpoints.',
+      hint: "Reopen anytime via Help → What's New",
+      done: 'Get started',
+      closeLabel: "Close What's New guide",
+      items: Object.freeze([
+        Object.freeze({
+          id: 'acp-and-nbfast',
+          icon: 'terminal',
+          title: 'Per-conversation ACP and nbfast',
+          description: 'Choose a local agent for the conversation. Use nbfast to explore code outlines, search syntax, preview rewrites, and retrieve full command output.',
+          actionLabel: 'Open Model Settings',
+          actionKind: 'models',
+        }),
+        Object.freeze({
+          id: 'documents-and-search',
+          icon: 'inbox',
+          title: 'Document reading and local search',
+          description: 'Drop in Office documents and PDFs, or extract a web page you approve. Search memories, your conversations, and selected knowledge sources by workspace or date.',
+        }),
+        Object.freeze({
+          id: 'apps-and-diagrams',
+          icon: 'layout',
+          title: 'MCP Apps and diagram export',
+          description: 'Interact with configured MCP tools in chat cards. Render Mermaid diagrams offline and export them as SVG or PNG.',
+        }),
+        Object.freeze({
+          id: 'workspace-checkpoints',
+          icon: 'sparkles',
+          title: 'Workspace checkpoints',
+          description: 'Compare file changes at the end of a turn. Review and confirm a single-file or whole-turn restore, and undo it if needed.',
+        }),
+      ]),
+    }),
+  }),
   '5.6.0': Object.freeze({
     zh: Object.freeze({
       badge: '版本新功能',
