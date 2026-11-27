@@ -31,6 +31,8 @@
 4. 路由清单必须指向仓库实际存在的文件或目录。兼容跨包复合路由的多个来源以及显式的官方 SDK 包引用。缺失迁移测试、失效本地源路径和缺少所有者均会使门禁失败。
 5. 两个预设插件分别发布到 npm，各自携带注册、目录同步和格式校验代码。权威源码位于 `shared/host/presets`。沿用已有生成机制可保留旧导入路径，且无需让任一插件依赖另一个插件，或给用户额外安装运行时包。CI 核对每份副本的内容和归属，并检查发布依赖及旧声明入口。
 6. 输入框的行布局、键盘焦点和菜单定位由官方会话工具栏与菜单组件负责。Git 图标挂入 `conversation.input.left`，分支名进入菜单、原生提示和无障碍名称。ACP 工作台通过当前会话的原生命令入口打开，实际启动与发送仍使用 Electron 的交互证明。
+7. 桌面 Dock 通过官方插件列表打开“实验性插件”。官方 SDK 拥有清单、权限和筛选状态，设置插件只负责本次导航。当清单就绪时点击“更多”；清单为空、用户切换面板、连接代次变化或组件卸载时结束等待并释放订阅。SDK 类型沿用设置包的 `settings-sdk-adapter.ts` 入口。
+8. 性价比模式的模型目录由 `model-catalog.ts` 查询，选择器只负责显示和重试意图。普通打开复用在途请求与 30 秒成功缓存。单次查询 10 秒超时，选择器在 12 秒内给出结果。用户在界面超时后明确重试时，加载器可以替换仍未完成的读取。并发读者取得最新结果，旧响应无法改写缓存。此规则也适用于经默认专家模型校验的首次引导入口。
 
 依赖图中的 `duplicateFunctions` 保留所有物理重复位置。`independentDuplicateFunctions` 将同一源码和受管副本折算为一个修改位置，`mirroredDuplicateFunctions` 给出已匹配的源与目标。只有同步清单和函数体同时匹配才能折算。从另一代皮肤移植的像素绘制和行情函数仍作为独立实现列出。
 
@@ -49,8 +51,11 @@
 | 工作区 Git 子进程 | shared/host/workspace-git-env.ts | AionUI 和 Git 图谱分别保留执行、错误及重试策略。共享实现清除继承的仓库定位和整组索引配置变量，让 Git 使用所选目录。 |
 | Profile 文件与目录项 | 桌面 profile-files.mjs | Profile 准备、隔离恢复、插件暂存与归档共用目录项存在性判定。检查保留断链，只有 ENOENT 表示缺失。事务路径另按原有平台策略刷盘，各自负责回滚次序。 |
 | 首次提示与版本引导 | 桌面 version-prompt-state.mjs | 星标提示和更新引导各自串行处理自己的状态文件，共用已展示的版本历史、原子写入及认领规则。升级引导独立处理 pending 状态。 |
+| 本地 HTTP 来源 | shared/host/loopback-request.ts | 七个独立 npm 包分别携带同一检查函数。路由先核对 socket、Host、浏览器来源，再按自己的主体、令牌或请求头契约授权。CI 验证每个受管副本。 |
 | 桌面主进程授权的 JSON 请求 | dsh-desktop-compat 的 desktop-json-post.ts | 会话导入和工作区文件打开在读取请求体前核验本地来源和启动令牌，分别保留 32 MiB 和 1 MiB 上限。业务校验、响应状态和工作区所有者仍由各自路由决定。 |
 | Electron 源码验收中的 Host RPC | 桌面 scripts/runtime-rpc-fixture.mjs | 统一请求信封与 HTTP 状态检查。成功路径读取值，负面用例可检查宿主返回的错误；工作区创建夹具支持两种历史回包。 |
+| 桌面验收中的启动提示与文件完整性 | 桌面 scripts/dismiss-onboarding-fixture.mjs、file-sha256-fixture.mjs | 通用“继续”只点目标弹窗内的按钮，设置场景还要核验提示正文。安装载体、浏览器及启动计时的文件证据共用流式 SHA-256。 |
+| 插件路由验收 | shared/tests/host-route-fixture.ts | AionUI 与 Git 图谱在测试中共用路由注册、字符串响应和写入捕获。各自验证请求头、拒绝分支、SSE 关闭及原始字节。 |
 | 桌面与插件的修复路径边界 | shared/host/repair-path.mjs | 四个调用点共用词法包含检查，分别保留真实路径、链接与权限校验。 |
 | 可选的 Cordis 服务查询 | shared/host/get-host-service.ts | nbfast、IM Hub、Win Control 共用运行时获取策略。插件保留自己的服务注册和不可用时的业务行为。 |
 | 图片输入能力 | dsh-tool-describe-image 的 model-capability | 探测器从 Cordis 注入的 Agent 与 LLM 服务读取元数据。公开包源码子路径单独编译，以验证调用方可以只导入探测器或 Git 芯片。 |
