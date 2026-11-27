@@ -12,6 +12,7 @@
   },
   "include": [
     "src/index.ts",
+    "src/schema.ts",
     "src/sync.ts"
   ]
 }

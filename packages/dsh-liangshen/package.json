@@ -36,6 +36,9 @@
     "schemastery": "^3.18.0",
     "yaml": "^2.9.1"
   },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.5 || 4.2.0-alpha.1"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.2.0-alpha.1",
     "@deepseek-ai/dsh-agent-preset-registry": "0.2.3-alpha.2",
