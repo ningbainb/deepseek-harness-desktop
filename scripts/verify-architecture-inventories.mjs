@@ -81,7 +81,7 @@ export function validateArchitectureInventories(root = ROOT) {
     for (const entry of record.sourcePath.split(';')) {
       const path = entry.trim().replaceAll('\\', '/')
       if (/^@deepseek-ai\/[a-z0-9-]+$/.test(path)) continue
-      if (!path.startsWith('packages/') || path.split('/').includes('..') || !existsSync(resolve(root, path))) {
+      if (!(/^(?:packages|apps)\//u.test(path)) || path.split('/').includes('..') || !existsSync(resolve(root, path))) {
         errors.push(`transport source is missing or invalid for ${record.pluginId}: ${path}`)
       } else {
         localSources.add(path)
