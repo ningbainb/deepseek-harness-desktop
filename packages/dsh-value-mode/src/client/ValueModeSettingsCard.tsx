@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import type { ModelRouteSelection, ValueModeConfig, ValueModeSettingsScope } from '../core/config.ts'
 import { isCompleteModelRoute, isConfigured, resolveResolvedConfig } from '../core/config.ts'
 import { ModelPicker } from './ModelPicker.tsx'
-import type { ValueModeModelCatalog } from './model-catalog.ts'
+import type { ModelCatalogLoader } from './model-catalog.ts'
 import { useSettingsValue, useValueModeConfig } from './useValueModeConfig.ts'
 import styles from './value-mode.module.css'
 import layout from './value-mode-polish.module.css'
@@ -17,7 +17,7 @@ export interface ValueModeSettingsCardProps {
   settingsScope?: ValueModeSettingsScope<ValueModeConfig>
   defaultModelScope?: ValueModeSettingsScope<ModelRouteSelection>
   onChange: (patch: Partial<ValueModeConfig>) => Promise<void> | void
-  fetchModels?: () => Promise<ValueModeModelCatalog>
+  fetchModels?: ModelCatalogLoader
 }
 
 export const ValueModeSettingsCard: React.FC<ValueModeSettingsCardProps> = ({

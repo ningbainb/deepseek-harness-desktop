@@ -26,13 +26,17 @@ export function createModelCatalogLoader(ctx, translate) {
         ctx.get('connection').generation.subscribe(invalidate),
     ];
     ctx.effect(() => () => { disposed = true; invalidate(); removers.forEach(remove => remove()); }, 'value-mode: model catalog lifetime');
-    return function fetchModels(retriesLeft = MAX_CATALOG_REVISION_RETRIES) {
+    return function fetchModels(request = MAX_CATALOG_REVISION_RETRIES) {
         if (disposed)
             return Promise.reject(new Error(translate('catalogUnavailable')));
+        // A revision refresh may still be pending after the picker has shown its deadline.
+        if (request === 'retry' && pending)
+            invalidate();
         if (cached && cached.expires > Date.now())
             return Promise.resolve(cached.value);
         if (pending)
             return pending;
+        const retriesLeft = typeof request === 'number' ? request : MAX_CATALOG_REVISION_RETRIES;
         const started = revision;
         let timer;
         const interrupted = new Promise((_, reject) => {

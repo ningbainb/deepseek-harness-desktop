@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ValueModeConfig, SessionOverrideConfig, ModelRouteSelection, ValueModeSettingsScope } from '../core/config.ts';
-import type { ValueModeModelCatalog } from './model-catalog.ts';
+import type { ModelCatalogLoader } from './model-catalog.ts';
 export interface ConsultationHistoryItem {
     id: string;
     timestamp: number;
@@ -35,7 +35,7 @@ export interface ValueModeHeaderStatusProps {
     sessionOverride?: SessionOverrideConfig;
     onChange: (patch: Partial<ValueModeConfig>) => Promise<void> | void;
     onSessionOverrideChange?: (override?: SessionOverrideConfig) => void;
-    fetchModels?: () => Promise<ValueModeModelCatalog>;
+    fetchModels?: ModelCatalogLoader;
     onOpenSettings?: () => void;
 }
 export declare const ValueModeHeaderStatus: React.FC<ValueModeHeaderStatusProps>;

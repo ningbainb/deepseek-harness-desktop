@@ -48,8 +48,8 @@ export const ValueModeHeroOnboarding = ({ config, settingsScope, defaultModelSco
     useEffect(() => {
         setError(initialError ?? null);
     }, [initialError]);
-    const loadModels = useCallback(async () => {
-        const catalog = await fetchModels();
+    const loadModels = useCallback(async (action) => {
+        const catalog = await (action === 'retry' ? fetchModels(action) : fetchModels());
         if (isCompleteModelRoute(defaultExpert)) {
             const defaultExists = catalog.groups.some((group) => (group.id === defaultExpert.provider && group.models.some((model) => model.id === defaultExpert.model)));
             if (!defaultExists) {

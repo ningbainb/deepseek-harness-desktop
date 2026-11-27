@@ -1,14 +1,14 @@
 import React from 'react';
 import type { ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client';
 import { BAI_PROVIDER_ID, type ModelRouteSelection } from '../core/config.ts';
-import { type ValueModeModelCatalog } from './model-catalog.ts';
+import { type ModelCatalogLoader } from './model-catalog.ts';
 export type { ValueModeModelCatalog } from './model-catalog.ts';
 export interface ModelPickerProps {
     title: string;
     current?: ModelRouteSelection;
     onSelect: (selection: ModelRouteSelection) => void;
     onClose: () => void;
-    fetchModels?: () => Promise<ValueModeModelCatalog>;
+    fetchModels?: ModelCatalogLoader;
 }
 export { BAI_PROVIDER_ID };
 /** Keep the Desktop-recommended bai provider first without disturbing the catalog's remaining order. */

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { ModelRouteSelection, ValueModeConfig, ValueModeSettingsScope, ValueModeStrategy } from '../core/config.ts'
 import { isCompleteModelRoute, resolveResolvedConfig } from '../core/config.ts'
 import { ModelPicker } from './ModelPicker.tsx'
-import type { ValueModeModelCatalog } from './model-catalog.ts'
+import type { ModelCatalogLoader } from './model-catalog.ts'
 import { useSettingsValue, useValueModeConfig } from './useValueModeConfig.ts'
 import styles from './value-mode.module.css'
 import headerStyles from './value-mode-header.module.css'
@@ -14,7 +14,7 @@ export interface ValueModeHeroOnboardingProps {
   settingsScope: ValueModeSettingsScope<ValueModeConfig>
   defaultModelScope: ValueModeSettingsScope<ModelRouteSelection>
   onChange: (patch: Partial<ValueModeConfig>) => Promise<void> | void
-  fetchModels: () => Promise<ValueModeModelCatalog>
+  fetchModels: ModelCatalogLoader
   onClose: () => void
   initialError?: string | null
 }
@@ -78,8 +78,8 @@ export const ValueModeHeroOnboarding: React.FC<ValueModeHeroOnboardingProps> = (
     setError(initialError ?? null)
   }, [initialError])
 
-  const loadModels = useCallback(async (): Promise<ValueModeModelCatalog> => {
-    const catalog = await fetchModels()
+  const loadModels = useCallback<ModelCatalogLoader>(async action => {
+    const catalog = await (action === 'retry' ? fetchModels(action) : fetchModels())
     if (isCompleteModelRoute(defaultExpert)) {
       const defaultExists = catalog.groups.some((group) => (
         group.id === defaultExpert.provider && group.models.some((model) => model.id === defaultExpert.model)

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import type { ModelCatalogFailure, ModelProviderGroup } from '@deepseek-ai/dsh-api-remotes/client'
 import { BAI_PROVIDER_ID, isPendingBaiModel, type ModelRouteSelection } from '../core/config.ts'
 import { en, zh, type ValueModeLocaleKey } from './locales.ts'
-import { CODEX_MODEL_CATALOG_CHANGED, ModelCatalogChangedError, type ValueModeModelCatalog } from './model-catalog.ts'
+import { CODEX_MODEL_CATALOG_CHANGED, ModelCatalogChangedError, type ModelCatalogLoader } from './model-catalog.ts'
 import styles from './value-mode.module.css'
 import layout from './value-mode-polish.module.css'
 import picker from './value-mode-picker.module.css'
@@ -15,7 +15,7 @@ export interface ModelPickerProps {
   current?: ModelRouteSelection
   onSelect: (selection: ModelRouteSelection) => void
   onClose: () => void
-  fetchModels?: () => Promise<ValueModeModelCatalog>
+  fetchModels?: ModelCatalogLoader
 }
 
 export { BAI_PROVIDER_ID }
@@ -44,6 +44,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
+  const manualRetry = useRef(false)
   const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -86,6 +87,8 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
 
   useEffect(() => {
     let active = true
+    const retry = manualRetry.current
+    manualRetry.current = false
     setLoading(true)
     setError(null)
     setGroups([])
@@ -107,7 +110,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
     void Promise.resolve().then(async () => {
       for (let refresh = 0; active; refresh += 1) {
         try {
-          return await fetchModels()
+          return await (retry && refresh === 0 ? fetchModels('retry') : fetchModels())
         } catch (reason) {
           if (!(reason instanceof ModelCatalogChangedError) || refresh >= 2 || !active) throw reason
         }
@@ -159,7 +162,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({ title, current, onSele
         {error && (
           <div className={picker.errorPanel} role="alert">
             <div className={picker.errorMessage}>{error}</div>
-            <button type="button" className={styles.button} onClick={() => setReloadToken((value) => value + 1)}>重试</button>
+            <button type="button" className={styles.button} onClick={() => {
+              manualRetry.current = true
+              setReloadToken(value => value + 1)
+            }}>重试</button>
           </div>
         )}
 

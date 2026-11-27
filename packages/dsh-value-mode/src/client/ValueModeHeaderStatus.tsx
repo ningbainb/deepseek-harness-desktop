@@ -9,7 +9,7 @@ import {
   resolveSessionConfig,
 } from '../core/config.ts'
 import { ModelPicker } from './ModelPicker.tsx'
-import type { ValueModeModelCatalog } from './model-catalog.ts'
+import type { ModelCatalogLoader } from './model-catalog.ts'
 import { useSettingsValue, useValueModeConfig } from './useValueModeConfig.ts'
 import styles from './value-mode.module.css'
 import headerStyles from './value-mode-header.module.css'
@@ -47,7 +47,7 @@ export interface ValueModeHeaderStatusProps {
   sessionOverride?: SessionOverrideConfig
   onChange: (patch: Partial<ValueModeConfig>) => Promise<void> | void
   onSessionOverrideChange?: (override?: SessionOverrideConfig) => void
-  fetchModels?: () => Promise<ValueModeModelCatalog>
+  fetchModels?: ModelCatalogLoader
   onOpenSettings?: () => void
 }
 

@@ -21,7 +21,7 @@ import { ValueModeSettingsCard } from './ValueModeSettingsCard.tsx'
 import { ValueModeHeaderStatus } from './ValueModeHeaderStatus.tsx'
 import { ValueModeHeroOnboarding } from './ValueModeHeroOnboarding.tsx'
 import { reportValueModeTelemetry } from './telemetry.ts'
-import { createModelCatalogLoader, type ValueModeModelCatalog } from './model-catalog.ts'
+import { createModelCatalogLoader, type ModelCatalogLoader } from './model-catalog.ts'
 import { createValueModeSettingsWriter } from './settings-write.ts'
 
 export { ValueModeSettingsCard } from './ValueModeSettingsCard.tsx'
@@ -62,7 +62,7 @@ interface HeroOnboardingMountOptions {
   scope: ValueModeSettingsScope<ValueModeConfig>
   defaultModelScope: ValueModeSettingsScope<ModelRouteSelection>
   onChange: (patch: Partial<ValueModeConfig>) => Promise<void>
-  fetchModels: () => Promise<ValueModeModelCatalog>
+  fetchModels: ModelCatalogLoader
 }
 
 function heroPresetButton(): HTMLButtonElement | undefined {

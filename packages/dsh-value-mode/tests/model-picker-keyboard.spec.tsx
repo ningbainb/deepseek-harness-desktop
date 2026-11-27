@@ -3,7 +3,8 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ModelPicker } from '../src/client/ModelPicker.tsx'
-import { ModelCatalogChangedError } from '../src/client/model-catalog.ts'
+import { createModelCatalogLoader, ModelCatalogChangedError } from '../src/client/model-catalog.ts'
+import { zh } from '../src/client/locales.ts'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const roots: Root[] = []
@@ -19,6 +20,42 @@ function mount(container: HTMLElement, onClose = vi.fn()) {
   act(() => root.render(<ModelPicker title="Models" onClose={onClose} onSelect={() => {}} />))
   return root
 }
+
+it('starts a fresh catalog read on manual retry when a revision outlives the picker deadline', async () => {
+  vi.useFakeTimers()
+  let invalidate!: () => void
+  const stalled: Array<(response: unknown) => void> = []
+  const modelCatalog = vi.fn().mockImplementation(() => new Promise(resolve => stalled.push(resolve)))
+  const subscribe = (event: string, callback: () => void) => {
+    if (event === 'settings/document-updated') invalidate = callback
+    return () => {}
+  }
+  const ctx = {
+    remote: { session: { modelCatalog }, $on: subscribe }, on: subscribe,
+    get: () => ({ generation: { subscribe: () => () => {} } }), effect: () => {},
+  }
+  const fetchModels = createModelCatalogLoader(ctx as never, key => zh[key])
+  const root = createRoot(document.body.appendChild(document.createElement('div')))
+  roots.push(root)
+  await act(async () => root.render(<ModelPicker title="Models" onClose={() => {}} onSelect={() => {}} fetchModels={fetchModels} />))
+  await act(async () => { await vi.advanceTimersByTimeAsync(3_564); invalidate() })
+  expect(modelCatalog).toHaveBeenCalledTimes(2)
+  await act(async () => { await vi.advanceTimersByTimeAsync(12_000 - 3_564) })
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('超时')
+
+  const otherReader = fetchModels()
+  const response = (id: string) => ({ ok: true, value: { groups: [{ id: 'relay', models: [{ id, name: id }] }] } })
+  modelCatalog.mockResolvedValue(response('fresh'))
+  const retry = [...document.querySelectorAll('button')].find(button => button.textContent === '重试')!
+  await act(async () => retry.click())
+  expect(modelCatalog).toHaveBeenCalledTimes(3)
+  expect(document.querySelector('[data-model-id="fresh"]')).toBeTruthy()
+  expect((await otherReader).groups[0].models[0].id).toBe('fresh')
+  await act(async () => { for (const finish of stalled) finish(response('obsolete')) })
+  expect(document.querySelector('[data-model-id="obsolete"]')).toBeNull()
+  expect((await fetchModels('retry')).groups[0].models[0].id).toBe('fresh')
+  expect(modelCatalog).toHaveBeenCalledTimes(3)
+})
 
 it('closes with Escape and restores focus to the trigger', () => {
   const trigger = document.createElement('button')

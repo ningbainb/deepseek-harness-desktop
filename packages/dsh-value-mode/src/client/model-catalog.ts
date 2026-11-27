@@ -10,6 +10,8 @@ export interface ValueModeModelCatalog {
   failures?: readonly ModelCatalogFailure[]
 }
 
+export type ModelCatalogLoader = (action?: 'retry') => Promise<ValueModeModelCatalog>
+
 export const MODEL_CATALOG_TIMEOUT_MS = 10_000
 export const CODEX_MODEL_CATALOG_CHANGED = 'dsh-codex-model-catalog-changed'
 const MAX_CATALOG_REVISION_RETRIES = 2
@@ -41,10 +43,13 @@ export function createModelCatalogLoader(ctx: Context, translate: (key: ValueMod
   ]
   ctx.effect(() => () => { disposed = true; invalidate(); removers.forEach(remove => remove()) }, 'value-mode: model catalog lifetime')
 
-  return function fetchModels(retriesLeft = MAX_CATALOG_REVISION_RETRIES): Promise<ValueModeModelCatalog> {
+  return function fetchModels(request: 'retry' | number = MAX_CATALOG_REVISION_RETRIES): Promise<ValueModeModelCatalog> {
     if (disposed) return Promise.reject(new Error(translate('catalogUnavailable')))
+    // A revision refresh may still be pending after the picker has shown its deadline.
+    if (request === 'retry' && pending) invalidate()
     if (cached && cached.expires > Date.now()) return Promise.resolve(cached.value)
     if (pending) return pending
+    const retriesLeft = typeof request === 'number' ? request : MAX_CATALOG_REVISION_RETRIES
     const started = revision
     let timer: ReturnType<typeof setTimeout>
     const interrupted = new Promise<never>((_, reject) => {
