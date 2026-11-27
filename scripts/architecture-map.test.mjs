@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { renderCopy } from './sync-shared.mjs'
 
 test('architecture check distinguishes a type reference from a circular value import', t => {
   const cwd = mkdtempSync(join(tmpdir(), 'dsh-module-graph-'))
@@ -57,4 +58,48 @@ test('architecture check distinguishes a type reference from a circular value im
 
   writeFileSync(join(src, 'catalog.ts'), 'export interface Row {}\nexport const load = (): Row => ({})\n')
   execFileSync(process.execPath, [script, '--check'], options)
+})
+
+test('duplicate function reports collapse only declared copies with a matching source function', t => {
+  const cwd = mkdtempSync(join(tmpdir(), 'dsh-duplicate-functions-'))
+  t.after(() => rmSync(cwd, { recursive: true, force: true }))
+  writeFileSync(join(cwd, 'package.json'), '{"name":"example"}')
+  execFileSync('git', ['init', '--quiet'], { cwd })
+
+  const source = 'shared/host/presets/sync.ts'
+  const copies = ['packages/dsh-liangshen/src/sync.ts', 'packages/dsh-value-mode/src/sync.ts']
+  const independent = 'unlisted.ts'
+  const sample = (name, label = name) => `function ${name}(records: string[]) {
+    const values = records.map(record => record.trim()).filter(value => value.length > 0)
+    return values.map(value => '${label}: ' + value).join(', ')
+  }`
+  const common = [sample('managed'), sample('mixed')]
+  const canonical = [...common, sample('changed', 'canonical')].join('\n')
+  const divergent = [...common, sample('changed', 'other')].join('\n')
+  mkdirSync(join(cwd, 'shared/host/presets'), { recursive: true })
+  writeFileSync(join(cwd, source), canonical)
+  for (const copy of copies) {
+    mkdirSync(dirname(join(cwd, copy)), { recursive: true })
+    writeFileSync(join(cwd, copy), renderCopy(divergent, 'sync.ts', source))
+  }
+  // A generated header cannot register a file as a managed copy.
+  writeFileSync(join(cwd, independent), renderCopy(sample('mixed'), 'sync.ts', source))
+
+  const script = fileURLToPath(new URL('./architecture-map.mjs', import.meta.url))
+  const report = JSON.parse(execFileSync(process.execPath, [script], {
+    cwd, input: JSON.stringify([{ path: cwd }]), encoding: 'utf8',
+  }))
+  assert.deepEqual(report.duplicateFunctions, [
+    { name: 'managed', files: [...copies, source] },
+    { name: 'mixed', files: [...copies, source, independent] },
+    { name: 'changed', files: copies },
+  ])
+  assert.deepEqual(report.mirroredDuplicateFunctions, [
+    { name: 'managed', source, files: copies },
+    { name: 'mixed', source, files: copies },
+  ])
+  assert.deepEqual(report.independentDuplicateFunctions, [
+    { name: 'mixed', files: [source, independent] },
+    { name: 'changed', files: copies },
+  ])
 })

@@ -3,6 +3,7 @@ import { json } from 'node:stream/consumers'
 import { existsSync, readFileSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
+import { copyEntries } from './sync-shared.mjs'
 
 // pnpm reports the active workspace, including projects with no dependencies.
 const projects = await json(process.stdin)
@@ -111,5 +112,29 @@ if (process.argv.includes('--check')) {
   for (const file of files) check(file)
   console.log(`Checked relative static imports and plugin type dependencies across ${files.length} source files.`)
 } else {
-  process.stdout.write(JSON.stringify({ packages, files, localImports, duplicateFunctions }, null, 2) + '\n')
+  const root = process.cwd()
+  const mirrorOwners = new Map(copyEntries(root).map(({ target, sourceRel }) => [
+    relative(root, target).split(sep).join('/'), sourceRel,
+  ]))
+  const independentDuplicateFunctions = []
+  const mirroredDuplicateFunctions = []
+  for (const { name, files } of duplicateFunctions) {
+    const independent = []
+    const mirrors = new Map()
+    for (const file of files) {
+      const source = mirrorOwners.get(file)
+      // Membership in this group proves the owner has the same name and body.
+      if (source && files.includes(source)) {
+        if (!mirrors.has(source)) mirrors.set(source, [])
+        mirrors.get(source).push(file)
+      } else {
+        independent.push(file)
+      }
+    }
+    for (const [source, copies] of mirrors) mirroredDuplicateFunctions.push({ name, source, files: copies })
+    if (independent.length > 1) independentDuplicateFunctions.push({ name, files: independent })
+  }
+  process.stdout.write(JSON.stringify({
+    packages, files, localImports, duplicateFunctions, independentDuplicateFunctions, mirroredDuplicateFunctions,
+  }, null, 2) + '\n')
 }
