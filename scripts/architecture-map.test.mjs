@@ -41,6 +41,20 @@ test('architecture check distinguishes a type reference from a circular value im
   const reversed = spawnSync(process.execPath, [script, '--check'], options)
   assert.equal(reversed.status, 1)
   assert.match(reversed.stderr, /catalog\.ts -> packages\/example\/src\/view\.ts -> packages\/example\/src\/catalog\.ts/)
+  for (const declaration of [
+    "export type T = import('./view.ts').Row",
+    "export type T = typeof import('./view.ts').load",
+    "import type View = require('./view.ts')",
+  ]) {
+    writeFileSync(join(src, 'catalog.ts'), declaration)
+    const queried = spawnSync(process.execPath, [script, '--check'], options)
+    assert.equal(queried.status, 1, declaration)
+    assert.match(queried.stderr, /Source dependency cycle/)
+  }
+  writeFileSync(join(src, 'contract.d.ts'), "export type T = import('./view.ts').Row")
+  writeFileSync(join(src, 'catalog.ts'), "export type { T } from './contract'")
+  assert.equal(spawnSync(process.execPath, [script, '--check'], options).status, 1)
+
   writeFileSync(join(src, 'catalog.ts'), 'export interface Row {}\nexport const load = (): Row => ({})\n')
   execFileSync(process.execPath, [script, '--check'], options)
 })

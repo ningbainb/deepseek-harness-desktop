@@ -19,7 +19,7 @@ const sourceEntries = new Set(workspaces.flatMap(({ directory, manifest }) => {
 // Include local packages before their first commit. Ignore generated and deleted files.
 const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--deduplicate'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
   .split('\0')
-  .filter(file => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !file.endsWith('.d.ts'))
+  .filter(file => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file))
   .filter(file => sourceEntries.has(file) || !/(^|\/)(?:vendor|dist|lib|node_modules|fixtures)\//.test(file))
   .filter(file => existsSync(file))
   .sort()
@@ -51,6 +51,10 @@ for (const file of files) {
       const names = node.exportClause
       const types = node.isTypeOnly || (names && ts.isNamedExports(names) && names.elements.length && names.elements.every(item => item.isTypeOnly))
       record(node.moduleSpecifier, types ? 'type' : 'static')
+    } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument)) {
+      record(node.argument.literal, 'type')
+    } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+      record(node.moduleReference.expression, node.isTypeOnly ? 'type' : 'require')
     } else if (ts.isCallExpression(node)) {
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword) record(node.arguments[0], 'dynamic')
       if (ts.isIdentifier(node.expression) && node.expression.text === 'require') record(node.arguments[0], 'require')
