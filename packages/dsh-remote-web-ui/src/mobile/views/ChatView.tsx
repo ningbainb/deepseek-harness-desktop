@@ -13,9 +13,8 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { HistoryEntry, MobileMuxFrame, SessionModels } from '../../mobile-contract.ts'
-import { loadHistory, prompt, type SessionView } from './App.tsx'
-import { errorText, formatTime, staleHostHint } from './App.tsx'
-import { fetchMobilePreferences, models, selectModel, sendCommand } from '../api.ts'
+import { errorText, formatTime, staleHostHint, type SessionView } from './presentation.ts'
+import { fetchMobilePreferences, loadHistory, prompt, models, selectModel, sendCommand } from '../api.ts'
 import { foldEvents, type RenderMessage, type ToolCallInfo, type WireEvent } from '../messages.ts'
 import { MuxClient } from '../mux.ts'
 import { ThemeToggle } from '../theme-toggle.tsx'

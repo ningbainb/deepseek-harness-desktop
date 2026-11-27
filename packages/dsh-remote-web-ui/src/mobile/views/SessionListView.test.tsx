@@ -4,9 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { WorkspaceView as WorkspaceRow } from '../../mobile-contract.ts'
 import { SessionListView, type SessionListViewProps } from './SessionListView.tsx'
-import { type SessionView } from './App.tsx'
+import { type SessionView } from './presentation.ts'
 
-// The api module is fully mocked; the view's App.tsx helpers stay real.
 vi.mock('../api.ts', () => ({
   listSessions: vi.fn(),
   listWorkspaces: vi.fn(),

@@ -118,3 +118,8 @@ export async function selectModel(
     ...(selection.reasoningEffort !== undefined ? { reasoningEffort: selection.reasoningEffort } : {}),
   })
 }
+
+/** Fetch one history page (tail by default) — thin wrapper so views share the call shape. */
+export function loadHistory(sessionId: string, beforeSeq?: number, signal?: AbortSignal) {
+  return history(sessionId, beforeSeq, undefined, signal)
+}

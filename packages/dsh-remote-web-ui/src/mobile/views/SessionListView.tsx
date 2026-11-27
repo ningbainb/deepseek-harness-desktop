@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SessionSummary, WorkspaceView as WorkspaceRow } from '../../mobile-contract.ts'
 import { createSession, listSessions, listWorkspaces } from '../api.ts'
-import { errorText, formatTime, staleHostHint, toSessionView, type SessionView } from './App.tsx'
+import { errorText, formatTime, staleHostHint, toSessionView, type SessionView } from './presentation.ts'
 import { ThemeToggle } from '../theme-toggle.tsx'
 
 /** Props for the session list. */

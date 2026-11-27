@@ -4,28 +4,19 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { SessionModels } from '../../mobile-contract.ts'
 import { ChatView, MAX_TAIL_BUFFER_EVENTS } from './ChatView.tsx'
-import { type SessionView } from './App.tsx'
+import { type SessionView } from './presentation.ts'
 import type { HistoryPage } from '../api.ts'
 import type { WireEvent } from '../messages.ts'
 
-// The api module is fully mocked; App.tsx's history wrapper is overridden to
-// feed fixed history pages, its pure helpers (errorText / formatTime) stay real.
 vi.mock('../api.ts', () => ({
   fetchMobilePreferences: vi.fn(),
+  loadHistory: vi.fn(),
+  prompt: vi.fn(async () => {}),
   models: vi.fn(),
   selectModel: vi.fn(),
   sendCommand: vi.fn(),
 }))
-vi.mock('./App.tsx', async importOriginal => {
-  const actual = await importOriginal<typeof import('./App.tsx')>()
-  return {
-    ...actual,
-    loadHistory: vi.fn(),
-    prompt: vi.fn(async () => {}),
-  }
-})
-import { fetchMobilePreferences, models, selectModel, sendCommand } from '../api.ts'
-import { loadHistory, prompt } from './App.tsx'
+import { fetchMobilePreferences, loadHistory, prompt, models, selectModel, sendCommand } from '../api.ts'
 
 const session: SessionView = {
   sessionId: 's-1',

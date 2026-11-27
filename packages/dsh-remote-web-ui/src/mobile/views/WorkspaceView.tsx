@@ -8,7 +8,7 @@
 import { useEffect, useState } from 'react'
 import type { WorkspaceView as WorkspaceRow } from '../../mobile-contract.ts'
 import { listWorkspaces } from '../api.ts'
-import { errorText } from './App.tsx'
+import { errorText } from './presentation.ts'
 import { ThemeToggle } from '../theme-toggle.tsx'
 
 /** Props for the workspace roster. */
