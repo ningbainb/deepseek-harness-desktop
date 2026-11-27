@@ -1,21 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isLoopbackRequest } from './loopback-request.ts'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { LocalSearchService, SearchAccessError, type SessionSearchRequest } from './service.ts'
 
 export const SEARCH_API_PREFIX = '/api/dsh-local-search'
-
-function sameOrigin(request: IncomingMessage): boolean {
-  if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket.remoteAddress ?? '')
-    || request.headers['x-dsh-local-search'] !== '1' || request.headers['sec-fetch-site'] === 'cross-site'
-    || typeof request.headers.host !== 'string') return false
-  try {
-    const host = new URL('http://' + request.headers.host)
-    return ['127.0.0.1', 'localhost', '[::1]'].includes(host.hostname)
-      && (request.headers.origin === undefined || new URL(request.headers.origin).host === host.host)
-  } catch {
-    return false
-  }
-}
 
 function send(response: ServerResponse, status: number, body: unknown): void {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' })
@@ -53,7 +41,7 @@ export function searchRoutes(service: LocalSearchService): WebRoute[] {
   return [{
     kind: 'prefix', path: SEARCH_API_PREFIX,
     async handler(request, response, context) {
-      if (!sameOrigin(request) || context?.principal?.kind !== 'owner') {
+      if (!isLoopbackRequest(request) || request.headers['x-dsh-local-search'] !== '1' || context?.principal?.kind !== 'owner') {
         send(response, 403, { ok: false, code: 'forbidden' }); return
       }
       if (request.method !== 'POST') { send(response, 405, { ok: false, code: 'method-not-allowed' }); return }

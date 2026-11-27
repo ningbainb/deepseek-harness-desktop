@@ -765,6 +765,92 @@ function installTranscriptBalanceGuard(ctx) {
 	}, { global: true });
 }
 //#endregion
+//#region src/loopback-request.ts
+/** Validate the socket, loopback Host and browser site/origin before route-specific authorization. */
+function isLoopbackRequest(request) {
+	const address = request.socket.remoteAddress;
+	if (address !== "127.0.0.1" && address !== "::1" && address !== "::ffff:127.0.0.1") return false;
+	const host = request.headers.host;
+	if (typeof host !== "string") return false;
+	let hostUrl;
+	try {
+		hostUrl = new URL(`http://${host}`);
+	} catch {
+		return false;
+	}
+	if (![
+		"127.0.0.1",
+		"localhost",
+		"[::1]"
+	].includes(hostUrl.hostname)) return false;
+	if (request.headers["sec-fetch-site"] === "cross-site") return false;
+	const origin = request.headers.origin;
+	if (origin === void 0) return true;
+	try {
+		return new URL(origin).host === hostUrl.host;
+	} catch {
+		return false;
+	}
+}
+//#endregion
+//#region src/desktop-json-post.ts
+function writeJson(response, status, value) {
+	response.writeHead(status, {
+		"content-type": "application/json; charset=utf-8",
+		"cache-control": "no-store",
+		"x-content-type-options": "nosniff"
+	});
+	response.end(JSON.stringify(value));
+}
+/**
+* Compare an opaque launch capability without leaking a matching prefix. A
+* missing, malformed, or wrong-length header is padded before comparison too,
+* so every request with a configured secret reaches `timingSafeEqual`.
+*/
+function capabilityTokenMatches(expected, supplied) {
+	if (!isDesktopWorkspaceFileOpenToken(expected)) return false;
+	const expectedBytes = Buffer.from(expected, "utf8");
+	const suppliedBytes = typeof supplied === "string" ? Buffer.from(supplied, "utf8") : Buffer.alloc(0);
+	const paddedSupplied = Buffer.alloc(expectedBytes.length);
+	suppliedBytes.copy(paddedSupplied, 0, 0, expectedBytes.length);
+	const equal = timingSafeEqual(expectedBytes, paddedSupplied);
+	return suppliedBytes.length === expectedBytes.length && equal;
+}
+async function readJsonBody$2(request, maxBytes) {
+	const chunks = [];
+	let size = 0;
+	for await (const chunk of request) {
+		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+		size += buffer.length;
+		if (size > maxBytes) return void 0;
+		chunks.push(buffer);
+	}
+	try {
+		return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+	} catch {
+		return;
+	}
+}
+/** Enforce the Desktop main-process capability before reading a request or consulting Host state. */
+function desktopJsonPost(capabilityToken, maxBodyBytes, handleBody) {
+	return async (request, response) => {
+		function reject(status, code, message) {
+			writeJson(response, status, {
+				ok: false,
+				error: {
+					code,
+					message
+				}
+			});
+		}
+		if (!isLoopbackRequest(request)) return reject(403, "forbidden", "loopback-only");
+		if (!capabilityTokenMatches(capabilityToken, request.headers["x-dsh-desktop-workspace-file-open-token"])) return reject(403, "forbidden", "desktop capability required");
+		if (request.method !== "POST") return reject(405, "method-not-allowed", "POST is required");
+		if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) return reject(415, "invalid-content-type", "application/json is required");
+		await handleBody(await readJsonBody$2(request, maxBodyBytes), response);
+	};
+}
+//#endregion
 //#region src/conversation-import-route.ts
 /** Loopback-only Host route for importing an external transcript as a DSH session. */
 const DESKTOP_CONVERSATION_IMPORT_PATH = "/desktop/conversation-import";
@@ -814,62 +900,6 @@ function failure$1(code, message) {
 			message
 		}
 	};
-}
-function writeJson$1(response, status, value) {
-	response.writeHead(status, {
-		"content-type": "application/json; charset=utf-8",
-		"cache-control": "no-store",
-		"x-content-type-options": "nosniff"
-	});
-	response.end(JSON.stringify(value));
-}
-function isLoopbackRequest$1(request) {
-	const address = request.socket.remoteAddress;
-	if (address !== "127.0.0.1" && address !== "::1" && address !== "::ffff:127.0.0.1") return false;
-	const host = request.headers.host;
-	if (typeof host !== "string") return false;
-	let hostUrl;
-	try {
-		hostUrl = new URL(`http://${host}`);
-	} catch {
-		return false;
-	}
-	if (![
-		"127.0.0.1",
-		"localhost",
-		"[::1]"
-	].includes(hostUrl.hostname)) return false;
-	if (request.headers["sec-fetch-site"] === "cross-site") return false;
-	const origin = request.headers.origin;
-	if (origin === void 0) return true;
-	try {
-		return new URL(origin).host === hostUrl.host;
-	} catch {
-		return false;
-	}
-}
-function capabilityTokenMatches$1(expected, supplied) {
-	if (!isDesktopWorkspaceFileOpenToken(expected)) return false;
-	const expectedBytes = Buffer.from(expected, "utf8");
-	const suppliedBytes = typeof supplied === "string" ? Buffer.from(supplied, "utf8") : Buffer.alloc(0);
-	const padded = Buffer.alloc(expectedBytes.length);
-	suppliedBytes.copy(padded, 0, 0, expectedBytes.length);
-	return suppliedBytes.length === expectedBytes.length && timingSafeEqual(expectedBytes, padded);
-}
-async function readJsonBody$3(request) {
-	const chunks = [];
-	let size = 0;
-	for await (const chunk of request) {
-		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-		size += buffer.length;
-		if (size > MAX_BODY_BYTES$3) return void 0;
-		chunks.push(buffer);
-	}
-	try {
-		return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-	} catch {
-		return;
-	}
 }
 function isPlainObject$1(value) {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -997,39 +1027,22 @@ async function importConversationIntoHost(ctx, request) {
 	};
 }
 function createDesktopConversationImportRoute(ctx, { capabilityToken = process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] } = {}) {
-	const expectedCapabilityToken = capabilityToken;
 	return {
 		kind: "exact",
 		path: DESKTOP_CONVERSATION_IMPORT_PATH,
-		handler: async (request, response) => {
-			if (!isLoopbackRequest$1(request)) {
-				writeJson$1(response, 403, failure$1("forbidden", "loopback-only"));
-				return;
-			}
-			if (!capabilityTokenMatches$1(expectedCapabilityToken, request.headers["x-dsh-desktop-workspace-file-open-token"])) {
-				writeJson$1(response, 403, failure$1("forbidden", "desktop capability required"));
-				return;
-			}
-			if (request.method !== "POST") {
-				writeJson$1(response, 405, failure$1("method-not-allowed", "POST is required"));
-				return;
-			}
-			if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
-				writeJson$1(response, 415, failure$1("invalid-content-type", "application/json is required"));
-				return;
-			}
-			const requestValue = normalizeRequest$1(await readJsonBody$3(request));
+		handler: desktopJsonPost(capabilityToken, MAX_BODY_BYTES$3, async (body, response) => {
+			const requestValue = normalizeRequest$1(body);
 			if (requestValue === void 0) {
-				writeJson$1(response, 400, failure$1("bad-request", "malformed conversation import request"));
+				writeJson(response, 400, failure$1("bad-request", "malformed conversation import request"));
 				return;
 			}
 			try {
 				const result = await importConversationIntoHost(ctx, requestValue);
-				writeJson$1(response, result.ok ? 200 : 422, result);
+				writeJson(response, result.ok ? 200 : 422, result);
 			} catch (error) {
-				writeJson$1(response, 500, failure$1("internal-error", error instanceof Error ? error.message : String(error)));
+				writeJson(response, 500, failure$1("internal-error", error instanceof Error ? error.message : String(error)));
 			}
-		}
+		})
 	};
 }
 function registerDesktopConversationImportRoute(ctx) {
@@ -1066,68 +1079,6 @@ function isSameCanonicalPath(left, right) {
 }
 function isGitPath(path) {
 	return path.replaceAll("\\", "/").split("/").some((part) => part.toLowerCase() === ".git");
-}
-function isLoopbackRequest(request) {
-	const address = request.socket.remoteAddress;
-	if (address !== "127.0.0.1" && address !== "::1" && address !== "::ffff:127.0.0.1") return false;
-	const host = request.headers.host;
-	if (typeof host !== "string") return false;
-	let hostUrl;
-	try {
-		hostUrl = new URL(`http://${host}`);
-	} catch {
-		return false;
-	}
-	if (![
-		"127.0.0.1",
-		"localhost",
-		"[::1]"
-	].includes(hostUrl.hostname)) return false;
-	if (request.headers["sec-fetch-site"] === "cross-site") return false;
-	const origin = request.headers.origin;
-	if (origin === void 0) return true;
-	try {
-		return new URL(origin).host === hostUrl.host;
-	} catch {
-		return false;
-	}
-}
-function writeJson(response, status, value) {
-	response.writeHead(status, {
-		"content-type": "application/json; charset=utf-8",
-		"cache-control": "no-store",
-		"x-content-type-options": "nosniff"
-	});
-	response.end(JSON.stringify(value));
-}
-/**
-* Compare an opaque launch capability without leaking a matching prefix. A
-* missing, malformed, or wrong-length header is padded before comparison too,
-* so every request with a configured secret reaches `timingSafeEqual`.
-*/
-function capabilityTokenMatches(expected, supplied) {
-	if (!isDesktopWorkspaceFileOpenToken(expected)) return false;
-	const expectedBytes = Buffer.from(expected, "utf8");
-	const suppliedBytes = typeof supplied === "string" ? Buffer.from(supplied, "utf8") : Buffer.alloc(0);
-	const paddedSupplied = Buffer.alloc(expectedBytes.length);
-	suppliedBytes.copy(paddedSupplied, 0, 0, expectedBytes.length);
-	const equal = timingSafeEqual(expectedBytes, paddedSupplied);
-	return suppliedBytes.length === expectedBytes.length && equal;
-}
-async function readJsonBody$2(request) {
-	const chunks = [];
-	let size = 0;
-	for await (const chunk of request) {
-		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-		size += buffer.length;
-		if (size > MAX_BODY_BYTES$2) return void 0;
-		chunks.push(buffer);
-	}
-	try {
-		return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-	} catch {
-		return;
-	}
 }
 function normalizeRequest(value) {
 	if (value === null || typeof value !== "object" || Array.isArray(value)) return void 0;
@@ -1192,34 +1143,17 @@ async function resolveDesktopWorkspaceFileOpenTarget(workspaceRegistry, request)
 }
 /** Create the exact route so unit tests can exercise its transport fence. */
 function createDesktopWorkspaceFileOpenRoute(workspaceRegistry, { capabilityToken = process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] } = {}) {
-	const expectedCapabilityToken = capabilityToken;
 	return {
 		kind: "exact",
 		path: DESKTOP_WORKSPACE_FILE_OPEN_TARGET_PATH,
-		handler: async (request, response) => {
-			if (!isLoopbackRequest(request)) {
-				writeJson(response, 403, failure("forbidden", "loopback-only"));
-				return;
-			}
-			if (!capabilityTokenMatches(expectedCapabilityToken, request.headers["x-dsh-desktop-workspace-file-open-token"])) {
-				writeJson(response, 403, failure("forbidden", "desktop capability required"));
-				return;
-			}
-			if (request.method !== "POST") {
-				writeJson(response, 405, failure("method-not-allowed", "POST is required"));
-				return;
-			}
-			if (!(request.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
-				writeJson(response, 415, failure("invalid-content-type", "application/json is required"));
-				return;
-			}
-			const requestValue = normalizeRequest(await readJsonBody$2(request));
+		handler: desktopJsonPost(capabilityToken, MAX_BODY_BYTES$2, async (body, response) => {
+			const requestValue = normalizeRequest(body);
 			if (requestValue === void 0) {
 				writeJson(response, 400, failure("bad-request", "malformed workspace file request"));
 				return;
 			}
 			writeJson(response, 200, await resolveDesktopWorkspaceFileOpenTarget(workspaceRegistry, requestValue));
-		}
+		})
 	};
 }
 /** Register the authority with the always-mounted Desktop compat bundle. */

@@ -1,28 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isLoopbackRequest } from './loopback-request.ts'
 import { DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_HEADER, isDesktopWorkspaceFileOpenToken } from './workspace-file-open-policy.ts'
-
-function isLoopbackRequest(request: IncomingMessage): boolean {
-  const address = request.socket.remoteAddress
-  if (address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') return false
-  const host = request.headers.host
-  if (typeof host !== 'string') return false
-  let hostUrl: URL
-  try {
-    hostUrl = new URL(`http://${host}`)
-  } catch {
-    return false
-  }
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostUrl.hostname)) return false
-  if (request.headers['sec-fetch-site'] === 'cross-site') return false
-  const origin = request.headers.origin
-  if (origin === undefined) return true
-  try {
-    return new URL(origin).host === hostUrl.host
-  } catch {
-    return false
-  }
-}
 
 export function writeJson(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, {

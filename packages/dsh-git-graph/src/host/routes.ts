@@ -7,6 +7,7 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isLoopbackRequest } from './loopback-request.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import {
@@ -72,35 +73,7 @@ const MALFORMED_VIEW: GitError = { code: 'internal', message: 'malformed git res
 /** Request body size cap; larger bodies are destroyed rather than drained. */
 const BODY_CAP_BYTES = 1 << 20
 
-/**
- * Loopback trust fence — the same judgment dsh-ssh applies to its host
- * routes: a loopback socket address AND a loopback Host header, plus browser
- * same-origin markers. The /git operations mutate the real repository, so a
- * LAN-exposed dsh web must not serve them to unpaired devices. The socket
- * address is authoritative; X-Forwarded-For is never trusted (matching
- * dsh-ssh).
- */
-export function isLoopbackRequest(request: IncomingMessage): boolean {
-  const address = request.socket.remoteAddress
-  if (address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') return false
-  const host = request.headers.host
-  if (typeof host !== 'string') return false
-  let hostUrl: URL
-  try {
-    hostUrl = new URL(`http://${host}`)
-  } catch {
-    return false
-  }
-  if (hostUrl.hostname !== '127.0.0.1' && hostUrl.hostname !== 'localhost' && hostUrl.hostname !== '[::1]') return false
-  if (request.headers['sec-fetch-site'] === 'cross-site') return false
-  const origin = request.headers.origin
-  if (origin === undefined) return true
-  try {
-    return new URL(origin).host === hostUrl.host
-  } catch {
-    return false
-  }
-}
+export { isLoopbackRequest }
 
 /** Write the shared non-loopback rejection (same body as dsh-ssh). */
 function forbidden(res: ServerResponse): void {

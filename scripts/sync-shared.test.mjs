@@ -30,7 +30,12 @@ test('stripHeader accepts a Windows CRLF separator', () => {
 
 test('copies cover each client and host helper and its consuming plugins', () => {
   const entries = copyEntries()
-  assert.equal(entries.length, 42)
+  assert.equal(entries.length, 49)
+  assert.deepEqual(entries.filter(entry => entry.file === 'loopback-request.ts').map(entry => entry.target), [
+    ...['dsh-aionui-panel', 'dsh-git-graph', 'dsh-task-board', 'dsh-local-search']
+      .map(pkg => join(REPO_ROOT, 'packages', pkg, 'src/host/loopback-request.ts')),
+    ...['dsh-ssh', 'dsh-desktop-compat', 'dsh-memory'].map(pkg => join(REPO_ROOT, 'packages', pkg, 'src/loopback-request.ts')),
+  ])
   assert.deepEqual(entries.filter(entry => entry.file === 'get-host-service.ts').map(entry => entry.target),
     ['dsh-fast-ops', 'dsh-im-hub', 'dsh-win-control'].map(pkg => join(REPO_ROOT, 'packages', pkg, 'src/core/get-host-service.ts')))
   assert.deepEqual(entries.filter(entry => entry.file === 'repair-path.mjs').map(entry => entry.target), [
@@ -48,7 +53,7 @@ test('copies cover each client and host helper and its consuming plugins', () =>
     join(REPO_ROOT, 'packages/dsh-aionui-panel/src/client/feature-telemetry.ts'),
   ])
   const hostCopies = entries.filter(entry => /[\\/]src[\\/]host[\\/]/.test(entry.target) || /[\\/]src[\\/]dsh-home\.ts$/.test(entry.target))
-  assert.equal(hostCopies.length, 7)
+  assert.equal(hostCopies.length, 11)
   for (const file of ['preset-schema.ts', 'preset-registry.ts', 'sync.ts']) {
     const copies = entries.filter(entry => entry.sourceRel === `shared/host/presets/${file}`)
     assert.deepEqual(copies.map(copy => copy.target), [

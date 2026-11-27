@@ -1,5 +1,6 @@
 /** Safe same-origin Host routes for the profile-isolated Task Board ledger. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isLoopbackRequest } from './loopback-request.ts'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 
 import { parseLedger, type TaskLedgerDocumentV2 } from '../core/store.ts'
@@ -11,28 +12,7 @@ export const TASK_BOARD_EVENTS_PATH = '/api/dsh-task-board/events'
 const MAX_BODY_BYTES = 2 * 1024 * 1024
 const KEEPALIVE_MS = 15_000
 
-/** Loopback transport + same-origin browser markers; no arbitrary filesystem input exists. */
-export function isTrustedTaskBoardRequest(request: IncomingMessage): boolean {
-  const address = request.socket.remoteAddress
-  if (address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') return false
-  const host = request.headers.host
-  if (typeof host !== 'string') return false
-  let hostUrl: URL
-  try {
-    hostUrl = new URL(`http://${host}`)
-  } catch {
-    return false
-  }
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostUrl.hostname)) return false
-  if (request.headers['sec-fetch-site'] === 'cross-site') return false
-  const origin = request.headers.origin
-  if (origin === undefined) return true
-  try {
-    return new URL(origin).host === hostUrl.host
-  } catch {
-    return false
-  }
-}
+export { isLoopbackRequest as isTrustedTaskBoardRequest }
 
 function writeJson(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, {
@@ -124,7 +104,7 @@ export class TaskBoardEvents {
 export function makeTaskBoardRoutes(store: HostTaskFileStore): { routes: WebRoute[]; dispose: () => void } {
   const events = new TaskBoardEvents(store)
   const tasksHandler = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
-    if (!isTrustedTaskBoardRequest(request)) {
+    if (!isLoopbackRequest(request)) {
       writeJson(response, 403, { ok: false, code: 'forbidden' })
       return
     }
@@ -148,7 +128,7 @@ export function makeTaskBoardRoutes(store: HostTaskFileStore): { routes: WebRout
     writeJson(response, 405, { ok: false, code: 'method-not-allowed' })
   }
   const eventHandler = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
-    if (!isTrustedTaskBoardRequest(request)) {
+    if (!isLoopbackRequest(request)) {
       writeJson(response, 403, { ok: false, code: 'forbidden' })
       return
     }

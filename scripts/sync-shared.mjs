@@ -23,6 +23,15 @@ export const REPO_ROOT = resolve(SCRIPT_DIR, '..')
  */
 const MANIFEST = [
   {
+    file: 'loopback-request.ts',
+    source: 'shared/host/loopback-request.ts',
+    targets: [
+      ...['dsh-aionui-panel', 'dsh-git-graph', 'dsh-task-board', 'dsh-local-search']
+        .map(pkg => `packages/${pkg}/src/host/loopback-request.ts`),
+      ...['dsh-ssh', 'dsh-desktop-compat', 'dsh-memory'].map(pkg => `packages/${pkg}/src/loopback-request.ts`),
+    ],
+  },
+  {
     file: 'get-host-service.ts',
     source: 'shared/host/get-host-service.ts',
     targets: ['dsh-fast-ops', 'dsh-im-hub', 'dsh-win-control'].map(pkg => `packages/${pkg}/src/core/get-host-service.ts`),

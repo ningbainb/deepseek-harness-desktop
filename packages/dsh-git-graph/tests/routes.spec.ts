@@ -5,8 +5,28 @@
  * Exercises the handlers through a fake ctx.webServer registry.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { registerGitRoutes } from '../src/host/routes.ts'
+import type { IncomingMessage } from 'node:http'
+import { isLoopbackRequest, registerGitRoutes } from '../src/host/routes.ts'
 import type { RepoStatus } from '../src/core/types.ts'
+
+describe('local request origin', () => {
+  it.each([
+    [true, '127.0.0.1', '127.0.0.1:3000', undefined, undefined],
+    [true, '::1', '[::1]:3000', 'same-origin', 'http://[::1]:3000'],
+    [true, '::ffff:127.0.0.1', 'localhost:3000', 'same-site', 'http://localhost:3000'],
+    [false, undefined, 'localhost:3000', undefined, undefined],
+    [false, '192.0.2.1', 'localhost:3000', undefined, undefined],
+    [false, '127.0.0.1', undefined, undefined, undefined],
+    [false, '127.0.0.1', 'invalid host', undefined, undefined],
+    [false, '127.0.0.1', 'example.test', undefined, undefined],
+    [false, '127.0.0.1', 'localhost:3000', 'cross-site', 'http://localhost:3000'],
+    [false, '127.0.0.1', 'localhost:3000', undefined, 'http://localhost:4000'],
+    [false, '127.0.0.1', 'localhost:3000', undefined, 'invalid origin'],
+  ] as const)('accept=%s for socket=%s host=%s site=%s origin=%s', (expected, remoteAddress, host, site, origin) => {
+    const request = { socket: { remoteAddress }, headers: { host, origin, 'sec-fetch-site': site } }
+    expect(isLoopbackRequest(request as IncomingMessage)).toBe(expected)
+  })
+})
 
 /** A minimal ctx fulfilling what registerGitRoutes touches. */
 function fakeCtx(): {

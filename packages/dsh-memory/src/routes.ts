@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { isLoopbackRequest } from './loopback-request.ts'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import {
   MemoryAccessError,
@@ -18,20 +19,7 @@ export const MEMORY_ITEMS_PATH = MEMORY_API_PREFIX + '/items'
 export const MEMORY_PENDING_PATH = MEMORY_API_PREFIX + '/pending'
 const MAX_BODY_BYTES = 256 * 1024
 
-/** Loopback + same-origin fence; memory is never a LAN API. */
-export function isTrustedMemoryRequest(request: IncomingMessage): boolean {
-  const address = request.socket.remoteAddress
-  if (address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') return false
-  const host = request.headers.host
-  if (typeof host !== 'string') return false
-  let hostUrl: URL
-  try { hostUrl = new URL('http://' + host) } catch { return false }
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostUrl.hostname)) return false
-  if (request.headers['sec-fetch-site'] === 'cross-site') return false
-  const origin = request.headers.origin
-  if (origin === undefined) return true
-  try { return new URL(origin).host === hostUrl.host } catch { return false }
-}
+export { isLoopbackRequest as isTrustedMemoryRequest }
 
 function writeJson(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, {
@@ -122,7 +110,7 @@ export function makeMemoryRoutes(options: {
   const { service } = options
 
   const handler = async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
-    if (!isTrustedMemoryRequest(request)) {
+    if (!isLoopbackRequest(request)) {
       writeJson(response, 403, { ok: false, code: 'forbidden' })
       return
     }

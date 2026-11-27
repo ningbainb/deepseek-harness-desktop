@@ -1376,18 +1376,16 @@ function createMemoryTool(service, options) {
 	});
 }
 //#endregion
-//#region src/routes.ts
-const MEMORY_API_PREFIX = "/api/dsh-memory";
-const MAX_BODY_BYTES = 256 * 1024;
-/** Loopback + same-origin fence; memory is never a LAN API. */
-function isTrustedMemoryRequest(request) {
+//#region src/loopback-request.ts
+/** Validate the socket, loopback Host and browser site/origin before route-specific authorization. */
+function isLoopbackRequest(request) {
 	const address = request.socket.remoteAddress;
 	if (address !== "127.0.0.1" && address !== "::1" && address !== "::ffff:127.0.0.1") return false;
 	const host = request.headers.host;
 	if (typeof host !== "string") return false;
 	let hostUrl;
 	try {
-		hostUrl = new URL("http://" + host);
+		hostUrl = new URL(`http://${host}`);
 	} catch {
 		return false;
 	}
@@ -1405,6 +1403,10 @@ function isTrustedMemoryRequest(request) {
 		return false;
 	}
 }
+//#endregion
+//#region src/routes.ts
+const MEMORY_API_PREFIX = "/api/dsh-memory";
+const MAX_BODY_BYTES = 256 * 1024;
 function writeJson(response, status, value) {
 	response.writeHead(status, {
 		"content-type": "application/json; charset=utf-8",
@@ -1479,7 +1481,7 @@ function draftFromBody(body) {
 function makeMemoryRoutes(options) {
 	const { service } = options;
 	const handler = async (request, response) => {
-		if (!isTrustedMemoryRequest(request)) {
+		if (!isLoopbackRequest(request)) {
 			writeJson(response, 403, {
 				ok: false,
 				code: "forbidden"
