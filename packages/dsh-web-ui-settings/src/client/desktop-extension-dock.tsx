@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import type { DiscoverFace } from '@deepseek-ai/dsh-client-ui-plugin-market/client'
-import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import type { HostObservable } from './settings-sdk-adapter.ts'
 import {
   dismissDockNudge,
   getDockEntryState,

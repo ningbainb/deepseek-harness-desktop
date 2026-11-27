@@ -6,7 +6,6 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { openDesktopSurface } from '@linxin666/dsh-desktop-client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -63,7 +62,7 @@ import { installFirstRunChooser } from './FirstRunChooser.tsx'
 import { installRemoteAccessHintEnhancer } from './remote-access-hint.ts'
 import { registerRemoteAccessPluginRows } from './remote-access-plugin-row.ts'
 import { installSettingsOnboardingPriority, supportsDesktopSettingsPriority } from './settings-onboarding-priority.tsx'
-import { ensureOfficeWorkSession, registerOfficeAppsIntegration } from './settings-sdk-adapter.ts'
+import { ensureOfficeWorkSession, registerOfficeAppsIntegration, type ConnectionHandle } from './settings-sdk-adapter.ts'
 import { OfficeAppsComposerTrigger, OfficeStarterDock } from './work-mode/OfficeAppsComposerBar.tsx'
 import { workModeEn, workModeZh } from './work-mode/locales.ts'
 import { installSidebarModeSwitcher } from './work-mode/sidebar-mode-switcher.ts'
