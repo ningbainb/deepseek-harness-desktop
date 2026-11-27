@@ -51,3 +51,10 @@
 目标工作区的存储、profile、运行时和版本兼容复验 377 项全部通过，修复和可选文件等定向复验 139 项全部通过。两组测试含重复覆盖。首次扩大基线时发现旧测试仍将 5.6.0 写为当前桌面版本，已按 5.7.0-test.1 精确校正。市场团队启动测试在竞争资源时曾超时，最终运行沿用原时限通过。
 
 本轮本机记录位于 D:/dshshequ/.desktop-build/artifacts/architecture-5.7-state-ownership。源码桌面回归、测试包部署和数据核对分别以该目录的当次回执为准。
+
+### Windows 测试版交付
+
+- 打包源码对应隔离分支提交 2c6c6bc8。目标工作区保留原有在途修改，原生回执记录其 Git 起点 51e9c923。integrated-source.json 核对治理范围内 73 个文件，两个重新生成的 TypeScript 增量缓存仅有输入哈希差异，对应源码按换行归一后相同。
+- 源码 Electron 回归 37 组全部通过。首三组启动后集成了最后一批写入迁移，又在最终源码上分别复验运行时与 IPC、发布插件和全部皮肤的窗口布局，三组全部通过。汇总见 source-acceptance.json。
+- Windows x64 unpacked 测试包只打包一次。打包校验覆盖 164 个运行时包、231 个实际解包文件与两个 ASAR 的完整性，结果见 pack-verify.log 和 pack-verified.json。
+- 桌面程序和 app.asar 的 SHA-256 与打包目录一致。部署前后 test-data 的 187 个文件、391 个链接与 87 个目录具有相同清单摘要。已用独立测试数据启动桌面的实际可执行文件，验证运行时和渲染器就绪。结果见 stage-acceptance.json 和 staged-smoke.json。
