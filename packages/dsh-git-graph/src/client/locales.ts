@@ -39,6 +39,7 @@ export const zh = {
   'toast.switchSuccess': '已切换到分支 {branchName}',
   'toast.createSuccess': '已创建并切换到分支 {branchName}',
   'chip.aria.branch': '分支',
+  'chip.branchName': '分支：{branchName}',
 } satisfies Record<string, string>
 
 /** The git-graph namespace key union. */
@@ -83,4 +84,5 @@ export const en = {
   'toast.switchSuccess': 'Switched to branch {branchName}',
   'toast.createSuccess': 'Created and switched to branch {branchName}',
   'chip.aria.branch': 'Branch',
+  'chip.branchName': 'Branch: {branchName}',
 } satisfies Record<GitGraphKey, string>

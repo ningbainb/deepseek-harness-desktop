@@ -2,35 +2,26 @@
 
 [English](README.md) | 中文
 
-外部 dsh Web GUI 插件：**git 分支选择器**与**Git 图谱**面板，优先挂在官方输入选择器行的 context 洞（`conversation.input.selector.context`，session-maybe list 槽位）里，与官方工作区选择胶囊并排、紧贴输入卡上方；若运行 shell 未声明该槽位（npm SDK rc.6 删除了它），等待 `CONTEXT_FALLBACK_MS` 后回退到 `conversation.input.dock`（0.1.9 的挂载点）。dock 上 active 相位测量输入卡左边缘、chip 与输入卡起点对齐；hero（空白会话）相位则把 chip 提升进官方 hero 行，紧贴 agent-preset 座位右侧（即预设名右侧），采用与官方工作区/预设胶囊一致的透明 28px 胶囊配方和 `--dsw-*` 主题 token。git 能力在 host 进程真实执行（磁盘工作树 `git switch`），UI 在浏览器 React；工作区选择完全交给官方入口（产品决策：自研选择器下线，不保留双入口）。
+会话输入栏里的 Git 分支图标可以打开可搜索的分支列表和 Git 图谱。悬停提示和无障碍名称均显示当前分支。Git 操作由宿主进程在本会话的工作区中执行。
 
 行为对齐 ZCode 的 `GitBranchSwitcher`：可搜索弹层、当前项打勾、「创建并检出新分支… / Git 图谱」底部操作、切换守卫（未解决冲突 / 进行中操作 / 目标分支被其他 worktree 检出）与可读报错。
 
 ## 仓库布局与构建
 
-与 DeepSeek Harness 主仓保持同级（sibling checkout，turtle-ui 同款布局；路径任意，以下仅为示例）：
-
-```text
-~/code/deepseek-harness   # deepseek-harness checkout（sibling）
-~/code/dsh-git-graph      # 本仓库
-```
-
-peer APIs 全部来自 sibling checkout 的源码（tsconfig 通过 `../deepseek-harness/tsconfig.base.json` 的 paths 解析；sibling 目录名不同时把 tsconfig 各文件里的 `../deepseek-harness` 相对路径换成实际目录即可），类型门是 `pnpm run typecheck`（`tsc -b`，会连带构建 references 指向的 sibling 包，向 sibling 的 `lib/` 写声明产物——与 turtle-ui 相同的设计）。
+插件位于 `packages/dsh-git-graph`。宿主和客户端项目都从官方 `@deepseek-ai/*` npm 依赖解析 SDK 类型。在工作区根目录执行以下命令。
 
 ```sh
 pnpm install
-pnpm run typecheck   # tsc -b（含 sibling 引用项目）
-pnpm test            # vitest（core 纯函数 / 真实 git 服务 / jsdom 组件）
-pnpm run build       # tsc -b && tsdown（lib/index.js + lib/invariant.js + lib/client.js）
+pnpm --filter @linxin666/dsh-client-ui-git-graph typecheck
+pnpm --filter @linxin666/dsh-client-ui-git-graph test
+pnpm --filter @linxin666/dsh-client-ui-git-graph build
 ```
 
-`lib/client.js` 是浏览器 bundle（闭包工厂产物，`window.__ModuleLoader__.load`），由 host 的 client-modules 按 `/plugins/<id>/client.js` 伺服；构建预设 `build/tsdown.client.ts` + `build/web/src/platform.ts` 是从主仓 `packages/client/tsdown.client.ts` / `packages/client/web/src/platform.ts` 复制的副本，主仓版本变更时需同步。
-
-git 安装（无 sibling checkout 的消费者机器）走 `prepare` 脚本：`tsdown --config tsdown.prepare.config.ts` 从 src 直接 transpile，不做类型检查（`tsconfig.prepare.json` 自包含）。
+浏览器构建使用仓库共享预设 `shared/tsdown.client.ts`。宿主通过 `/plugins/<id>/client.js` 提供构建产物 `lib/client.js`。
 
 ## 激活
 
-本包是 dsh profile bundle（`package.json` 声明 `"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }`）。激活后，下次启动 `dsh web`（或对应 profile）时，bundle patch 的 insert 行把 `ui-git-graph`（host half：git 服务 + `/git/*` 路由）与浏览器 half（dsh.client 声明）一起装进 Web 组合；页面刷新后，空白会话上分支胶囊显示在 hero 行的 agent-preset 座位右侧，active 会话上显示在输入卡正上方的 dock 带、与输入卡左边缘对齐。
+Profile 通过 `cordis.patch.yml` 加载 Git 服务及 `/git/*` 路由。会话关联 Git 工作区后，客户端在会话输入工具栏显示分支图标。
 
 ### 通用安装（任何机器）
 
@@ -73,7 +64,7 @@ dsh plugin --profile web remove @linxin666/dsh-client-ui-git-graph
 - host half 的 `/git/*` 只接受已注册 workspace 的路径（realpath 校验）与 loopback 客户端（loopback socket + loopback Host，与 dsh-ssh 相同的 fence）；浏览器无法对任意目录执行 git，LAN 暴露的 dsh web 对非 loopback 客户端返回 403。
 - Desktop 的 `/git-worktree/*` 路由只接受 loopback 和不透明 ID：Renderer 仅传 `workspaceId`、`taskId`、`runId` 或 `worktreeId`，不传绝对路径、base ref 或 Git argv。Host 解析 canonical workspace root，把执行树放在 `DSH_HOME/worktrees` 下，限制 Diff 预览，并要求二次确认才能丢弃 dirty Worktree。
 - 切换语义是工作区级：`git switch --no-guess <branch>` 作用于 repoRoot 磁盘树，影响该工作区所有会话；项目切换 = 激活目标工作区并打开其（复用或新建的）空白会话，不给既有会话换 cwd。
-- 挂载 seam：`conversation.input.selector.context`（官方声明的 session-maybe list 槽位）——输入选择器行的 context 洞，与官方工作区胶囊并排；hero（空白会话）与 active 会话相位都有分支胶囊；无会话 cwd 或非 git 工作区时分支 chip 自行隐藏。声明感知 + 回退：等待该槽位声明 `CONTEXT_FALLBACK_MS`（npm SDK rc.6 的 shell 已删除此声明），超时未声明则改挂 `conversation.input.dock`。dock 上 active 相位实时测量输入卡左边缘并与之对齐；hero 相位把 chip 重新定位到官方 hero 行 agent-preset 座位右侧（官方 2px 行间距、垂直居中，胶囊尺寸与 token 对齐官方工作区/预设胶囊），弹层改为向下打开、对齐官方工作区菜单。只挂一个座位，回退后迟到的 context 声明被忽略。
+- 图标挂在官方会话工具栏 `conversation.input.left`。处于 Git 工作区的空白会话和已有对话均使用此入口。原生菜单锚定到图标，切换会话会关闭上一个工作区的菜单和对话框。
 - 工作区选择不在此插件内：官方工作区胶囊（`conversation.input.selector.workspace`）是唯一入口，本插件只提供 git 分支上下文。
 - 分支状态刷新：挂载/弹层打开/切换成功后拉取 + host SSE（`/git/events`，订阅期间每 30s 轮询 workspace 状态，单次探测有 15s 超时兜底，挂起的 git 不会卡死推送流）推送外部变更 + window focus 刷新（5s 节流）。
 

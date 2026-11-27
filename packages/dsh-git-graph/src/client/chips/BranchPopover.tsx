@@ -6,12 +6,12 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { IconBranchOutlineMedium, IconCheckOutlineRegular, IconSearchOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { RefObject } from 'react'
+import { IconBranchOutlineMedium, Menu } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { BranchesView, SwitchResult } from '../../core/types.ts'
 import type { GitGraphKey } from '../locales.ts'
 import { errorMessage } from './error-copy.ts'
-import { cx, Backdrop } from './Chip.tsx'
 import css from './context.module.css'
 
 /** Props of the branch picker popover. */
@@ -30,6 +30,7 @@ export interface BranchPopoverProps {
   t: Translate<GitGraphKey>
   /** Open downward from the official hero row (the default opens upward from the dock row). */
   hero?: boolean
+  anchorRef?: RefObject<HTMLButtonElement>
 }
 
 /** How long the success notice stays before the popover closes itself. */
@@ -39,7 +40,7 @@ const SUCCESS_DISMISS_MS = 900
  * The branch picker popover.
  * @param props - see {@link BranchPopoverProps}.
  */
-export function BranchPopover({ view, onSwitch, onSwitched, onCreate, onGraph, onClose, t, hero = false }: BranchPopoverProps) {
+export function BranchPopover({ view, onSwitch, onSwitched, onCreate, onGraph, onClose, t, hero = false, anchorRef }: BranchPopoverProps) {
   const [query, setQuery] = useState('')
   const [pending, setPending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -72,56 +73,32 @@ export function BranchPopover({ view, onSwitch, onSwitched, onCreate, onGraph, o
     }).finally(() => { setPending(null) })
   }
 
+  // Prefix only branch IDs: a branch may itself be named "create" or "graph".
+  const branchId = (name: string) => `branch/${name}`
   return (
-    <>
-      <Backdrop onClose={onClose} />
-      <div className={cx(css.popover, hero && css.popoverHero)} role="listbox" aria-label={t('branch.search')} data-gitgraph-popover>
-        <div className={css.searchBox}>
-          <IconSearchOutlineMedium size={14} />
-          <input
-            className={css.searchInput}
-            value={query}
-            onChange={(event) => { setQuery(event.target.value) }}
-            placeholder={t('branch.search')}
-            autoFocus
-          />
-        </div>
-        {view.dirtyFiles > 0
-          && <div className={css.dirty}>{t('branch.dirty', { count: view.dirtyFiles })}</div>}
-        <div className={css.list}>
-          {filtered.length === 0
-            ? <div className={css.empty}>{t('branch.empty')}</div>
-            : filtered.map(branch => (
-              <button
-                type="button"
-                key={branch.name}
-                className={cx(css.item, branch.current && css.itemActive)}
-                onClick={() => { switchTo(branch.name) }}
-                role="option"
-                aria-selected={branch.current}
-                disabled={pending !== null}
-              >
-                <IconBranchOutlineMedium size={14} />
-                <span className={css.itemText}>
-                  <span className={css.itemName} title={branch.name}>{branch.name}</span>
-                </span>
-                {branch.current && <IconCheckOutlineRegular className={css.check} size={14} />}
-              </button>
-            ))}
-        </div>
-        {success !== null && <div className={cx(css.notice, css.noticeOk)}>{success}</div>}
-        {error !== null && <div className={css.notice}>{error}</div>}
-        <div className={css.footer}>
-          <button type="button" className={css.footerItem} onClick={onCreate}>
-            <IconBranchOutlineMedium size={14} />
-            {t('branch.create')}
-          </button>
-          <button type="button" className={css.footerItem} onClick={onGraph}>
-            <IconBranchOutlineMedium size={14} />
-            {t('branch.graph')}
-          </button>
-        </div>
-      </div>
-    </>
+    <Menu open portal={anchorRef !== undefined} anchor={null} anchorRef={anchorRef}
+      side={hero ? 'bottom' : 'top'} onClose={onClose}
+      isExternalTrigger={node => anchorRef?.current?.contains(node) === true}
+      search={{ label: t('branch.search'), value: query, onChange: setQuery, emptyMessage: t('branch.empty') }}
+      items={filtered.map(branch => ({
+        id: branchId(branch.name), label: branch.name,
+        icon: <IconBranchOutlineMedium size={14} />, disabled: pending !== null,
+      }))}
+      selectedId={branchId(view.branch)}
+      footer={[
+        { id: 'create', label: t('branch.create') },
+        { id: 'graph', label: t('branch.graph') },
+      ]}
+      onSelect={id => {
+        if (id === 'create') onCreate()
+        else if (id === 'graph') onGraph()
+        else switchTo(id.slice('branch/'.length))
+      }}
+    >
+      {view.branch === '' && <div className={css.branchStatus}>{t('branch.detached')}</div>}
+      {view.dirtyFiles > 0 && <div className={css.dirty}>{t('branch.dirty', { count: view.dirtyFiles })}</div>}
+      {success !== null && <div role="status" className={`${css.notice} ${css.noticeOk}`}>{success}</div>}
+      {error !== null && <div role="alert" className={css.notice}>{error}</div>}
+    </Menu>
   )
 }

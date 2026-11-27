@@ -1,10 +1,12 @@
 # ADR-001 — dsh-git-graph 插件边界与加载链调研结论
 
-状态：已实现。日期：2026-08-09。
+初始决策于 2026-08-09 实现。桌面测试版 5.7.0-test.1 于 2026-11-28 更新了输入栏接入方式。
 
-> 修正（2026-08）：分支 chip 挂载槽位为官方声明的 `conversation.input.selector.context`（list、session-maybe 作用域），与官方工作区选择胶囊并排。此前 acbcf80 曾把 chip 迁到 `conversation.input.dock`，理由是「selector-context 洞在 rc.6 从未声明」——该前提不成立：随发行 shell 的 apply.ts 同时声明了 selector-context（session-maybe）与 dock（session），selector-context 才是分支 chip 的正确席位，现已回迁。hero（空白会话）与 active 会话相位都挂载；见 README 挂载 seam。
->
-> 再修正（2026-08-15）：发布 npm SDK rc.6 与当前随发行 shell 实际未声明 `conversation.input.selector.context`，插件保持「声明感知 + 超时回退 `conversation.input.dock`」；在 dock 的 hero 相位，BranchChip 重新定位进官方 hero 行、贴到 agent-preset 座位右侧（视觉上与官方工作区/预设胶囊同一行），active 相位维持输入卡左对齐，见 README 挂载 seam。
+## 当前输入栏决策
+
+分支入口由官方 SDK 的 `conversation.input.left` 列表槽位提供，按会话注册一个 32px 图标按钮。空白和已有对话共用该入口。工具提示和无障碍名称显示完整分支名。原生菜单锚定按钮，菜单和对话框通过 portal 显示。切换会话或工作目录时，旧仓库的界面与订阅一起释放。XP、同花顺、QQ98 和龙裔皮肤可继续通过 `[data-gitgraph-chip][aria-expanded='true']` 为打开的图标着色。原先为两枚胶囊设置配色的父行选择器不再匹配新的工具栏。
+
+2026-08 曾尝试在 `conversation.input.selector.context` 与 `conversation.input.dock` 之间按声明和超时选择，并通过测量定位使按钮贴近预设选择器。当前及在仓库内核对的 SDK 0.2.2-rc.3、0.2.2-rc.5 均提供 `conversation.input.left`，桌面使用的 0.2.3-alpha.2 也在空白及已有对话的输入栏渲染此槽位。现已迁出旧槽位并删除计时器和 DOM 测量。保留已经公开的类型、常量及组件导入路径。
 
 ## 背景
 
@@ -16,7 +18,7 @@
 - 条目解析锚点是配置树的 `ctx.baseUrl`（cordis.yml 所在目录的 package 依赖）。任何能由 Loader 解析、`package.json` 声明 `dshClient` + `exports["./client"]` 的包都能成为 Web 插件行——不要求包在主仓。
 - 生产先例（本机 `~/.dsh/profiles/node_modules` 与 `~/.dsh/cordis.patch.yml`）：`dsh-client-ui-task-board`、`dsh-client-ui-skin-center`、`dsh-client-ui-subagent-tree`、四个 `skin-*` 皮肤全部是外部包，走同一条链。
 - 浏览器 half 的 `apply(ctx)` 在 client-side cordis ctx 上运行，`inject` 按服务名等待（`slots`/`sessions`/`workspaces`/`connection`/`locale` 均为运行时服务）。外部 bundle 只能做 type-only 的 `@deepseek-ai/*` 导入（构建期纯度门），跨插件协作走 cordis 服务——无需主仓改动。
-- 槽位注册：`ctx.slots.register` 可注册进别家声明的槽位；对 `conversation.input.selector.context` 这类无 waitable 服务的槽位，用「检查 `slots.spec(name)` 否则 `slots.subscribe(name)` 延迟注册」范式（`ui-goal` 的 GoalDock 是现成模板，`ctx.inject(['slots','conversation',...])` 以 conversation 服务在作为注册安全信号）。
+- 槽位注册：`ctx.slots.register` 可注册进别家声明的槽位；本插件用 `slots.inject('conversation.input.left', ...)` 等待声明并注册列表项。
 
 ## 问题 2：host RPC 可扩展性 —— RPC map 静态封闭，但 HTTP 载体面开放
 
@@ -26,9 +28,9 @@
 ## 边界决策：方案 (a) —— 全部功能在 dsh-git-graph，主仓零改动
 
 - host half（node half，`exports["."]`）：`GitService`（workspace 门卫 + 守卫 + 真实 git 操作）+ `/git/*` JSON 路由 + `/git/events` SSE 变更推送，全部经 `ctx.httpServer`/`ctx.subprocess`/`ctx.workspace` 服务接入。
-- browser half（`dshClient` bundle，`exports["./client"]`）：注册进 `conversation.input.selector.context`（list、session-maybe、`order: 100`），自带中英文案词典（`ctx.locale.register`）。
+- browser half（`dshClient` bundle，`exports["./client"]`）：注册进 `conversation.input.left`（list、session、`order: 100`），自带中英文案词典（`ctx.locale.register`）。
 - 激活：`"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }` + `dsh plugin --profile <name> add github:dsh-external/dsh-git-graph`（git 安装 + prepare 构建 + reconcile 进 `dsh.profile.bundles`）；本地开发用 `add link:<绝对路径>`。
-- 主仓需提供输入选择器洞契约（`conversation.input.selector.workspace`/`.context`）与官方工作区选择器；本 ADR 的「主仓零改动」前提随产品决策（自研工作区选择器下线、分支选择器并入官方选择器行）作废，主仓契约变更走主仓验证链。
+- 会话工具栏槽位及官方工作区选择器均来自 npm SDK。插件源码由本仓库维护，配置由 profile 挂载。
 
 ## 关键设计决策
 
@@ -36,7 +38,7 @@
 2. ~~工作区语义~~：项目（工作区）选择已下线（产品决策：自研 WorkspaceChip 整体移除，工作区选择与 placeholder 由官方 header 入口全权负责）；本插件不再携带任何工作区动词。
 3. **git 操作语义**：`git switch --no-guess <branch>` / `git switch --no-guess -c <name>`，在 repoRoot 执行，作用于磁盘工作树，影响该工作区所有会话。守卫（对齐 ZCode branchSwitcher 错误码）：未解决冲突（`conflicts-present`）、进行中操作（`operation-in-progress`，检查 MERGE_HEAD/CHERRY_PICK_HEAD/REVERT_HEAD/BISECT_LOG/rebase-merge/rebase-apply/sequencer 标记）、目标分支被其他 worktree 检出（`branch-in-other-worktree`，`git worktree list --porcelain`）、切换失败按 stderr 归类（tracked/untracked overwrite + 文件列表、target-branch-not-found、internal）。创建分支：客户端镜像 `check-ref-format --branch` 规则即时反馈 + host `git check-ref-format` 权威门 + 重名拒绝。
 4. **安全边界**：`/git/*` 只接受「realpath 后等于某已注册 workspace.path」的路径（`ctx.workspace.list()`），浏览器无法对任意目录执行 git。
-5. **输入选择器席位**：`conversation.input.selector.context` 是 session-maybe 洞——分支 chip 从冷启动到 active 全程挂载，与输入卡 dock 在一起（与卡片同款宽度配方）；无会话 cwd（pathOf 解析失败）或非 git 工作区（status 返回 null）时 chip 自行隐藏。hero（空白会话）有 cwd，分支胶囊照常显示——与官方工作区胶囊并排，两个相位一致。
+5. **输入栏席位**采用上文的会话工具栏决策。通过会话列表订阅等待工作目录就绪，再读取仓库状态。
 6. **非 git 工作区降级**：分支 chip 隐藏（status 返回 null 即不渲染）。隐藏优于禁用：不产生死控件，且工作区变仓库后自动出现（SSE/打开弹层时刷新）。
 7. **刷新策略**：chip 挂载时拉取、弹层打开时重新拉取、切换/创建成功后刷新、SSE 推送与 window focus 触发刷新。
 8. ~~「远程连接」占位~~：随项目选择器一并下线（`WorkspacePopover` 移除）。

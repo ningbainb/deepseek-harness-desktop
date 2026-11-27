@@ -37,7 +37,7 @@ interface RequestOptions {
 /** One fake IncomingMessage: loopback socket + Host by default. */
 function fakeRequest(url: string, options: RequestOptions = {}): Record<string, unknown> {
   const body = options.body
-  const req: Record<string, unknown> = {
+  const req: Record<PropertyKey, unknown> = {
     method: options.method ?? 'POST',
     url,
     headers: {

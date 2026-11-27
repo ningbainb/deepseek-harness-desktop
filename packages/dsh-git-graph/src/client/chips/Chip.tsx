@@ -1,10 +1,9 @@
 /**
- * The shared chip button: one pill in the context row above the input.
+ * The Git button in the conversation composer toolbar.
  * @module dsh-git-graph/client/chips/Chip
  */
 
-import type { ReactNode } from 'react'
-import { IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ReactNode, RefObject } from 'react'
 import css from './context.module.css'
 
 /** Join conditional class names (the dependency-free clsx stand-in). */
@@ -19,24 +18,26 @@ export interface ChipProps {
   ariaLabel: string
   open: boolean
   onClick: () => void
-  /** The official hero-row seat style (transparent 28px pill beside the preset chip). */
+  /** @deprecated Composer controls use the same style in every session phase. */
   hero?: boolean
+  buttonRef?: RefObject<HTMLButtonElement>
 }
 
-/** The pill button shared by the project and branch chips. */
-export function Chip({ icon, label, ariaLabel, open, onClick, hero = false }: ChipProps) {
+/** An icon-only branch control with an accessible name and a native tooltip. */
+export function Chip({ icon, label, ariaLabel, open, onClick, buttonRef }: ChipProps) {
   return (
     <button
       type="button"
       data-gitgraph-chip
-      className={cx(css.chip, open && css.chipOpen, hero && css.chipHero)}
+      ref={buttonRef}
+      className={cx(css.chip, open && css.chipOpen)}
+      title={label}
+      aria-haspopup="menu"
       onClick={onClick}
       aria-label={ariaLabel}
       aria-expanded={open}
     >
       {icon}
-      <span className={css.chipLabel} title={label}>{label}</span>
-      <IconChevronDownOutlineRegular className={css.chipChevron} size={12} />
     </button>
   )
 }

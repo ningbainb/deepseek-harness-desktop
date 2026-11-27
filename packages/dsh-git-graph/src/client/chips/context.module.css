@@ -1,120 +1,37 @@
-/* Branch selector chip in the conversation header context hole.
-   Tokens only — no literal colors. */
-
-.anchor {
-  position: relative;
-}
-
-/* Positioning wrapper for the chip + popover: the popover anchors to the
-   chip itself instead of the padded/inset dock row. */
-.chipWrap {
-  position: relative;
+/* Match the DSH composer's circular command button. */
+.toolbarControl {
   display: inline-flex;
-}
-
-/* The dock seat spans its host row while the input card below is inset
-   relative to that row. The hero-phase clearance is the fallback; the
-   component measures the real card edge and applies it inline so the chip
-   starts exactly where the input card starts in every phase. */
-.anchorDock {
-  padding-left: var(--dsh-composer-side-clearance, 16px);
-}
-
-/* Hero phase: leave the dock row and join the official hero chip row. The
-   inline left/top offsets are measured against the composer stack; the row
-   gap and the seat metrics mirror the official WorkspaceChip /
-   AgentPresetSeat recipe. */
-.anchorHero {
-  position: absolute;
-  z-index: 10;
-  padding-left: 0;
+  flex: none;
 }
 
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 24px;
-  padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
   border-radius: 999px;
-  background: var(--dsw-alias-button-tool-bar-fill);
-  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-specific-selector);
+  color: var(--dsw-alias-label-primary);
   cursor: pointer;
-  font-size: 12px;
-  line-height: 1;
-  white-space: nowrap;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
-.chip:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .chip:hover {
+    background: var(--dsw-alias-interactive-bg-hover-solid);
+  }
 }
 
-.chip:active {
+.chip:active,
+.chipOpen {
   background: var(--dsw-alias-interactive-bg-active);
 }
 
 .chip:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
-}
-
-.chip:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.chip:disabled:hover {
-  background: var(--dsw-alias-button-tool-bar-fill);
-}
-
-.chipOpen {
-  border-color: var(--dsw-alias-brand-primary);
-  color: var(--dsw-alias-label-primary);
-}
-
-.chipLabel {
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.chipChevron {
-  color: var(--dsw-alias-label-tertiary);
-}
-
-/* Hero seat: the official hero-row chips are transparent 28px pills with
-   label-primary text and interactive-bg hover/open states (the same recipe
-   as WorkspaceChip and AgentPresetSeat in the official UI packages). */
-.chipHero {
-  height: auto;
-  min-height: 28px;
-  max-width: min(100%, 240px);
-  padding: 0 8px;
-  border: none;
-  border-radius: 16px;
-  background: transparent;
-  color: var(--dsw-alias-label-primary);
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 20px;
-  overflow: hidden;
-}
-
-.chipHero:hover,
-.chipHero:active,
-.chipHero.chipOpen {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.chipHero .chipLabel {
-  max-width: 180px;
-}
-
-.chipHero .chipChevron {
-  color: var(--dsw-alias-label-caption);
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
 }
 
 .backdrop {
@@ -123,140 +40,9 @@
   z-index: 30;
 }
 
-.popover {
-  position: absolute;
-  /* The selector row sits above the input card: the popover opens UPWARD,
-     capped at the same 360px as the workspace picker menu beside it. */
-  bottom: calc(100% + 4px);
-  left: 0;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  width: 280px;
-  max-height: 360px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
-  background: var(--dsw-alias-bg-overlay);
-  box-shadow: 0 8px 24px var(--dsw-alias-bg-mask-2);
-  overflow: hidden;
-}
-
-/* In the hero row the menu opens downward (top: calc(100% + 4px)), matching
-   the official workspace picker anchored under the same chip row. */
-.popoverHero {
-  bottom: auto;
-  top: calc(100% + 4px);
-}
-
-.searchBox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 8px;
-  padding: 6px 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-base);
-  color: var(--dsw-alias-label-primary);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-
-.searchBox:focus-within {
-  border-color: var(--dsw-alias-brand-primary);
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
-}
-
-.searchInput {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  outline: none;
-  background: none;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  transition: box-shadow 120ms ease;
-}
-
-.searchInput::placeholder {
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.list {
-  flex: 1;
-  min-height: 64px;
-  overflow-y: auto;
-  padding: 2px 6px 6px;
-}
-
-.item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 8px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  text-align: left;
-  transition: background-color 120ms ease;
-}
-
-.item:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.item:active {
-  background: var(--dsw-alias-interactive-bg-active);
-}
-
-.item:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
-}
-
-.item:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.item:disabled:hover {
-  background: none;
-}
-
-.itemActive {
-  background: var(--dsw-alias-interactive-bg-active);
-}
-
-.itemText {
-  flex: 1;
-  min-width: 0;
-}
-
-.itemName {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-}
-
-.itemPath {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
-  margin-top: 1px;
-}
-
-.check {
-  color: var(--dsw-alias-brand-primary);
-  flex: none;
-}
-
-.empty {
-  padding: 14px 10px;
-  text-align: center;
-  color: var(--dsw-alias-label-tertiary);
+.branchStatus {
+  margin: 0 10px 4px;
+  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
 }
 
@@ -278,66 +64,6 @@
 .noticeOk {
   background: var(--dsw-alias-state-success-secondary);
   color: var(--dsw-alias-state-success-primary);
-}
-
-.footer {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-top: 1px solid var(--dsw-alias-border-l1);
-  padding: 6px;
-}
-
-.footerItem {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  cursor: pointer;
-  color: var(--dsw-alias-label-primary);
-  font-size: 13px;
-  text-align: left;
-  transition: background-color 120ms ease;
-}
-
-.footerItem:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.footerItem:active {
-  background: var(--dsw-alias-interactive-bg-active);
-}
-
-.footerItem:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
-}
-
-.footerItem:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.footerItem:disabled:hover {
-  background: none;
-}
-
-.footerItemDisabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.footerItemDisabled:hover {
-  background: none;
-}
-
-.footerHint {
-  margin-left: auto;
-  color: var(--dsw-alias-label-tertiary);
-  font-size: 11px;
 }
 
 .dialog {
@@ -668,11 +394,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chip,
-  .searchBox,
-  .searchInput,
-  .item,
-  .footerItem,
   .dialogClose,
   .dialogInput,
   .dialogButton,
