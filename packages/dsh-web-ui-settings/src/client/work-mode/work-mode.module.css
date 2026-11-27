@@ -9,6 +9,7 @@
   padding: 0;
   border: 0;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-specific-selector);
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
