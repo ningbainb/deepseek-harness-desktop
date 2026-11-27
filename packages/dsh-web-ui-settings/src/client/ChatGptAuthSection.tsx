@@ -12,7 +12,12 @@ export interface ChatGptAuthSectionProps {
   t: (key: ChatGptAuthKey, params?: Record<string, unknown>) => string
 }
 
-type SurfaceError = 'transport' | 'authorization'
+type SurfaceError = 'transport' | 'authorization' | 'local-codex-unavailable'
+
+function formatPlanName(planType: string | undefined): string | undefined {
+  if (!planType) return undefined
+  return planType.charAt(0).toUpperCase() + planType.slice(1)
+}
 
 const OPENAI_ICON = (
   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
@@ -21,6 +26,9 @@ const OPENAI_ICON = (
 )
 
 function errorKind(error: unknown): SurfaceError {
+  if (error instanceof ChatGptAuthClientError && error.code === 'local-codex-unavailable') {
+    return 'local-codex-unavailable'
+  }
   if (error instanceof ChatGptAuthClientError && [
     'transport-unavailable',
     'transport-rejected',
@@ -202,6 +210,10 @@ export function ChatGptAuthSection({ close, t }: ChatGptAuthSectionProps): React
     : state.configured
       ? t('signedIn' satisfies ChatGptAuthKey)
       : t('signedOut' satisfies ChatGptAuthKey)
+  const formattedPlan = formatPlanName(state?.localCodex?.planType)
+  const planBadgeText = formattedPlan
+    ? t('localCodexPlanBadge' satisfies ChatGptAuthKey, { plan: formattedPlan }).replace('{plan}', formattedPlan)
+    : undefined
 
   return (
     <section className={css.section} aria-labelledby="chatgpt-auth-heading">
@@ -217,13 +229,20 @@ export function ChatGptAuthSection({ close, t }: ChatGptAuthSectionProps): React
         <div className={css.statusRow}>
           <span className={css.statusDot} data-active={state?.configured === true ? 'true' : 'false'} aria-hidden="true" />
           <span className={css.status}>{statusText}</span>
+          {state?.localCodex?.detected === true && planBadgeText !== undefined && (
+            <span className={css.planBadge} data-testid="local-codex-plan-badge">{planBadgeText}</span>
+          )}
         </div>
 
         {state?.available === false && <p className={css.message}>{t('unavailable' satisfies ChatGptAuthKey)}</p>}
         {state?.writable === false && state.available && <p className={css.message}>{t('readOnly' satisfies ChatGptAuthKey)}</p>}
         {error !== undefined && (
           <p className={css.error} role="alert">
-            {t((error === 'transport' ? 'transportFailed' : 'failed') satisfies ChatGptAuthKey)}
+            {t((error === 'transport'
+              ? 'transportFailed'
+              : error === 'local-codex-unavailable'
+                ? 'localCodexUnavailable'
+                : 'failed') satisfies ChatGptAuthKey)}
           </p>
         )}
         {state?.phase === 'failed' && error === undefined && (
@@ -234,6 +253,29 @@ export function ChatGptAuthSection({ close, t }: ChatGptAuthSectionProps): React
           <div className={css.success} role="status">
             <p>{t('signedInGuide')}</p>
             <button type="button" className={css.secondaryButton} onClick={openModels}>{t('chooseModel')}</button>
+          </div>
+        )}
+
+        {state?.localCodex?.detected === true && state.localCodex.syncable && state.configured !== true && state.inFlight !== true && (
+          <div className={css.localCodexBanner} data-testid="local-codex-banner">
+            <div className={css.localCodexText}>
+              <p className={css.localCodexTitle}>
+                {t('localCodexDetected' satisfies ChatGptAuthKey)}
+                {planBadgeText ? ` · ${planBadgeText}` : ''}
+              </p>
+              <p className={css.localCodexHint}>{t('localCodexHint' satisfies ChatGptAuthKey)}</p>
+            </div>
+            <button
+              type="button"
+              className={css.primaryButton}
+              disabled={pending || !state.writable}
+              onClick={() => {
+                reportFeatureEvent({ feature: 'chatgpt-login', outcome: 'started', detail: 'local-codex' })
+                void run(() => chatGptAuthClient.importLocal())
+              }}
+            >
+              {t('localCodexSync' satisfies ChatGptAuthKey)}
+            </button>
           </div>
         )}
 
@@ -298,14 +340,26 @@ export function ChatGptAuthSection({ close, t }: ChatGptAuthSectionProps): React
 
         <div className={css.actions}>
           {state?.configured === true ? (
-            <button
-              type="button"
-              className={css.secondaryButton}
-              disabled={pending || !state.writable}
-              onClick={() => { void run(() => chatGptAuthClient.logout()) }}
-            >
-              {t('logout' satisfies ChatGptAuthKey)}
-            </button>
+            <>
+              <button
+                type="button"
+                className={css.secondaryButton}
+                disabled={pending || !state.writable}
+                onClick={() => { void run(() => chatGptAuthClient.logout()) }}
+              >
+                {t('logout' satisfies ChatGptAuthKey)}
+              </button>
+              {state.localCodex?.detected === true && state.localCodex.syncable && (
+                <button
+                  type="button"
+                  className={css.quietButton}
+                  disabled={pending || !state.writable}
+                  onClick={() => { void run(() => chatGptAuthClient.importLocal()) }}
+                >
+                  {t('localCodexResync' satisfies ChatGptAuthKey)}
+                </button>
+              )}
+            </>
           ) : (
             <button
               type="button"

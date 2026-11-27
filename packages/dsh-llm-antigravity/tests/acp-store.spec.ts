@@ -87,8 +87,16 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
 
     await store.openWithModel('gemini-3.8-flash-low', 'D:\\work')
     expect(store.getSnapshot().active).toBe(true)
+    expect(store.getSnapshot().viewMode).toBe('inset')
     expect(store.getSnapshot().acpSessionId).toBe('acp-live-1')
     expect(store.getSnapshot().selectedModelId).toBe('gemini-3.8-flash-low')
+
+    store.setViewMode('pip')
+    expect(store.getSnapshot().viewMode).toBe('pip')
+    store.setViewMode('minimized')
+    expect(store.getSnapshot().viewMode).toBe('minimized')
+    await store.openWithModel('gemini-4-neon-high', 'D:\\work')
+    expect(store.getSnapshot().viewMode).toBe('inset')
 
     await store.switchModel('gemini-4-neon-high')
     expect(store.getSnapshot().selectedModelId).toBe('gemini-4-neon-high')
@@ -130,7 +138,7 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
       },
     }
     apply(fakeCtx as never)
-    expect(injectedSlots).toEqual(['web-ui.plugin.item', 'conversation.input.right', 'conversation.hero.frame'])
-    expect(registeredSlots).toEqual(['web-ui.plugin.item', 'conversation.input.right', 'conversation.hero.frame'])
+    expect(injectedSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame'])
+    expect(registeredSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame'])
   })
 })

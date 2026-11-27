@@ -147,4 +147,42 @@ describe('model selector lifecycle', () => {
       relayRoot.remove()
     }
   })
+
+  it('shows Antigravity (Gemini) ACP group when local OAuth CLI is ready and dispatches frame-in-frame open without touching select()', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      state: 'ready',
+      harnessLlmAllowed: false,
+      models: [
+        { id: 'gpt-oss-120b', name: 'GPT OSS 120B' },
+        { id: 'gemini-3.8-flash-low', name: 'Gemini 3.8 Flash (Low)' },
+      ],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+
+    const openSpy = vi.fn()
+    document.addEventListener('dsh-antigravity-acp-open', openSpy)
+    try {
+      const props = { ...createProps(vi.fn()), sessionCwd: 'D:\\work\\demo' }
+      const view = render(<ModelSelect {...props as never} />)
+      await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith('/api/dsh-antigravity-cli', { headers: { 'x-dsh-antigravity': '1' } }))
+
+      fireEvent.click(view.getByRole('button', { name: 'trigger.fallback' }))
+      fireEvent.click(view.getByRole('menuitem', { name: /menu.models/ }))
+
+      const group = await view.findByRole('group', { name: 'antigravity.group' })
+      const items = [...group.querySelectorAll('[data-dsh-antigravity-model]')]
+      expect(items.map(el => el.getAttribute('data-dsh-antigravity-model'))).toEqual(['gemini-3.8-flash-low', 'gpt-oss-120b'])
+
+      fireEvent.click(items[0]!)
+      expect(openSpy).toHaveBeenCalledTimes(1)
+      expect((openSpy.mock.calls[0][0] as CustomEvent).detail).toEqual({
+        modelId: 'gemini-3.8-flash-low',
+        cwd: 'D:\\work\\demo',
+      })
+      expect(props.select).not.toHaveBeenCalled()
+      expect(view.queryByRole('menu')).toBeNull()
+    } finally {
+      document.removeEventListener('dsh-antigravity-acp-open', openSpy)
+      fetchSpy.mockRestore()
+    }
+  })
 })

@@ -43,8 +43,11 @@ export interface AcpChatMessage {
   error?: string
 }
 
+export type AcpViewMode = 'inset' | 'pip' | 'minimized'
+
 export interface AcpStoreState {
   active: boolean
+  viewMode: AcpViewMode
   diagnostic: Diagnostic | null
   selectedModelId?: string
   cwd?: string
@@ -59,6 +62,7 @@ export interface AcpStoreState {
 }
 
 export const STATUS_UPDATED_EVENT = 'dsh-antigravity-status-updated'
+export const ACP_OPEN_EVENT = 'dsh-antigravity-acp-open'
 const PANEL_ACTIVATE_EVENT = 'dsh-panel-activate'
 const ACP_PANEL_NAME = 'antigravity-acp'
 const SIDEBAR_ROW_SELECTOR = '[class*="sessionRow"], [class*="projectRow"], [class*="searchResultRow"], [class*="searchResultWorkspace"], [class*="newSession"]'
@@ -90,6 +94,7 @@ function normalizeModels(
 export class AntigravityAcpStore {
   private state: AcpStoreState = {
     active: false,
+    viewMode: 'inset',
     diagnostic: null,
     availableModels: [],
     configOptions: [],
@@ -123,14 +128,18 @@ export class AntigravityAcpStore {
     window.addEventListener(STATUS_UPDATED_EVENT, () => {
       void this.refreshDiagnostic(true)
     })
+    document.addEventListener(ACP_OPEN_EVENT, (event: Event) => {
+      const detail = (event as CustomEvent<{ modelId?: string; cwd?: string }>).detail
+      void this.openWithModel(detail?.modelId, detail?.cwd)
+    })
     document.addEventListener(PANEL_ACTIVATE_EVENT, (event: Event) => {
       const detail = (event as CustomEvent<string>).detail
-      if (detail !== ACP_PANEL_NAME && this.state.active) {
+      if (detail !== ACP_PANEL_NAME && this.state.active && this.state.viewMode === 'inset') {
         this.emit({ active: false })
       }
     })
     document.addEventListener('click', (event: MouseEvent) => {
-      if (!this.state.active) return
+      if (!this.state.active || this.state.viewMode !== 'inset') return
       const target = event.target as HTMLElement | null
       if (target?.closest(SIDEBAR_ROW_SELECTOR)) {
         this.emit({ active: false })
@@ -261,7 +270,10 @@ export class AntigravityAcpStore {
 
   async openWithModel(modelId?: string, cwd?: string): Promise<void> {
     this.ensureWindowListeners()
-    this.announceActivePanel()
+    const nextViewMode: AcpViewMode = !this.state.active || this.state.viewMode === 'minimized'
+      ? 'inset'
+      : this.state.viewMode
+    if (nextViewMode === 'inset') this.announceActivePanel()
     const nextCwd = cwd ?? this.state.cwd
     const cwdChanged = Boolean(this.state.acpSessionId && cwd && cwd !== this.state.cwd)
     if (cwdChanged && this.state.dshSessionId) {
@@ -275,10 +287,16 @@ export class AntigravityAcpStore {
     const chosenModel = modelId ?? this.state.selectedModelId ?? this.state.availableModels[0]?.id
     this.emit({
       active: true,
+      viewMode: nextViewMode,
       ...(chosenModel ? { selectedModelId: chosenModel } : {}),
       ...(nextCwd ? { cwd: nextCwd } : {}),
     })
     await this.ensureStarted(chosenModel, nextCwd)
+  }
+
+  setViewMode(viewMode: AcpViewMode): void {
+    if (viewMode === 'inset') this.announceActivePanel()
+    this.emit({ viewMode })
   }
 
   async switchModel(modelId: string): Promise<void> {
@@ -533,6 +551,7 @@ export class AntigravityAcpStore {
     this.sessionSeq = 0
     this.state = {
       active: false,
+      viewMode: 'inset',
       diagnostic: null,
       availableModels: [],
       configOptions: [],
@@ -545,3 +564,4 @@ export class AntigravityAcpStore {
 }
 
 export const acpStore = new AntigravityAcpStore()
+acpStore.subscribe(() => {})()

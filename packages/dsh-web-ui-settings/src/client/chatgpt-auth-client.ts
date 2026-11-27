@@ -54,6 +54,7 @@ export const chatGptAuthClient = {
   answer: (promptId: string, answer: string) => invoke('/answer', { promptId, answer }),
   cancel: () => invoke('/cancel'),
   logout: () => invoke('/logout'),
+  importLocal: () => invoke('/import-local'),
 }
 
 /** Stable client failure; provider messages and credential values never cross the bridge. */

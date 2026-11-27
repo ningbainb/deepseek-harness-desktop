@@ -59,8 +59,56 @@
 
 .statusRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.planBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary, #10a37f) 38%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #10a37f) 12%, transparent);
+  color: var(--dsw-alias-label-primary, #ffffff);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.localCodexBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary, #10a37f) 34%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, #10a37f) 8%, transparent);
+}
+
+.localCodexText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.localCodexTitle {
+  margin: 0;
+  color: var(--dsw-alias-label-primary, #ffffff);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.localCodexHint {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary, #9ca3af);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .statusDot {

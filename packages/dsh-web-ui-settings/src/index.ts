@@ -22,6 +22,7 @@ import z from 'schemastery'
 import { makeBridgeRoutes, type BridgeAccess } from './bridge.ts'
 import { makeChatGptAuthRoutes } from './chatgpt-auth-routes.ts'
 import { ChatGptAuthorizationController } from './chatgpt-auth.ts'
+import { readLocalCodexAuth } from './local-codex-auth.ts'
 import { mountOnce } from './mount-once.ts'
 import { makeRelayRoutes, type RelayDefaultModel } from './relay-routes.ts'
 import { initializeRelayDefaultOnReady } from './relay-default-on-ready.ts'
@@ -108,6 +109,7 @@ function applyImpl(ctx: Context, config: WebUiSettingsConfig = {}): void {
     const controller = new ChatGptAuthorizationController({
       authorization: authCtx.authorization,
       credentials: authCtx.credentials,
+      readLocalCodex: readLocalCodexAuth,
       onError: (error) => {
         const candidateName = error instanceof Error ? error.name : 'UnknownError'
         const name = /^[A-Za-z][A-Za-z0-9]{0,63}$/u.test(candidateName) ? candidateName : 'Error'

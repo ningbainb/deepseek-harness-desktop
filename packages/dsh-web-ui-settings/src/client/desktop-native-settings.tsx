@@ -27,6 +27,7 @@ const sections = {
   'win-control': 'win-control',
   'fast-ops': 'fast-ops',
   'im-hub': 'im-hub',
+  plugins: 'plugins',
   models: 'models',
   relay: 'models',
   'value-mode': ADVANCED_MODEL_SECTION,

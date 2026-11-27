@@ -4,6 +4,10 @@ import { PRIMARY_PROVIDER_ID } from "../core/config.js";
 import { catalogFromDirectory, modelDisplayName, selectionForModel, sortModelCatalog, } from "./model-projection.js";
 import styles from './model-preferences.module.css';
 import { installModelRefreshBridge } from "./model-refresh.js";
+function sortAcpModels(models) {
+    const isGemini = (m) => /gemini|orchestrator/iu.test(m.id) || /gemini|orchestrator/iu.test(m.name);
+    return [...models].sort((a, b) => Number(isGemini(b)) - Number(isGemini(a)));
+}
 function errorText(reason, fallback) {
     return reason instanceof Error && reason.message.trim() ? reason.message.trim() : fallback;
 }
@@ -13,11 +17,13 @@ function errorText(reason, fallback) {
  * model-selection seat so the desktop composer keeps its native appearance.
  */
 export function ModelSelect(props) {
-    const { locked, available, directory, load, modelSessionId, select, settingsScope, t } = props;
+    const { locked, available, directory, load, modelSessionId, sessionCwd, select, settingsScope, t } = props;
     const [open, setOpen] = useState(false);
     const [pane, setPane] = useState('root');
     const [selecting, setSelecting] = useState(false);
     const [error, setError] = useState(null);
+    const [acpModels, setAcpModels] = useState([]);
+    const [acpExpanded, setAcpExpanded] = useState(false);
     const [relayAccessAvailable, setRelayAccessAvailable] = useState(() => typeof document !== 'undefined' && document.querySelector('[data-dsh-relay-access-root]') !== null);
     const lastActionRef = useRef('load');
     const loadRef = useRef(load);
@@ -76,6 +82,32 @@ export function ModelSelect(props) {
         update();
         return () => document.removeEventListener('dsh-relay-access-changed', update);
     }, []);
+    useEffect(() => {
+        if (!available || typeof fetch !== 'function')
+            return;
+        let disposed = false;
+        const refreshAcp = () => {
+            void fetch('/api/dsh-antigravity-cli', { headers: { 'x-dsh-antigravity': '1' } })
+                .then(res => (res.ok ? res.json() : null))
+                .then((diag) => {
+                if (disposed)
+                    return;
+                if (diag?.state === 'ready' && !diag.harnessLlmAllowed && Array.isArray(diag.models) && diag.models.length > 0) {
+                    setAcpModels(sortAcpModels(diag.models.filter((m) => typeof m?.id === 'string' && typeof m?.name === 'string')));
+                }
+                else {
+                    setAcpModels([]);
+                }
+            })
+                .catch(() => { });
+        };
+        refreshAcp();
+        window.addEventListener('dsh-antigravity-status-updated', refreshAcp);
+        return () => {
+            disposed = true;
+            window.removeEventListener('dsh-antigravity-status-updated', refreshAcp);
+        };
+    }, [available]);
     useEffect(() => {
         if (!available)
             return;
@@ -184,8 +216,13 @@ export function ModelSelect(props) {
                         if (state.status === 'idle' || state.status === 'error')
                             reload();
                     }
-                }, children: [_jsx("span", { className: styles.triggerLabel, children: modelLabel }), effortLabel !== undefined && _jsx("span", { className: styles.triggerEffort, children: effortLabel }), _jsx("span", { "aria-hidden": "true", className: `${styles.chevron} ${open ? styles.chevronOpen : ''}` })] }), open && (_jsxs("div", { id: `${id}-menu`, className: styles.menu, role: "menu", "aria-label": t('menu.aria'), "aria-busy": state.status === 'loading' || busy, children: [pane === 'root' && (_jsxs(_Fragment, { children: [_jsxs("button", { type: "button", role: "menuitem", className: styles.cell, onClick: () => setPane('model'), children: [_jsx("span", { className: styles.cellLabel, children: t('menu.models') }), _jsx("span", { className: styles.cellValue, children: modelLabel }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }), reasoning !== undefined && (_jsxs("button", { type: "button", role: "menuitem", className: styles.cell, onClick: () => setPane('effort'), children: [_jsx("span", { className: styles.cellLabel, children: t('menu.effort') }), _jsx("span", { className: styles.cellValue, children: effortLabel }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }))] })), pane === 'model' && (_jsxs(_Fragment, { children: [state.status === 'loading' && _jsx("div", { className: styles.status, role: "status", children: t('status.loading') }), state.error !== null && lastActionRef.current === 'load' && (_jsxs("div", { className: styles.error, role: "alert", children: [_jsxs("span", { children: [t('error.load'), " ", state.error] }), _jsx("button", { type: "button", className: styles.retry, onClick: reload, children: t('action.reload') })] })), error !== null && _jsx("div", { className: styles.error, role: "alert", children: _jsx("span", { children: error }) }), catalog.failures.map(failure => (_jsxs("div", { className: styles.warning, role: "status", children: [_jsxs("span", { children: [failure.name || failure.id, ": ", failure.message] }), _jsx("button", { type: "button", className: styles.retry, onClick: reload, children: t('action.reload') })] }, failure.id))), _jsxs("div", { className: `${styles.groups} scrollable`, children: [catalog.pinned.length > 0 && renderGroup(t('menu.pinned'), catalog.pinned, 'pinned'), catalog.groups.map(group => renderGroup(group.name, group.models, group.id)), relayAccessAvailable && !hasConfiguredRelay && (_jsxs("section", { role: "group", "aria-label": t('relayShowcase.group'), className: `${styles.group} ${styles.primaryProviderGroup}`, "data-dsh-relay-showcase": "true", children: [_jsxs("div", { className: styles.groupTitle, children: [_jsx("span", { children: t('relayShowcase.group') }), _jsx("span", { className: styles.recommendedBadge, children: t('relayShowcase.badge') })] }), ['claude', 'gpt', 'multi'].map(tier => (_jsxs("button", { type: "button", role: "menuitem", className: styles.option, onClick: () => {
+                }, children: [_jsx("span", { className: styles.triggerLabel, children: modelLabel }), effortLabel !== undefined && _jsx("span", { className: styles.triggerEffort, children: effortLabel }), _jsx("span", { "aria-hidden": "true", className: `${styles.chevron} ${open ? styles.chevronOpen : ''}` })] }), open && (_jsxs("div", { id: `${id}-menu`, className: styles.menu, role: "menu", "aria-label": t('menu.aria'), "aria-busy": state.status === 'loading' || busy, children: [pane === 'root' && (_jsxs(_Fragment, { children: [_jsxs("button", { type: "button", role: "menuitem", className: styles.cell, onClick: () => setPane('model'), children: [_jsx("span", { className: styles.cellLabel, children: t('menu.models') }), _jsx("span", { className: styles.cellValue, children: modelLabel }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }), reasoning !== undefined && (_jsxs("button", { type: "button", role: "menuitem", className: styles.cell, onClick: () => setPane('effort'), children: [_jsx("span", { className: styles.cellLabel, children: t('menu.effort') }), _jsx("span", { className: styles.cellValue, children: effortLabel }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }))] })), pane === 'model' && (_jsxs(_Fragment, { children: [state.status === 'loading' && _jsx("div", { className: styles.status, role: "status", children: t('status.loading') }), state.error !== null && lastActionRef.current === 'load' && (_jsxs("div", { className: styles.error, role: "alert", children: [_jsxs("span", { children: [t('error.load'), " ", state.error] }), _jsx("button", { type: "button", className: styles.retry, onClick: reload, children: t('action.reload') })] })), error !== null && _jsx("div", { className: styles.error, role: "alert", children: _jsx("span", { children: error }) }), catalog.failures.map(failure => (_jsxs("div", { className: styles.warning, role: "status", children: [_jsxs("span", { children: [failure.name || failure.id, ": ", failure.message] }), _jsx("button", { type: "button", className: styles.retry, onClick: reload, children: t('action.reload') })] }, failure.id))), _jsxs("div", { className: `${styles.groups} scrollable`, children: [catalog.pinned.length > 0 && renderGroup(t('menu.pinned'), catalog.pinned, 'pinned'), catalog.groups.map(group => renderGroup(group.name, group.models, group.id)), acpModels.length > 0 && (_jsxs("section", { role: "group", "aria-label": t('antigravity.group'), className: styles.group, "data-dsh-antigravity-group": "true", children: [_jsxs("div", { className: styles.groupTitle, children: [_jsx("span", { children: t('antigravity.group') }), _jsx("span", { className: styles.acpBadge, children: t('antigravity.badge') })] }), (acpExpanded ? acpModels : acpModels.slice(0, 6)).map(model => (_jsxs("button", { type: "button", role: "menuitem", className: styles.option, title: `${model.name} — ${t('antigravity.desc')}`, "data-dsh-antigravity-model": model.id, onClick: () => {
+                                                    close();
+                                                    document.dispatchEvent(new CustomEvent('dsh-antigravity-acp-open', {
+                                                        detail: { modelId: model.id, cwd: sessionCwd },
+                                                    }));
+                                                }, children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: model.name }), _jsx("span", { className: styles.description, children: t('antigravity.desc') })] }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }, model.id))), acpModels.length > 6 && (_jsx("button", { type: "button", className: styles.acpExpandBtn, onClick: () => setAcpExpanded(prev => !prev), children: acpExpanded ? t('antigravity.collapse') : t('antigravity.expand', { count: acpModels.length }) }))] })), relayAccessAvailable && !hasConfiguredRelay && (_jsxs("section", { role: "group", "aria-label": t('relayShowcase.group'), className: `${styles.group} ${styles.primaryProviderGroup}`, "data-dsh-relay-showcase": "true", children: [_jsxs("div", { className: styles.groupTitle, children: [_jsx("span", { children: t('relayShowcase.group') }), _jsx("span", { className: styles.recommendedBadge, children: t('relayShowcase.badge') })] }), ['claude', 'gpt', 'multi'].map(tier => (_jsxs("button", { type: "button", role: "menuitem", className: styles.option, onClick: () => {
                                                     close();
                                                     document.dispatchEvent(new CustomEvent('dsh-relay-sign-in-required', { detail: { source: 'model-picker', tier, autoConnect: false } }));
-                                                }, children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: t(`relayShowcase.${tier}Name`) }), _jsx("span", { className: styles.description, children: t(`relayShowcase.${tier}Desc`) })] }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }, tier)))] }))] }), state.status === 'ready' && options.length === 0 && !(relayAccessAvailable && !hasConfiguredRelay) && (_jsx("div", { className: styles.empty, children: t('status.empty') }))] })), pane === 'effort' && (_jsxs(_Fragment, { children: [error !== null && _jsx("div", { className: styles.error, role: "alert", children: _jsx("span", { children: error }) }), effortChoices.length === 0 && _jsx("div", { className: styles.empty, children: t('status.empty') }), effortChoices.map(choice => (_jsxs("button", { type: "button", role: "menuitemradio", "aria-checked": effectiveEffort === choice.effort, className: `${styles.option} ${effectiveEffort === choice.effort ? styles.optionCurrent : ''}`, disabled: busy, onClick: () => chooseEffort(choice.effort), children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: choice.label }), choice.description !== undefined && _jsx("span", { className: styles.description, children: choice.description })] }), _jsx("span", { className: styles.check, "aria-hidden": "true", children: effectiveEffort === choice.effort && _jsx("span", { className: styles.checkmark }) })] }, choice.key)))] }))] }))] }));
+                                                }, children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: t(`relayShowcase.${tier}Name`) }), _jsx("span", { className: styles.description, children: t(`relayShowcase.${tier}Desc`) })] }), _jsx("span", { "aria-hidden": "true", className: styles.cellChevron })] }, tier)))] }))] }), state.status === 'ready' && options.length === 0 && acpModels.length === 0 && !(relayAccessAvailable && !hasConfiguredRelay) && (_jsx("div", { className: styles.empty, children: t('status.empty') }))] })), pane === 'effort' && (_jsxs(_Fragment, { children: [error !== null && _jsx("div", { className: styles.error, role: "alert", children: _jsx("span", { children: error }) }), effortChoices.length === 0 && _jsx("div", { className: styles.empty, children: t('status.empty') }), effortChoices.map(choice => (_jsxs("button", { type: "button", role: "menuitemradio", "aria-checked": effectiveEffort === choice.effort, className: `${styles.option} ${effectiveEffort === choice.effort ? styles.optionCurrent : ''}`, disabled: busy, onClick: () => chooseEffort(choice.effort), children: [_jsxs("span", { className: styles.optionCopy, children: [_jsx("span", { className: styles.modelName, children: choice.label }), choice.description !== undefined && _jsx("span", { className: styles.description, children: choice.description })] }), _jsx("span", { className: styles.check, "aria-hidden": "true", children: effectiveEffort === choice.effort && _jsx("span", { className: styles.checkmark }) })] }, choice.key)))] }))] }))] }));
 }

@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
@@ -6,6 +9,7 @@ import {
   chatGptAuthErrorCode,
   ChatGptAuthorizationController,
 } from '../src/chatgpt-auth.ts'
+import { readLocalCodexAuth } from '../src/local-codex-auth.ts'
 import { makeChatGptAuthRoutes } from '../src/chatgpt-auth-routes.ts'
 import { CHATGPT_AUTH_BRIDGE_PREFIX } from '../src/chatgpt-auth-protocol.ts'
 
@@ -19,6 +23,7 @@ function fakeRuntime(options: { available?: boolean; configured?: boolean } = {}
   let configured = options.configured ?? false
   let cancelled = 0
   let deleted = 0
+  let storedGrant: unknown
   const entered = deferred<void>()
   const authorization = {
     describe: () => options.available === false
@@ -61,7 +66,15 @@ function fakeRuntime(options: { available?: boolean; configured?: boolean } = {}
   }
   const credentials = {
     describeRecord: async () => ({ configured, kind: configured ? 'grant' as const : undefined, writable: true }),
-    deleteRecord: async () => { configured = false; deleted += 1 },
+    deleteRecord: async () => { configured = false; storedGrant = undefined; deleted += 1 },
+    modifyRecord: async (_key: unknown, mutate: (current: undefined) => Promise<{ kind: string; payload: unknown } | undefined>) => {
+      const next = await mutate(undefined)
+      if (next) {
+        configured = true
+        storedGrant = next.payload
+      }
+      return next as never
+    },
   }
   return {
     authorization,
@@ -69,6 +82,7 @@ function fakeRuntime(options: { available?: boolean; configured?: boolean } = {}
     entered: entered.promise,
     cancelled: () => cancelled,
     deleted: () => deleted,
+    storedGrant: () => storedGrant,
   }
 }
 
@@ -148,6 +162,54 @@ describe('ChatGPT authorization controller', () => {
     await controller.logout()
     expect(runtime.deleted()).toBe(1)
     expect(await controller.state()).toMatchObject({ configured: false, phase: 'idle' })
+  })
+
+  it('auto-detects local Codex CLI auth without exposing secrets and syncs via importLocal', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'codex-auth-'))
+    try {
+      const payload = Buffer.from(JSON.stringify({
+        exp: 1_900_000_000,
+        'https://api.openai.com/auth': { chatgpt_plan_type: 'team', chatgpt_account_id: 'acct-team-123' },
+      })).toString('base64url')
+      const authPath = join(dir, 'auth.json')
+      writeFileSync(authPath, JSON.stringify({
+        auth_mode: 'chatgpt',
+        last_refresh: '2026-11-24T06:51:49Z',
+        tokens: {
+          access_token: `hdr.${payload}.sig`,
+          refresh_token: 'rt-secret-fixture',
+          account_id: 'acct-team-123',
+        },
+      }), 'utf8')
+
+      const runtime = fakeRuntime()
+      const controller = new ChatGptAuthorizationController({
+        ...runtime,
+        readLocalCodex: () => readLocalCodexAuth(authPath),
+      })
+
+      const state = await controller.state()
+      expect(state.localCodex).toEqual({
+        detected: true,
+        syncable: true,
+        planType: 'team',
+        updatedAt: '2026-11-24T06:51:49Z',
+      })
+      expect(JSON.stringify(state)).not.toMatch(/access|refresh|token|secret/iu)
+
+      const routeResult = await invokeAuthRoute(controller, '/import-local', authRequest())
+      expect(routeResult.status).toBe(200)
+      expect(routeResult.body).toMatchObject({
+        ok: true,
+        value: { configured: true, phase: 'authorized', localCodex: { planType: 'team' } },
+      })
+      expect(runtime.storedGrant()).toMatchObject({
+        type: 'oauth',
+        accountId: 'acct-team-123',
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

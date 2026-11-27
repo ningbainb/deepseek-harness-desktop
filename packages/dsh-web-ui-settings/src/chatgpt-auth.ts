@@ -4,7 +4,7 @@ import type {
   AuthorizationOutcome,
   AuthorizationPrompt,
 } from '@deepseek-ai/dsh-authorization'
-import { credentialKey, type CredentialKey, type CredentialRecordInfo } from '@deepseek-ai/dsh-credentials'
+import { credentialKey, type CredentialKey, type CredentialRecord, type CredentialRecordInfo } from '@deepseek-ai/dsh-credentials'
 import type {
   ChatGptAuthNoticeView,
   ChatGptAuthPhase,
@@ -12,6 +12,7 @@ import type {
   ChatGptAuthState,
   ChatGptLoginMode,
 } from './chatgpt-auth-protocol.ts'
+import type { LocalCodexSnapshot } from './local-codex-auth.ts'
 
 /** Official DSH 0.1.6 record written by the built-in pi-ai OpenAI Codex flow. */
 export const CHATGPT_CREDENTIAL_KEY = credentialKey('llm-pi-ai', 'openai-codex')
@@ -38,12 +39,17 @@ export interface ChatGptAuthorizationFace {
 export interface ChatGptCredentialFace {
   describeRecord(key: CredentialKey): Promise<CredentialRecordInfo>
   deleteRecord(key: CredentialKey): Promise<void>
+  modifyRecord?: (
+    key: CredentialKey,
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  ) => Promise<CredentialRecord | undefined>
 }
 
 /** Dependencies supplied by the injected Runtime services. */
 export interface ChatGptAuthorizationDeps {
   authorization: ChatGptAuthorizationFace
   credentials: ChatGptCredentialFace
+  readLocalCodex?: () => LocalCodexSnapshot | undefined
   onError?: (error: unknown) => void
 }
 
@@ -144,6 +150,13 @@ export class ChatGptAuthorizationController {
       this.deps.onError?.(error)
       record = { configured: false, writable: false }
     }
+    let localCodex: ChatGptAuthState['localCodex']
+    try {
+      const snapshot = this.deps.readLocalCodex?.()
+      if (snapshot?.view.detected) localCodex = snapshot.view
+    } catch (error) {
+      this.deps.onError?.(error)
+    }
     return {
       available: entry !== undefined,
       configured: record.configured,
@@ -160,6 +173,7 @@ export class ChatGptAuthorizationController {
       ...this.notice === undefined ? {} : { notice: this.notice },
       ...this.pending === undefined ? {} : { prompt: this.pending.view },
       ...this.failureCode === undefined ? {} : { errorCode: this.failureCode },
+      ...localCodex === undefined ? {} : { localCodex },
     }
   }
 
@@ -256,6 +270,31 @@ export class ChatGptAuthorizationController {
     if (this.operation !== undefined) await this.cancel()
     await this.deps.credentials.deleteRecord(CHATGPT_CREDENTIAL_KEY)
     this.phase = 'idle'
+    this.notice = undefined
+    this.failureCode = undefined
+    return this.state()
+  }
+
+  /** Sync local Codex CLI ChatGPT OAuth grant into the DSH credential store. */
+  async importLocal(): Promise<ChatGptAuthState> {
+    const entry = this.deps.authorization.describe(CHATGPT_CREDENTIAL_KEY)
+    if (this.operation !== undefined || entry?.inFlight === true) {
+      throw new ChatGptAuthError('authorization-in-flight')
+    }
+    const record = await this.deps.credentials.describeRecord(CHATGPT_CREDENTIAL_KEY)
+    if (!record.writable || typeof this.deps.credentials.modifyRecord !== 'function') {
+      throw new ChatGptAuthError('credential-store-readonly')
+    }
+    const snapshot = this.deps.readLocalCodex?.()
+    if (!snapshot?.grant) {
+      throw new ChatGptAuthError('local-codex-unavailable')
+    }
+    const grant = snapshot.grant
+    await this.deps.credentials.modifyRecord(CHATGPT_CREDENTIAL_KEY, async () => ({
+      kind: 'grant',
+      payload: grant,
+    }))
+    this.phase = 'authorized'
     this.notice = undefined
     this.failureCode = undefined
     return this.state()

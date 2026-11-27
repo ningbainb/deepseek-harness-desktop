@@ -150,6 +150,34 @@
   font-weight: 500;
   line-height: 16px;
 }
+.acpBadge {
+  border: 0;
+  border-radius: 999px;
+  padding: 1px 7px;
+  background: color-mix(in srgb, #10a37f 12%, transparent);
+  color: var(--dsw-alias-state-success-primary, #10a37f);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.acpExpandBtn {
+  display: block;
+  width: 100%;
+  margin-top: 2px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-brand-primary, #3370ff);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+.acpExpandBtn:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(0, 0, 0, .06));
+}
 .option {
   display: flex;
   align-items: center;

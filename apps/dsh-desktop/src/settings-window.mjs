@@ -53,6 +53,71 @@ export const SETTINGS_WINDOW_CSS = `
   max-width: 100%;
 }
 
+.${SETTINGS_DIALOG_CLASS} details:not([class]) {
+  margin-top: 10px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));
+  border-radius: var(--dsw-radius-lg, 10px);
+  background: var(--dsw-alias-bg-layer-2, rgba(128, 128, 128, 0.04));
+  overflow: hidden;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class]):hover {
+  border-color: var(--dsw-alias-border-l3, rgba(128, 128, 128, 0.35));
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class]) > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 14px;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.14s ease;
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class]) > summary::-webkit-details-marker {
+  display: none;
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class]) > summary::marker {
+  content: '';
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class]) > summary:hover {
+  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.08));
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class]) > summary::after {
+  content: '';
+  flex: none;
+  width: 6.5px;
+  height: 6.5px;
+  margin-right: 2px;
+  border-right: 1.75px solid var(--dsw-alias-label-tertiary, currentColor);
+  border-bottom: 1.75px solid var(--dsw-alias-label-tertiary, currentColor);
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease, border-color 0.14s ease;
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class])[open] > summary {
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.2));
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class])[open] > summary::after {
+  transform: rotate(45deg);
+  border-color: var(--dsw-alias-label-primary, currentColor);
+}
+
+.${SETTINGS_DIALOG_CLASS} details:not([class]) > :not(summary) {
+  padding: 10px 14px;
+}
+
 .${SETTINGS_DIALOG_CLASS} [data-dsh-settings-drag-handle="true"] {
   cursor: move;
   cursor: grab;

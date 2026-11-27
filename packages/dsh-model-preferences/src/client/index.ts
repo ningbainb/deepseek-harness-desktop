@@ -188,9 +188,12 @@ export function apply(ctx: ClientContext): void {
       inject: (sessionId) => {
         const directory = models.directoryFor(sessionId)
         const available = sessions.subagentAddress(sessionId) === undefined
+        const sessionCwd = (sessions as { getSnapshot?: () => { byId?: Record<string, { cwd?: string }> } })
+          .getSnapshot?.()?.byId?.[String(sessionId)]?.cwd
         return {
           available,
           modelSessionId: String(sessionId),
+          ...(typeof sessionCwd === 'string' && sessionCwd.trim() ? { sessionCwd } : {}),
           directory: directory.store,
           settingsScope,
           resolveText: text => ctx.locale.resolveText(text),

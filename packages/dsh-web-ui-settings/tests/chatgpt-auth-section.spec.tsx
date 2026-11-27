@@ -11,6 +11,7 @@ const api = vi.hoisted(() => ({
   answer: vi.fn(),
   cancel: vi.fn(),
   logout: vi.fn(),
+  importLocal: vi.fn(),
 }))
 const desktop = vi.hoisted(() => ({ openDesktopSurface: vi.fn() }))
 
@@ -61,6 +62,7 @@ beforeEach(() => {
   api.answer.mockResolvedValue(signedOut)
   api.cancel.mockResolvedValue(signedOut)
   api.logout.mockResolvedValue(signedOut)
+  api.importLocal.mockResolvedValue({ ...signedOut, configured: true, phase: 'authorized' })
   desktop.openDesktopSurface.mockResolvedValue(true)
 })
 
@@ -234,5 +236,21 @@ describe('ChatGPT authorization settings section', () => {
 
     expect(await screen.findByText(/当前运行环境没有提供 ChatGPT 授权能力/)).toBeTruthy()
     expect((screen.getByRole('button', { name: '使用 ChatGPT 登录' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('shows local Codex subscription banner and triggers one-click sync', async () => {
+    api.state.mockResolvedValue({
+      ...signedOut,
+      localCodex: { detected: true, syncable: true, planType: 'team', updatedAt: '2026-11-24T06:51:49Z' },
+    })
+    renderSection()
+
+    expect(await screen.findByTestId('local-codex-plan-badge')).toBeTruthy()
+    expect(screen.getByTestId('local-codex-banner').textContent).toContain('ChatGPT Team 订阅')
+
+    fireEvent.click(screen.getByRole('button', { name: t('localCodexSync') }))
+
+    await waitFor(() => expect(api.importLocal).toHaveBeenCalledTimes(1))
+    expect(await screen.findByRole('button', { name: t('logout') })).toBeTruthy()
   })
 })

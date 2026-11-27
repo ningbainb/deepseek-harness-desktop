@@ -128,5 +128,10 @@ export function makeChatGptAuthRoutes(
       path: CHATGPT_AUTH_BRIDGE_PREFIX + '/logout',
       handler: (req, res) => invoke(req, res, async () => ({ ok: true, value: await controller.logout() })),
     },
+    {
+      kind: 'exact',
+      path: CHATGPT_AUTH_BRIDGE_PREFIX + '/import-local',
+      handler: (req, res) => invoke(req, res, async () => ({ ok: true, value: await controller.importLocal() })),
+    },
   ]
 }

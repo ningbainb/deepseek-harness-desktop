@@ -36,6 +36,14 @@ export interface ChatGptAuthPromptView {
   options?: ChatGptAuthPromptOptionView[]
 }
 
+/** Value-free detection summary for local Codex CLI credentials (`~/.codex/auth.json`). */
+export interface LocalCodexAuthView {
+  detected: boolean
+  syncable: boolean
+  planType?: string
+  updatedAt?: string
+}
+
 /** Complete value-free state consumed by the settings card. */
 export interface ChatGptAuthState {
   available: boolean
@@ -48,6 +56,7 @@ export interface ChatGptAuthState {
   notice?: ChatGptAuthNoticeView
   prompt?: ChatGptAuthPromptView
   errorCode?: string
+  localCodex?: LocalCodexAuthView
 }
 
 /** Success/failure envelope shared by every authorization bridge route. */

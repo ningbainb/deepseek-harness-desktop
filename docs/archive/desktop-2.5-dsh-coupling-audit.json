@@ -2724,7 +2724,7 @@
       "path": "packages/dsh-model-preferences/src/client/ModelSelect.tsx",
       "kind": "dynamic-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
-      "line": 22,
+      "line": 23,
       "typeOnly": false,
       "classification": "public-experimental",
       "controlled": false
@@ -5244,7 +5244,7 @@
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
-      "line": 13,
+      "line": 14,
       "typeOnly": true,
       "classification": "public-experimental",
       "controlled": false
@@ -5253,15 +5253,6 @@
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings-models/client",
-      "line": 15,
-      "typeOnly": true,
-      "classification": "public-experimental",
-      "controlled": false
-    },
-    {
-      "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
       "line": 16,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -5270,7 +5261,7 @@
     {
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-model-selection/client",
+      "specifier": "@deepseek-ai/dsh-client-ui-renderer/client",
       "line": 17,
       "typeOnly": true,
       "classification": "public-experimental",
@@ -5279,8 +5270,17 @@
     {
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
       "kind": "static-import",
-      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "specifier": "@deepseek-ai/dsh-client-ui-model-selection/client",
       "line": 18,
+      "typeOnly": true,
+      "classification": "public-experimental",
+      "controlled": false
+    },
+    {
+      "path": "packages/dsh-web-ui-settings/src/client/index.ts",
+      "kind": "static-import",
+      "specifier": "@deepseek-ai/dsh-client-ui-slots",
+      "line": 19,
       "typeOnly": true,
       "classification": "public-stable",
       "controlled": false
@@ -5968,7 +5968,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 376,
+      "line": 374,
       "operation": "web-ui.plugin.item"
     },
     {
@@ -6106,7 +6106,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 107,
+      "line": 109,
       "operation": "remote"
     },
     {
@@ -16792,19 +16792,13 @@
     {
       "category": "slot",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 380,
+      "line": 378,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 384,
-      "operation": "conversation.input.right"
-    },
-    {
-      "category": "slot",
-      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 387,
+      "line": 382,
       "operation": "conversation.hero.frame"
     },
     {
@@ -16906,19 +16900,19 @@
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx",
-      "line": 254,
+      "line": 255,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx",
-      "line": 259,
+      "line": 260,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/desktop-native-settings.tsx",
-      "line": 266,
+      "line": 267,
       "operation": "settings.section"
     },
     {
@@ -16930,49 +16924,49 @@
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 219,
+      "line": 238,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 224,
+      "line": 243,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 232,
+      "line": 251,
       "operation": "settings.section"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 242,
+      "line": 261,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 252,
+      "line": 271,
       "operation": "settings.models.footer"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 267,
+      "line": 286,
       "operation": "settings.models.footer"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 273,
+      "line": 292,
       "operation": "sidebar.footer.action"
     },
     {
       "category": "slot",
       "path": "packages/dsh-web-ui-settings/src/client/index.ts",
-      "line": 288,
+      "line": 307,
       "operation": "root"
     },
     {

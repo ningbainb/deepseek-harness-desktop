@@ -196,6 +196,12 @@ export const chatGptAuthZh = {
   'callbackFailed': '授权回调无效或已过期，请重新发起登录，不要复用旧页面。',
   'credentialFailed': '授权完成，但凭据未能安全写入本机。请检查数据目录权限后重试。',
   'transportFailed': '无法连接本机授权服务，请重新启动桌面端后重试。',
+  'localCodexDetected': '已检测到本机 Codex CLI 登录',
+  'localCodexPlanBadge': 'ChatGPT {plan} 订阅',
+  'localCodexHint': '可直接复用本机 Codex CLI 的 ChatGPT 订阅授权，无需重新打开浏览器登录。',
+  'localCodexSync': '一键同步本机 Codex 登录',
+  'localCodexResync': '从本机 Codex 同步最新授权',
+  'localCodexUnavailable': '未找到可同步的本机 Codex 登录凭据，请先在 Codex CLI 登录或使用下方按钮登录。',
 } satisfies Record<string, string>
 
 export type ChatGptAuthKey = keyof typeof chatGptAuthZh
@@ -226,6 +232,12 @@ export const chatGptAuthEn = {
   'callbackFailed': 'The authorization callback was invalid or expired. Start a new sign-in instead of reusing the old page.',
   'credentialFailed': 'Authorization completed, but Desktop could not store the grant safely. Check data-directory permissions and retry.',
   'transportFailed': 'The local authorization service could not be reached. Restart Desktop and try again.',
+  'localCodexDetected': 'Local Codex CLI sign-in detected',
+  'localCodexPlanBadge': 'ChatGPT {plan} plan',
+  'localCodexHint': 'Reuse your local Codex CLI ChatGPT subscription directly without signing in through the browser again.',
+  'localCodexSync': 'Sync local Codex sign-in',
+  'localCodexResync': 'Re-sync from local Codex',
+  'localCodexUnavailable': 'No syncable local Codex sign-in was found. Sign in via Codex CLI or use the buttons below.',
 } satisfies Record<ChatGptAuthKey, string>
 
 /**

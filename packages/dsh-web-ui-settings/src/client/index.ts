@@ -6,6 +6,7 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { openDesktopSurface } from '@linxin666/dsh-desktop-client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface SlotMap merge (the 'settings.section'
@@ -58,6 +59,7 @@ import { installRelaySendGuard } from './relay-send-guard.ts'
 import { installRelayAuthFailures } from './relay-auth-failures.ts'
 import { installRelayErrorFallback } from './relay-error-fallback.tsx'
 import { installFirstRunChooser } from './FirstRunChooser.tsx'
+import { installRemoteAccessHintEnhancer } from './remote-access-hint.ts'
 import { installSettingsOnboardingPriority, supportsDesktopSettingsPriority } from './settings-onboarding-priority.tsx'
 import { ensureOfficeWorkSession, registerOfficeAppsIntegration } from './settings-sdk-adapter.ts'
 import { OfficeAppsComposerTrigger, OfficeStarterDock } from './work-mode/OfficeAppsComposerBar.tsx'
@@ -188,6 +190,23 @@ export function apply(ctx: ClientContext): void {
         }
       },
     }), 'web-ui-settings: first-run onboarding chooser')
+  }
+  if (!dockSetting) {
+    ctx.effect(() => installRemoteAccessHintEnhancer(document, {
+      openPluginSettings: () => {
+        const navigation = ctx.get('pluginNavigation') as { openBundle?(name: string): void; openList?(): void } | undefined
+        if (navigation?.openBundle) {
+          navigation.openBundle('@linxin666/dsh-web-all')
+          return true
+        }
+        if (navigation?.openList) {
+          navigation.openList()
+          return true
+        }
+        void openDesktopSurface('extensions', { tab: 'plugins' })
+        return true
+      },
+    }), 'web-ui-settings: remote access hint enhancer')
   }
   if (!dockSetting) ctx.effect(
     () => installDesktopManagementRouting(document, ctx.locale.bind('web-ui-plugins'), nativeDesktopSettings ? {
