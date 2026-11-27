@@ -1,4 +1,4 @@
-import { writeFileAtomic } from './atomic-write-adapter.mjs'
+import { writeJsonAtomic } from './atomic-write-adapter.mjs'
 import { readFile } from 'node:fs/promises'
 
 export const SETTINGS_WINDOW_MIN_WIDTH = 520
@@ -69,7 +69,7 @@ export class SettingsWindowStateStore {
 
   save(input) {
     const bounds = normalizeStoredSettingsWindowBounds(input)
-    const operation = this.writeQueue.then(() => writeFileAtomic(this.path, `${JSON.stringify(bounds, null, 2)}\n`, { mode: 0o666 }))
+    const operation = this.writeQueue.then(() => writeJsonAtomic(this.path, bounds))
     this.writeQueue = operation.catch(() => {})
     return operation.then(() => bounds)
   }

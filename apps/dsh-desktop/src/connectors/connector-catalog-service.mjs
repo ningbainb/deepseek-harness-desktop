@@ -1,4 +1,4 @@
-import { writeFileAtomic } from '../atomic-write-adapter.mjs'
+import { writeJsonAtomic } from '../atomic-write-adapter.mjs'
 import { verify as cryptoVerify } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -337,7 +337,7 @@ export class ConnectorCatalogService {
           ...current.meta,
           lastCheckedAt: new Date().toISOString(),
         }
-        await writeFileAtomic(this.metaPath, `${JSON.stringify(meta, null, 2)}\n`, { mode: 0o666 }).catch(() => {})
+        await writeJsonAtomic(this.metaPath, meta).catch(() => {})
         return { ...current, meta }
       }
       if (!response.ok) {
@@ -369,8 +369,8 @@ export class ConnectorCatalogService {
         lastCheckedAt: new Date().toISOString(),
         catalogVersion: parsed.catalogVersion,
       }
-      await writeFileAtomic(this.cachePath, `${JSON.stringify(parsed, null, 2)}\n`, { mode: 0o666 })
-      await writeFileAtomic(this.metaPath, `${JSON.stringify(meta, null, 2)}\n`, { mode: 0o666 })
+      await writeJsonAtomic(this.cachePath, parsed)
+      await writeJsonAtomic(this.metaPath, meta)
       return this.annotate(parsed, { source: 'remote', meta, previousCatalog: current })
     } catch (error) {
       return {

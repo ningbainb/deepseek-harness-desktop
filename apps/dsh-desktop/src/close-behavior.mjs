@@ -1,4 +1,4 @@
-import { writeFileAtomic } from './atomic-write-adapter.mjs'
+import { writeJsonAtomic } from './atomic-write-adapter.mjs'
 import { readFile } from 'node:fs/promises'
 
 export const CLOSE_BEHAVIORS = Object.freeze({
@@ -82,11 +82,7 @@ export class DesktopClosePreferencesStore {
 
   saveCloseBehavior(value) {
     const closeBehavior = assertCloseBehavior(value)
-    const operation = this.writeQueue.then(() => writeFileAtomic(
-      this.path,
-      `${JSON.stringify({ closeBehavior }, null, 2)}\n`,
-      { mode: 0o666 },
-    ))
+    const operation = this.writeQueue.then(() => writeJsonAtomic(this.path, { closeBehavior }))
     this.writeQueue = operation.catch(() => {})
     return operation.then(() => closeBehavior)
   }

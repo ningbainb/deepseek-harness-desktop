@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { writeFileAtomic } from './atomic-write-adapter.mjs'
+import { writeJsonAtomic } from './atomic-write-adapter.mjs'
 
 function normalizeShownVersions(value) {
   if (!Array.isArray(value)) return []
@@ -21,7 +21,7 @@ async function readState(path) {
 
 function writeState(path, shownVersions, pendingVersion) {
   const state = { schemaVersion: 1, shownVersions, pendingVersion }
-  return writeFileAtomic(path, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o666 })
+  return writeJsonAtomic(path, state)
 }
 
 /** Callers serialize each read-modify-write operation in the store for its own file. */
