@@ -1,30 +1,32 @@
 .composerTriggerBtn {
+  position: relative;
   box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 10px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
+  background: var(--dsw-specific-selector);
+  color: var(--dsw-alias-label-primary);
   cursor: pointer;
-  white-space: nowrap;
-  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
-.composerTriggerBtn:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
-  color: var(--dsw-alias-label-primary);
-  border-color: var(--dsw-alias-border-l3, var(--dsw-alias-border-l2));
+@media (hover: hover) {
+  .composerTriggerBtn:hover { background: var(--dsw-alias-interactive-bg-hover-solid); }
 }
 
-.composerTriggerBtn[data-connected="true"] {
-  color: var(--dsw-alias-label-primary);
+.composerTriggerBtn[data-connected="true"]::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-success-primary);
 }
 
 .composerTriggerBtn:focus-visible {

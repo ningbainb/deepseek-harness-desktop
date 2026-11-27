@@ -176,8 +176,10 @@ describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
     )
 
     // Composer pill reflects connected service in normal chat
-    const trigger = screen.getByRole('button', { name: '已连 腾讯文档' })
-    expect(trigger).toBeTruthy()
+    const trigger = screen.getByRole('button', { name: '办公应用 · 已连 腾讯文档' })
+    expect(trigger.textContent).toBe('')
+    expect(trigger.getAttribute('aria-haspopup')).toBe('dialog')
+    expect(trigger.getAttribute('data-connected')).toBe('true')
 
     // Blank session in office mode renders starter chips; connected chip launches prompt directly
     fireEvent.click(screen.getByRole('button', { name: /生成周报/ }))
@@ -340,7 +342,7 @@ describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
         onRunPrompt={vi.fn()}
       />,
     )
-    fireEvent.click(screen.getByRole('button', { name: '已连 腾讯文档' }))
+    fireEvent.click(screen.getByRole('button', { name: '办公应用 · 已连 腾讯文档' }))
     fireEvent.click(screen.getByRole('button', { name: '去接入' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '一键安装官方组件' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '一键安装官方组件' }))
@@ -415,7 +417,7 @@ describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
         onRunPrompt={vi.fn()}
       />,
     )
-    fireEvent.click(screen.getByRole('button', { name: '已连 腾讯文档' }))
+    fireEvent.click(screen.getByRole('button', { name: '办公应用 · 已连 腾讯文档' }))
     fireEvent.click(screen.getByRole('button', { name: '去登录' }))
     await waitFor(() => expect(screen.getByRole('button', { name: '前往 飞书 网页授权登录' })).toBeTruthy())
     fireEvent.click(screen.getByRole('button', { name: '前往 飞书 网页授权登录' }))

@@ -59,6 +59,8 @@ export function OfficeAppsComposerTrigger({
           .replace('{more}', String(connected.length - 1))
           .replace('{total}', String(connected.length))
 
+  const accessibleName = connected.length ? `${t('officeAppsButton')} · ${label}` : label
+
   const starterNode = (
     <OfficeStarterDock
       t={t}
@@ -75,13 +77,12 @@ export function OfficeAppsComposerTrigger({
       className={css.composerTriggerBtn}
       data-dsh-office-apps-trigger
       data-connected={connected.length > 0 ? 'true' : undefined}
-      title={connected.length > 0 ? connected.map(c => c.entry.name[locale]).join(' / ') : t('officeAppsModalSubtitle')}
+      aria-label={accessibleName}
+      aria-haspopup="dialog"
+      title={connected.length > 1 ? `${t('officeAppsButton')} · ${connected.map(c => c.entry.name[locale]).join(' / ')}` : accessibleName}
       onClick={() => officeAppsStore.openCatalog()}
     >
-      {connected.length > 0
-        ? <span className={css.statusDot} data-state="connected" aria-hidden="true" />
-        : <BriefcaseIcon size={14} />}
-      <span>{label}</span>
+      <BriefcaseIcon size={14} />
     </button>
 
     {dockTarget ? createPortal(starterNode, dockTarget) : null}
