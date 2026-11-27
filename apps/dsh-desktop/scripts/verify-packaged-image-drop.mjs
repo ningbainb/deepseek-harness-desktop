@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict'
+import { dismissStartupContinuationDialogs } from './dismiss-onboarding-fixture.mjs'
 import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { rpc } from './runtime-rpc-fixture.mjs'
 import { execFile } from 'node:child_process'
@@ -46,23 +47,6 @@ const median = (values) => {
   return sorted.length % 2 === 1
     ? sorted[middle]
     : Math.round((sorted[middle - 1] + sorted[middle]) / 2)
-}
-
-async function dismissStartup(page) {
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    await page.waitForTimeout(250)
-    const starPrompt = page.locator('#dsh-desktop-star-prompt')
-    if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
-      await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click({ force: true })
-      continue
-    }
-    const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
-    if (await page.getByRole('dialog').filter({ has: continueButton }).isVisible().catch(() => false)) {
-      await continueButton.last().click({ force: true })
-      continue
-    }
-    if (attempt >= 7) break
-  }
 }
 
 async function openCreatedSession(page, sessionId) {
@@ -420,7 +404,7 @@ try {
       state: 'attached',
       timeout: runtimeReadyTimeoutMs,
     })
-    await dismissStartup(page)
+    await dismissStartupContinuationDialogs(page)
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
     throw new Error(`${error.message}\nRecent runtime log:\n${runtimeLog.slice(-8_000)}`, { cause: error })

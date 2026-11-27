@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { dismissStartupContinuationDialogs } from './dismiss-onboarding-fixture.mjs'
 import { waitForAsyncPageFunction } from './async-page-predicate.mjs'
 import { waitForBackgroundSettings } from './skin-state-fixture.mjs'
 import { existsSync } from 'node:fs'
@@ -31,24 +32,6 @@ const runtimeReadyTimeoutMs = Math.max(defaultRuntimeReadyTimeoutMs, Number(proc
 const relaunchScaleFactors = [1, 1.25, 1.5, 1.25, 1]
 let activeApp
 let failure
-
-async function dismissStartup(page) {
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    await page.waitForTimeout(250)
-    const starPrompt = page.locator('#dsh-desktop-star-prompt')
-    if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
-      await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click({ force: true })
-      continue
-    }
-    const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
-    const introDialog = page.getByRole('dialog').filter({ has: continueButton })
-    if (await introDialog.isVisible().catch(() => false)) {
-      await continueButton.last().click({ force: true })
-      continue
-    }
-    if (attempt >= 7) break
-  }
-}
 
 async function launch(scaleFactor) {
   await seedPrimaryRuntimePermissionForTest({ userData })
@@ -84,7 +67,7 @@ async function launch(scaleFactor) {
       state: 'attached',
       timeout: runtimeReadyTimeoutMs,
     })
-    await dismissStartup(page)
+    await dismissStartupContinuationDialogs(page)
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
     console.error(`runtime did not become ready; recent log:\n${runtimeLog.slice(-8_000) || '(no runtime log)'}`)

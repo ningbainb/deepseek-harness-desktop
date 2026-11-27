@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { _electron as electron } from 'playwright'
 import electronPath from 'electron'
 
+import { dismissKnownStartupNotices } from './dismiss-onboarding-fixture.mjs'
 import { openDockSetting, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
 
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
@@ -19,34 +20,6 @@ const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-personalization-'))
 const userData = join(temporary, 'user-data')
 const dshHome = join(temporary, 'dsh-home')
 let app
-
-async function dismissStartup(page) {
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    await page.waitForTimeout(250)
-    const starPrompt = page.locator('#dsh-desktop-star-prompt')
-    if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
-      await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click({ force: true })
-      continue
-    }
-    const dialogs = page.getByRole('dialog')
-    const count = await dialogs.count().catch(() => 0)
-    let clicked = false
-    for (let position = count - 1; position >= 0; position -= 1) {
-      const dialog = dialogs.nth(position)
-      if (!await dialog.isVisible().catch(() => false)) continue
-      const text = await dialog.textContent().catch(() => '')
-      if (!/内测声明|插件、技能和桌面核心功能在这里/u.test(text || '')) continue
-      const button = dialog.getByRole('button', { name: /^(继续|Continue)$/u }).last()
-      if (await button.count().catch(() => 0) > 0) {
-        await button.click({ force: true })
-        clicked = true
-        break
-      }
-    }
-    if (clicked) continue
-    if (attempt >= 7) break
-  }
-}
 
 async function launch() {
   await seedPrimaryRuntimePermissionForTest({ userData })
@@ -86,7 +59,7 @@ async function launch() {
   })
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
   await page.waitForSelector('#dsh-desktop-window-chrome', { timeout: 120_000 })
-  await dismissStartup(page)
+  await dismissKnownStartupNotices(page)
   return { instance, page, errors, diagnostics, beginClose: () => { phase = 'closing-app' } }
 }
 

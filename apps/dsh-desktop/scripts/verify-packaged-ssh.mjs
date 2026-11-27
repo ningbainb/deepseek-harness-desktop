@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict'
+import { dismissStartupContinuationDialogs } from './dismiss-onboarding-fixture.mjs'
 import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
 import { openDockTools } from './dock-settings-fixture.mjs'
 import { existsSync } from 'node:fs'
@@ -35,23 +36,6 @@ let verificationError
 if (process.platform !== 'win32') throw new Error('packaged SSH verification currently requires Windows')
 if (!existsSync(appPath)) throw new Error(`packaged executable does not exist: ${appPath}`)
 
-async function dismissStartup(page) {
-  for (let attempt = 0; attempt < 16; attempt += 1) {
-    await page.waitForTimeout(250)
-    const starPrompt = page.locator('#dsh-desktop-star-prompt')
-    if (await starPrompt.getAttribute('data-open').catch(() => null) === 'true') {
-      await starPrompt.getByRole('button', { name: '先继续使用', exact: true }).click({ force: true })
-      continue
-    }
-    const continueButton = page.getByRole('button', { name: /^(?:继续|Continue)$/u })
-    if (await page.getByRole('dialog').filter({ has: continueButton }).isVisible().catch(() => false)) {
-      await continueButton.last().click({ force: true })
-      continue
-    }
-    if (attempt >= 7) break
-  }
-}
-
 async function launchDesktop() {
   const rendererErrors = []
   const application = await electron.launch({
@@ -72,7 +56,7 @@ async function launchDesktop() {
   page.on('pageerror', error => rendererErrors.push(error.message))
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
-    await dismissStartup(page)
+    await dismissStartupContinuationDialogs(page)
     await expandSidebarTools(page)
     await page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
     assert.equal(await page.locator('[data-dsh-ssh-entry]').count(), 0, 'Desktop SSH has one Dock entry')
