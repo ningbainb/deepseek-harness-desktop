@@ -29,6 +29,8 @@ export declare class AcpAgentManager {
     upsertCustomAgent(agent: Omit<AcpAgentDefinition, 'custom'>): Promise<AcpAgentDefinition>;
     removeCustomAgent(agentId: string): Promise<boolean>;
     listActiveSessions(): AcpSessionInfo[];
+    getSessionInfo(sessionId: string): AcpSessionInfo | undefined;
+    private resolveAcpCommand;
     probeAgent(agentId: string, opts?: {
         cwd?: string;
         commandOverride?: string;

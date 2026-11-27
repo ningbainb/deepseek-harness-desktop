@@ -4765,10 +4765,21 @@ var AcpAgentManager = class {
 	listActiveSessions() {
 		return [...this.activeSessions.values()].map((rec) => rec.info);
 	}
+	getSessionInfo(sessionId) {
+		return this.activeSessions.get(sessionId)?.info;
+	}
+	resolveAcpCommand(agent, commandOverride) {
+		const raw = commandOverride?.trim() || agent.command;
+		if (process.platform === "win32" && agent.id === ANTIGRAVITY_ACP_AGENT.id && raw.toLowerCase() === "agy.exe" && process.env.LOCALAPPDATA) {
+			const candidate = join(process.env.LOCALAPPDATA, "agy", "bin", "agy.exe");
+			if (existsSync(candidate)) return candidate;
+		}
+		return raw;
+	}
 	async probeAgent(agentId, opts = {}) {
 		const base = await this.getAgent(agentId);
 		const client = new AcpClient({
-			command: opts.commandOverride?.trim() || base.command,
+			command: this.resolveAcpCommand(base, opts.commandOverride),
 			args: base.args,
 			cwd: opts.cwd || this.acpDir,
 			env: base.env,
@@ -4818,9 +4829,10 @@ var AcpAgentManager = class {
 	}
 	async startSession({ agentId, cwd, dshSessionId, resume = false, invocationSource, mcpServers = [], commandOverride, authModeOverride, onPermissionRequest, onFsWriteApprove }) {
 		await this.ensureLoaded();
+		const base = await this.getAgent(agentId);
 		const agent = {
-			...await this.getAgent(agentId),
-			...commandOverride?.trim() ? { command: commandOverride.trim() } : {},
+			...base,
+			command: this.resolveAcpCommand(base, commandOverride),
 			...authModeOverride ? { authMode: authModeOverride } : {}
 		};
 		assertAcpUsageAllowed(agent, invocationSource);
@@ -4932,6 +4944,7 @@ const ACP_API_PREFIX = "/api/dsh-acp";
 //#endregion
 //#region src/acp/acp-routes.ts
 const MAX_BODY_BYTES = 128 * 1024;
+const PERMISSION_TIMEOUT_MS = 5 * 6e4;
 const LOOPBACK_HOSTS = /* @__PURE__ */ new Set([
 	"127.0.0.1",
 	"::1",
@@ -4967,9 +4980,30 @@ function isAuthorizedRequest(request, peer) {
 	if (request.headers["sec-fetch-site"] === "cross-site") return false;
 	return true;
 }
+function resolveSessionCwd(rawCwd) {
+	if (typeof rawCwd === "string" && rawCwd.trim().length > 0 && existsSync(rawCwd.trim())) return rawCwd.trim();
+	return homedir();
+}
 function registerAcpRoutes(ctx, manager) {
 	const webServer = ctx.get?.("webServer");
 	if (!webServer?.register) return () => {};
+	const activeStreamWriters = /* @__PURE__ */ new Map();
+	const pendingPermissions = /* @__PURE__ */ new Map();
+	const pendingFsWrites = /* @__PURE__ */ new Map();
+	const cancelSessionPermissions = (sessionId) => {
+		for (const [permissionId, entry] of pendingPermissions) {
+			if (entry.sessionId !== sessionId) continue;
+			clearTimeout(entry.timer);
+			pendingPermissions.delete(permissionId);
+			entry.resolve({ outcome: { outcome: "cancelled" } });
+		}
+		for (const [permissionId, entry] of pendingFsWrites) {
+			if (entry.sessionId !== sessionId) continue;
+			clearTimeout(entry.timer);
+			pendingFsWrites.delete(permissionId);
+			entry.resolve(false);
+		}
+	};
 	const handler = async (request, response, peer) => {
 		if (!isAuthorizedRequest(request, peer)) {
 			response.writeHead(403).end();
@@ -5013,24 +5047,208 @@ function registerAcpRoutes(ctx, manager) {
 				}));
 				return;
 			}
+			if (action === "/session/start") {
+				const agentId = typeof body.agentId === "string" && body.agentId.trim() ? body.agentId.trim() : "antigravity";
+				const requestedSessionId = typeof body.dshSessionId === "string" && body.dshSessionId.trim() ? body.dshSessionId.trim() : randomUUID();
+				cancelSessionPermissions(requestedSessionId);
+				const onPermissionRequest = (req) => {
+					const writer = activeStreamWriters.get(requestedSessionId);
+					if (!writer) return Promise.resolve({ outcome: { outcome: "cancelled" } });
+					const permissionId = randomUUID();
+					return new Promise((resolvePromise) => {
+						const timer = setTimeout(() => {
+							pendingPermissions.delete(permissionId);
+							resolvePromise({ outcome: { outcome: "cancelled" } });
+						}, PERMISSION_TIMEOUT_MS);
+						timer.unref();
+						pendingPermissions.set(permissionId, {
+							sessionId: requestedSessionId,
+							resolve: resolvePromise,
+							timer
+						});
+						writer({
+							type: "permission_request",
+							permissionId,
+							title: req.toolCall?.title,
+							kind: req.toolCall?.kind,
+							rawInput: req.toolCall?.rawInput,
+							options: req.options
+						});
+					});
+				};
+				const onFsWriteApprove = (path, _content) => {
+					const writer = activeStreamWriters.get(requestedSessionId);
+					if (!writer) return Promise.resolve(false);
+					const permissionId = randomUUID();
+					return new Promise((resolvePromise) => {
+						const timer = setTimeout(() => {
+							pendingFsWrites.delete(permissionId);
+							resolvePromise(false);
+						}, PERMISSION_TIMEOUT_MS);
+						timer.unref();
+						pendingFsWrites.set(permissionId, {
+							sessionId: requestedSessionId,
+							resolve: resolvePromise,
+							timer
+						});
+						writer({
+							type: "permission_request",
+							permissionId,
+							title: path,
+							kind: "fs_write",
+							options: [{
+								optionId: "allow",
+								name: "允许写入",
+								kind: "allow_once"
+							}, {
+								optionId: "deny",
+								name: "拒绝",
+								kind: "reject_once"
+							}]
+						});
+					});
+				};
+				const info = await manager.startSession({
+					agentId,
+					cwd: resolveSessionCwd(body.cwd),
+					dshSessionId: requestedSessionId,
+					resume: Boolean(body.resume),
+					invocationSource: "human-interactive",
+					commandOverride: typeof body.commandOverride === "string" ? body.commandOverride : void 0,
+					onPermissionRequest,
+					onFsWriteApprove
+				});
+				if (typeof body.modelId === "string" && body.modelId.trim() && body.modelId.trim() !== info.currentModelId) {
+					await manager.setModel(info.sessionId, body.modelId.trim());
+					info.currentModelId = body.modelId.trim();
+				}
+				sendJson(response, 200, { session: info });
+				return;
+			}
+			if (action === "/session/model") {
+				const sessionId = String(body.sessionId ?? "").trim();
+				const modelId = String(body.modelId ?? "").trim();
+				if (!sessionId || !modelId) {
+					sendJson(response, 400, { error: "sessionId and modelId are required" });
+					return;
+				}
+				await manager.setModel(sessionId, modelId);
+				sendJson(response, 200, {
+					ok: true,
+					modelId
+				});
+				return;
+			}
+			if (action === "/session/config") {
+				const sessionId = String(body.sessionId ?? "").trim();
+				const configId = String(body.configId ?? "").trim();
+				const value = String(body.value ?? "").trim();
+				if (!sessionId || !configId || !value) {
+					sendJson(response, 400, { error: "sessionId, configId, and value are required" });
+					return;
+				}
+				await manager.setConfigOption(sessionId, configId, value);
+				sendJson(response, 200, { ok: true });
+				return;
+			}
+			if (action === "/session/permission") {
+				const permissionId = String(body.permissionId ?? "").trim();
+				const optionId = typeof body.optionId === "string" ? body.optionId.trim() : "";
+				const cancel = Boolean(body.cancel) || !optionId;
+				const permEntry = pendingPermissions.get(permissionId);
+				if (permEntry) {
+					clearTimeout(permEntry.timer);
+					pendingPermissions.delete(permissionId);
+					permEntry.resolve(cancel ? { outcome: { outcome: "cancelled" } } : { outcome: {
+						outcome: "selected",
+						optionId
+					} });
+					sendJson(response, 200, { resolved: true });
+					return;
+				}
+				const writeEntry = pendingFsWrites.get(permissionId);
+				if (writeEntry) {
+					clearTimeout(writeEntry.timer);
+					pendingFsWrites.delete(permissionId);
+					writeEntry.resolve(!cancel && optionId === "allow");
+					sendJson(response, 200, { resolved: true });
+					return;
+				}
+				sendJson(response, 404, { error: "permission request not found or expired" });
+				return;
+			}
+			if (action === "/session/prompt") {
+				const sessionId = String(body.sessionId ?? "").trim();
+				const text = typeof body.text === "string" ? body.text.trim() : "";
+				if (!sessionId || !text) {
+					sendJson(response, 400, { error: "sessionId and text are required" });
+					return;
+				}
+				response.writeHead(200, {
+					"content-type": "text/event-stream; charset=utf-8",
+					"cache-control": "no-cache, no-transform",
+					connection: "keep-alive",
+					"x-accel-buffering": "no"
+				});
+				const controller = new AbortController();
+				const onResponseClose = () => {
+					if (!response.writableEnded) controller.abort();
+				};
+				response.on?.("close", onResponseClose);
+				const writeEvent = (event) => {
+					if (response.writableEnded) return;
+					response.write(`data: ${JSON.stringify(event)}\n\n`);
+				};
+				activeStreamWriters.set(sessionId, writeEvent);
+				try {
+					await manager.sendPrompt({
+						sessionId,
+						text,
+						invocationSource: "human-interactive",
+						signal: controller.signal,
+						onEvent: writeEvent
+					});
+				} catch (error) {
+					writeEvent({
+						type: "error",
+						message: error instanceof Error ? error.message : String(error)
+					});
+				} finally {
+					response.off?.("close", onResponseClose);
+					if (activeStreamWriters.get(sessionId) === writeEvent) activeStreamWriters.delete(sessionId);
+					cancelSessionPermissions(sessionId);
+					if (!response.writableEnded) response.end();
+				}
+				return;
+			}
 			if (action === "/session/cancel") {
-				sendJson(response, 200, { cancelled: manager.cancelSession(String(body.sessionId ?? "")) });
+				const sessionId = String(body.sessionId ?? "").trim();
+				cancelSessionPermissions(sessionId);
+				sendJson(response, 200, { cancelled: manager.cancelSession(sessionId) });
 				return;
 			}
 			if (action === "/session/close") {
-				sendJson(response, 200, { closed: await manager.closeSession(String(body.sessionId ?? "")) });
+				const sessionId = String(body.sessionId ?? "").trim();
+				cancelSessionPermissions(sessionId);
+				sendJson(response, 200, { closed: await manager.closeSession(sessionId) });
 				return;
 			}
 			response.writeHead(404).end();
 		} catch (error) {
-			sendJson(response, 400, { error: error instanceof Error ? error.message : String(error) });
+			if (!response.headersSent) sendJson(response, 400, { error: error instanceof Error ? error.message : String(error) });
+			else if (!response.writableEnded) response.end();
 		}
 	};
-	return webServer.register({
+	const unregister = webServer.register({
 		kind: "prefix",
 		path: ACP_API_PREFIX,
 		handler
 	});
+	return () => {
+		for (const sessionId of [.../* @__PURE__ */ new Set([...[...pendingPermissions.values()].map((e) => e.sessionId), ...[...pendingFsWrites.values()].map((e) => e.sessionId)])]) cancelSessionPermissions(sessionId);
+		activeStreamWriters.clear();
+		unregister();
+	};
 }
 const PATCH_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u;

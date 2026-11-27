@@ -6,11 +6,16 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import css from './llm-antigravity.module.css'
 import { authModes, defaults, efforts, namespace, statusPath, type AuthMode, type Diagnostic, type Settings } from '../config.ts'
+import { acpStore, STATUS_UPDATED_EVENT } from './acpStore.ts'
+import { AcpChatFrameHoc } from './AcpChatView.tsx'
+import { GeminiComposerTrigger } from './GeminiComposerTrigger.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'llm-antigravity': keyof typeof zh }
   interface SlotMap {
     'web-ui.plugin.item': { kind: 'list'; scope: 'root'; owner: { children?: never } }
+    'conversation.input.right': { kind: 'list'; scope: 'session' }
+    'conversation.hero.frame': { kind: 'hoc'; scope: 'root'; owner: { hero: boolean } }
   }
 }
 
@@ -26,8 +31,9 @@ const en = {
   authBusiness: 'Gemini Enterprise (oauth-business, interactive ACP only)',
   authApiKey: 'Gemini API key (gemini-api-key)',
   authPlatform: 'Google Cloud / Vertex AI (agent-platform)',
-  oauthComplianceNotice: 'Personal and business OAuth are restricted to direct interactive ACP sessions and will not appear in the chat model picker. Switch Authentication mode to Gemini API key (with GEMINI_API_KEY) or Google Cloud / Vertex AI (with ADC credentials) and save to add them to chat.',
+  oauthComplianceNotice: 'Personal and business OAuth are restricted to direct interactive ACP sessions and will not appear in the ordinary API model picker. Once Ready, use the "Gemini" trigger in the chat composer or click "Open Gemini Chat" above to talk interactively via official ACP.',
   missingApiCredentialNotice: 'API-billed credentials were not detected yet. Set GEMINI_API_KEY / GOOGLE_API_KEY (or GCP Application Default Credentials), then click Refresh models so Antigravity models appear in the chat picker.',
+  openInteractive: 'Open Gemini Chat',
   expand: 'Show all models', collapse: 'Show fewer models', unsaved: 'Unsaved changes', saved: 'Settings saved.', saving: 'Saving settings',
   reset: 'Discard changes',
   title: 'Antigravity CLI (Gemini)', enabled: 'Enable provider', cliPath: 'Absolute agy executable path',
@@ -43,7 +49,7 @@ const en = {
   fillCliPath: 'Set executable path',
   loginGuide: 'Run this command in your terminal to sign in with your Google account, then refresh models:',
   readyGuide: 'Synced to the model selector — you can pick these Gemini models directly in chat.',
-  readyOauthWithheldGuide: 'The local CLI returned its model list. Antigravity is available for direct interactive use.',
+  readyOauthWithheldGuide: 'Antigravity CLI is ready. Use the "Gemini" selector at the bottom-right of the chat input bar to start an interactive ACP session (OAuth stays isolated from automated API routing).',
   acpCapabilitiesSummary: 'Official ACP v1 negotiated',
   acpLoadSupported: 'session resume supported',
   acpLoadUnsupported: 'fresh session per launch',
@@ -63,8 +69,9 @@ const zh: typeof en = {
   authBusiness: 'Gemini Enterprise（仅交互 ACP）',
   authApiKey: 'Gemini API Key（按量计费）',
   authPlatform: 'Google Cloud / Vertex AI（ADC 按量计费）',
-  oauthComplianceNotice: '说明：个人或企业 Google OAuth 仅限终端/ACP 人工交互使用，不会出现在对话框模型下拉列表中。如需在对话框直接选用 Gemini 模型，请将上方「认证方式」切换为「Gemini API Key（按量计费）」或「Google Cloud / Vertex AI」，配置环境变量后点击保存并刷新模型。',
-  missingApiCredentialNotice: '当前环境尚未检测到按量计费凭据（GEMINI_API_KEY / GOOGLE_API_KEY 或 gcloud ADC 凭据文件）。配置对应环境变量并重启桌面端后，模型将自动出现在对话框下拉列表中。',
+  oauthComplianceNotice: '说明：个人或企业 Google OAuth 仅限人工实时交互使用，不进入后台自动化/IM 或普通 API 路由。启用就绪后，直接在聊天输入框右下角点击「✦ Gemini」选择模型，即可通过官方 ACP 协议发起合规的交互对话（或切换为 API Key 计费接入通用路由）。',
+  missingApiCredentialNotice: '当前环境尚未检测到按量计费凭据（GEMINI_API_KEY / GOOGLE_API_KEY 或 gcloud ADC 凭据文件）。配置对应环境变量并重启桌面端后，模型将自动出现在通用模型下拉列表中；若继续使用本机登录的 OAuth，可直接点击输入框右下角「✦ Gemini」交互使用。',
+  openInteractive: '打开 Gemini 交互会话',
   expand: '显示全部模型', collapse: '收起模型', unsaved: '有未保存的修改', saved: '设置已保存。', saving: '正在保存设置',
   reset: '还原修改',
   title: 'Antigravity CLI (Gemini)', enabled: '启用模型提供商', cliPath: 'agy 可执行文件绝对路径',
@@ -79,7 +86,7 @@ const zh: typeof en = {
   fillCliPath: '填写可执行文件路径',
   loginGuide: '请在终端运行以下命令完成 Google 账号登录，登录后点击「重新检测」：',
   readyGuide: '已同步到模型选择器，可直接在会话中切换使用以下 Gemini 模型。',
-  readyOauthWithheldGuide: '已检测到本机 CLI 的模型列表。Antigravity 可用于本机人工交互。',
+  readyOauthWithheldGuide: '已检测到本机 Antigravity CLI 与模型列表：可直接点击下方「打开 Gemini 交互会话」或在对话输入框右下角选择「Gemini」进行人工 ACP 交互。',
   acpCapabilitiesSummary: '已协商官方 ACP v1 协议',
   acpLoadSupported: '支持会话恢复',
   acpLoadUnsupported: '每次独立会话',
@@ -138,7 +145,10 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
       })
       if (!result.ok) throw new Error()
       const value: Diagnostic = await result.json()
-      if (!controller.signal.aborted) setDiagnostic(value)
+      if (!controller.signal.aborted) {
+        setDiagnostic(value)
+        window.dispatchEvent(new CustomEvent(STATUS_UPDATED_EVENT))
+      }
       if (!controller.signal.aborted && value.state === 'ready') {
         void fetch('/api/dsh-acp/probe', {
           method: 'POST',
@@ -177,8 +187,11 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
     if (!dirty || !writable) return
     setSaveState('saving')
     const ops = changed.map(key => ({ op: 'set' as const, path: [key], value: draft[key] }))
-    try { setSaveState(await form.mutate(ops, snapshot.revision) ? 'saved' : 'failed') }
-    catch { setSaveState('failed') }
+    try {
+      const ok = await form.mutate(ops, snapshot.revision)
+      setSaveState(ok ? 'saved' : 'failed')
+      if (ok) window.dispatchEvent(new CustomEvent(STATUS_UPDATED_EVENT))
+    } catch { setSaveState('failed') }
   }
 
   async function copyLoginCommand() {
@@ -267,9 +280,22 @@ export function SettingsCard({ form, t }: { form: ConfigForm<Settings> } & Props
         </p>
         <div className={css.modelsHead}>
           <h4>{t('modelCount')} <span className={css.countPill}>{models.length}</span></h4>
-          {models.length > visibleModelCount && <button type="button" className={css.quietBtn} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
-            {t(expanded ? 'collapse' : 'expand')}
-          </button>}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {models.length > 0 && (
+              <button
+                type="button"
+                className={css.quietBtn}
+                onClick={() => {
+                  void acpStore.openWithModel(models[0]?.id)
+                }}
+              >
+                {t('openInteractive')}
+              </button>
+            )}
+            {models.length > visibleModelCount && <button type="button" className={css.quietBtn} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+              {t(expanded ? 'collapse' : 'expand')}
+            </button>}
+          </div>
         </div>
         <ul>{(expanded ? models : models.slice(0, visibleModelCount)).map(model =>
           <li key={model.id} className={css.modelChip} title={model.id}>{model.name}</li>)}</ul>
@@ -355,4 +381,10 @@ export function apply(ctx: Context) {
     name: 'web-ui.plugin.item', id: namespace, order: 120, locale: namespace,
     inject: () => ({ form: ctx.configForms.get<Settings>(namespace) }),
   }, SettingsCard))
+  ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
+    name: 'conversation.input.right', id: `${namespace}-gemini`, order: 20,
+  }, GeminiComposerTrigger))
+  ctx.slots.inject('conversation.hero.frame', () => ctx.slots.register({
+    name: 'conversation.hero.frame', id: `${namespace}-acp-frame`, order: 80,
+  }, AcpChatFrameHoc))
 }

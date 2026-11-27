@@ -697,7 +697,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-live-stats/src/client/index.ts | 69 | remote |
 | host-service | packages/dsh-live-stats/src/index.ts | 17 | live-stats |
 | host-service | packages/dsh-live-stats/src/invariant.ts | 14 | invariants |
-| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 350 | web-ui.plugin.item |
+| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 376 | web-ui.plugin.item |
 | host-service | packages/dsh-llm-antigravity/src/index.ts | 33 | stream-json |
 | host-service | packages/dsh-memory/src/client/index.ts | 34 | locale |
 | host-service | packages/dsh-memory/src/index.ts | 31 | tools |
@@ -2133,7 +2133,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/test/user-plugin-archive.test.mjs | 340 | profileDir |
 | profile-home | packages/dsh-data-location/src/client/Panel.tsx | 22 | DSH_HOME |
 | profile-home | packages/dsh-data-location/src/client/Panel.tsx | 37 | DSH_HOME |
-| profile-home | packages/dsh-desktop-compat/src/acp/acp-agent-manager.ts | 53 | DSH_HOME |
+| profile-home | packages/dsh-desktop-compat/src/acp/acp-agent-manager.ts | 54 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/agent-wsl-permission.ts | 21 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/agent-wsl-permission.ts | 21 | DSH_HOME |
 | profile-home | packages/dsh-desktop-compat/src/agent-wsl-permission.ts | 23 | DSH_HOME |
@@ -2501,7 +2501,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-im-hub/src/client/index.ts | 25 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 85 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 95 | conversation.composer.dock |
-| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 354 | web-ui.plugin.item |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 380 | web-ui.plugin.item |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 384 | conversation.input.right |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 387 | conversation.hero.frame |
 | slot | packages/dsh-memory/src/client/index.ts | 53 | web-ui.plugin.item |
 | slot | packages/dsh-mode-switcher/src/client/index.ts | 34 | conversation.session.header.actions |
 | slot | packages/dsh-model-preferences/src/client/index.ts | 124 | settings.models.footer |

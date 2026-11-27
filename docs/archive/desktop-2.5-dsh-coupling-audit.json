@@ -5968,7 +5968,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 350,
+      "line": 376,
       "operation": "web-ui.plugin.item"
     },
     {
@@ -14584,7 +14584,7 @@
     {
       "category": "profile-home",
       "path": "packages/dsh-desktop-compat/src/acp/acp-agent-manager.ts",
-      "line": 53,
+      "line": 54,
       "operation": "DSH_HOME"
     },
     {
@@ -16792,8 +16792,20 @@
     {
       "category": "slot",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 354,
+      "line": 380,
       "operation": "web-ui.plugin.item"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
+      "line": 384,
+      "operation": "conversation.input.right"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
+      "line": 387,
+      "operation": "conversation.hero.frame"
     },
     {
       "category": "slot",

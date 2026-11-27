@@ -101,6 +101,17 @@ export type AcpStreamEvent = {
         newText?: string;
     };
 } | {
+    type: 'permission_request';
+    permissionId: string;
+    title?: string;
+    kind?: string;
+    rawInput?: unknown;
+    options: Array<{
+        optionId: string;
+        name?: string;
+        kind?: string;
+    }>;
+} | {
     type: 'turn_finished';
     stopReason: string;
 } | {

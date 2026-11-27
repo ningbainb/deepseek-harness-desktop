@@ -193,6 +193,78 @@ describe('Generic ACP v1 Adapter and Antigravity compliance', () => {
     expect(saved.status).toBe(200)
     const agents = await invoke('GET', '/api/dsh-acp/agents', { 'x-dsh-acp': '1' }, 'owner')
     expect(agents.body.agents.map((a: { id: string }) => a.id)).toEqual(['antigravity', 'local-mock'])
+
+    // Interactive session routes: start with model switch, stream SSE + interactive permission, close
+    expect((await invoke('POST', '/api/dsh-acp/session/start', {}, 'owner', { agentId: 'local-mock' })).status).toBe(403)
+    const started = await invoke('POST', '/api/dsh-acp/session/start', { 'x-dsh-acp': '1' }, 'owner', {
+      agentId: 'local-mock',
+      cwd: workspace,
+      dshSessionId: 'http-s-1',
+      modelId: 'gemini-flash',
+    })
+    expect(started.status).toBe(200)
+    expect(started.body.session.currentModelId).toBe('gemini-flash')
+
+    const switched = await invoke('POST', '/api/dsh-acp/session/model', { 'x-dsh-acp': '1' }, 'owner', {
+      sessionId: 'http-s-1',
+      modelId: 'gemini-pro',
+    })
+    expect(switched.status).toBe(200)
+    expect(switched.body.modelId).toBe('gemini-pro')
+
+    const sseReq = Object.assign(new PassThrough(), {
+      method: 'POST',
+      url: '/api/dsh-acp/session/prompt',
+      headers: { 'x-dsh-acp': '1' },
+      socket: { remoteAddress: '127.0.0.1' },
+    })
+    const sseChunks: string[] = []
+    let sseEndedResolve!: () => void
+    const sseEnded = new Promise<void>(r => { sseEndedResolve = r })
+    let permissionResolved = false
+    const sseRes = {
+      headersSent: false,
+      writableEnded: false,
+      writeHead: () => { sseRes.headersSent = true; return sseRes },
+      on: () => sseRes,
+      off: () => sseRes,
+      write: (chunk: string) => {
+        sseChunks.push(chunk)
+        for (const line of chunk.split('\n')) {
+          if (!line.startsWith('data: ')) continue
+          const ev = JSON.parse(line.slice(6)) as { type?: string; permissionId?: string }
+          if (ev.type === 'permission_request' && ev.permissionId && !permissionResolved) {
+            permissionResolved = true
+            void invoke('POST', '/api/dsh-acp/session/permission', { 'x-dsh-acp': '1' }, 'owner', {
+              permissionId: ev.permissionId,
+              optionId: 'allow-once',
+            })
+          }
+        }
+        return true
+      },
+      end: () => { sseRes.writableEnded = true; sseEndedResolve() },
+    }
+    const promptPromise = registeredRoute!.handler(sseReq, sseRes, { principal: { kind: 'owner' } })
+    sseReq.end(Buffer.from(JSON.stringify({ sessionId: 'http-s-1', text: 'run prompt' })))
+    await sseEnded
+    await promptPromise
+
+    const sseEvents = sseChunks
+      .join('')
+      .split('\n\n')
+      .filter(Boolean)
+      .map(block => JSON.parse(block.replace(/^data:\s*/u, '')) as AcpStreamEvent)
+    expect(sseEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'thought_delta', text: 'planning steps' }),
+      expect.objectContaining({ type: 'permission_request', title: 'Edit note.txt' }),
+      expect.objectContaining({ type: 'message_delta', text: 'read=ok;perm=selected' }),
+      expect.objectContaining({ type: 'turn_finished', stopReason: 'end_turn' }),
+    ]))
+
+    const closed = await invoke('POST', '/api/dsh-acp/session/close', { 'x-dsh-acp': '1' }, 'owner', { sessionId: 'http-s-1' })
+    expect(closed.body.closed).toBe(true)
+
     await invoke('DELETE', '/api/dsh-acp/agents/custom', { 'x-dsh-acp': '1' }, 'owner', { id: 'local-mock' })
   })
 })

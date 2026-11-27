@@ -32,7 +32,7 @@ export function FirstRunChooser({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && dialogRef.current?.contains(document.activeElement)) {
+      if (event.key === 'Escape') {
         event.preventDefault()
         event.stopImmediatePropagation()
         onDismiss()
@@ -45,7 +45,12 @@ export function FirstRunChooser({
   const isZh = /[\u4e00-\u9fff]/.test(t('firstRunTitle'))
 
   return (
-    <div className={css.firstRunBackdrop}>
+    <div
+      className={css.firstRunBackdrop}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onDismiss()
+      }}
+    >
       <section
         ref={dialogRef}
         className={css.firstRunDialog}
@@ -219,10 +224,7 @@ export function installFirstRunChooser(
     const win = doc.defaultView
     if (!win) return
 
-    // In jsdom or non-layout environments, innerWidth/rects are 0; render directly without geometric gating.
-    const composerCard = doc.querySelector('[data-composer-card]')
-    const composerRect = composerCard?.getBoundingClientRect()
-    const hasRealViewport = win.innerWidth > 0 && win.innerHeight > 0 && composerRect && composerRect.width > 0
+    const hasRealViewport = win.innerWidth > 0 && win.innerHeight > 0
     if (!hasRealViewport) {
       if (!rendered) {
         rendered = true
@@ -245,7 +247,7 @@ export function installFirstRunChooser(
       || composerHasText(doc),
     )
 
-    if (hasBlockingDialog || hasSettingsOrConversation || !isElementVisible(composerCard, win)) {
+    if (hasBlockingDialog || hasSettingsOrConversation) {
       if (rendered) {
         rendered = false
         root.render(null)
@@ -253,55 +255,10 @@ export function installFirstRunChooser(
       return
     }
 
-    let sidebarRight = 0
-    for (const el of doc.querySelectorAll('[data-pane="sidebar"], [class*="sidebarCol"], aside, [data-sidebar]')) {
-      if (!isElementVisible(el, win)) continue
-      const rect = el.getBoundingClientRect()
-      if (rect.left <= 48 && rect.right < composerRect.left + 40) {
-        sidebarRight = Math.max(sidebarRight, rect.right)
-      }
-    }
-
-    let paneRight = win.innerWidth - 16
-    for (const el of doc.querySelectorAll('[data-rightbar-col]')) {
-      if (!isElementVisible(el, win)) continue
-      const rect = el.getBoundingClientRect()
-      if (rect.right >= win.innerWidth - 48 && rect.left > sidebarRight + 200) {
-        paneRight = Math.min(paneRight, rect.left - 16)
-      }
-    }
-
-    let topSafe = 84
-    for (const el of doc.querySelectorAll('[data-dsh-responsive-part="sidebar-toggle"], [data-dsh-relay-model-entry]')) {
-      if (!isElementVisible(el, win)) continue
-      const rect = el.getBoundingClientRect()
-      if (rect.top < 120 && rect.bottom < composerRect.top - 180) {
-        topSafe = Math.max(topSafe, rect.bottom + 12)
-      }
-    }
-
-    const paneLeft = Math.max(sidebarRight + 16, 16)
-    const paneWidth = Math.max(0, paneRight - paneLeft)
-    const clearHeight = Math.max(0, composerRect.top - topSafe - 16)
-
-    if (clearHeight < 220 || paneWidth < 520) {
-      if (rendered) {
-        rendered = false
-        root.render(null)
-      }
-      return
-    }
-
+    clearContainerPlacement()
     if (!rendered) {
       rendered = true
       renderCard()
-    }
-    const wrapper = container.firstElementChild as HTMLElement | null
-    if (wrapper) {
-      wrapper.style.left = `${Math.round(paneLeft)}px`
-      wrapper.style.top = `${topSafe}px`
-      wrapper.style.width = `${Math.round(paneWidth)}px`
-      wrapper.style.height = `${Math.round(clearHeight)}px`
     }
   }
 

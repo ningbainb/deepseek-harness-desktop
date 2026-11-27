@@ -1,5 +1,6 @@
 import { randomUUID, type UUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -195,9 +196,25 @@ export class AcpAgentManager {
     return [...this.activeSessions.values()].map(rec => rec.info)
   }
 
+  getSessionInfo(sessionId: string): AcpSessionInfo | undefined {
+    return this.activeSessions.get(sessionId)?.info
+  }
+
+  private resolveAcpCommand(agent: AcpAgentDefinition, commandOverride?: string): string {
+    const raw = commandOverride?.trim() || agent.command
+    if (process.platform === 'win32'
+      && agent.id === ANTIGRAVITY_ACP_AGENT.id
+      && raw.toLowerCase() === 'agy.exe'
+      && process.env.LOCALAPPDATA) {
+      const candidate = join(process.env.LOCALAPPDATA, 'agy', 'bin', 'agy.exe')
+      if (existsSync(candidate)) return candidate
+    }
+    return raw
+  }
+
   async probeAgent(agentId: string, opts: { cwd?: string; commandOverride?: string } = {}): Promise<AcpProbeResult> {
     const base = await this.getAgent(agentId)
-    const command = opts.commandOverride?.trim() || base.command
+    const command = this.resolveAcpCommand(base, opts.commandOverride)
     const client = new AcpClient({
       command,
       args: base.args,
@@ -275,7 +292,7 @@ export class AcpAgentManager {
     const base = await this.getAgent(agentId)
     const agent: AcpAgentDefinition = {
       ...base,
-      ...(commandOverride?.trim() ? { command: commandOverride.trim() } : {}),
+      command: this.resolveAcpCommand(base, commandOverride),
       ...(authModeOverride ? { authMode: authModeOverride } : {}),
     }
     assertAcpUsageAllowed(agent, invocationSource)

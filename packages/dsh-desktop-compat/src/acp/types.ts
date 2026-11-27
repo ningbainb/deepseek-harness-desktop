@@ -87,6 +87,14 @@ export type AcpStreamEvent =
   | { type: 'plan_update'; entries: Array<{ content: string; status?: string; priority?: string }> }
   | { type: 'tool_call'; toolCallId: string; title?: string; kind?: string; status?: string; rawInput?: unknown }
   | { type: 'tool_call_update'; toolCallId: string; status?: string; content?: unknown; diff?: { path: string; oldText?: string; newText?: string } }
+  | {
+      type: 'permission_request'
+      permissionId: string
+      title?: string
+      kind?: string
+      rawInput?: unknown
+      options: Array<{ optionId: string; name?: string; kind?: string }>
+    }
   | { type: 'turn_finished'; stopReason: string }
   | { type: 'error'; message: string }
 
