@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
-import { createHash, randomUUID } from 'node:crypto'
-import { createReadStream } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
@@ -8,6 +7,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import { _electron as electron } from 'playwright'
+import { fileSha256 } from './file-sha256-fixture.mjs'
 import { createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { waitForSessionLog } from './session-log-fixture.mjs'
@@ -53,12 +53,6 @@ const evidence = {
 let app
 let active
 let auxiliaryRequests = 0
-
-async function hashExecutable(path) {
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(path)) hash.update(chunk)
-  return hash.digest('hex')
-}
 
 function sendText(response, text) {
   response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' })
@@ -303,8 +297,8 @@ async function measure(paths, mode, session, executable = options.executable) {
 
 try {
   // Hash and all fixture setup stay outside every launch stopwatch.
-  evidence.executableSha256 = await hashExecutable(options.executable)
-  if (previousExecutable) evidence.previousExecutable = { path: previousExecutable, sha256: await hashExecutable(previousExecutable) }
+  evidence.executableSha256 = await fileSha256(options.executable)
+  if (previousExecutable) evidence.previousExecutable = { path: previousExecutable, sha256: await fileSha256(previousExecutable) }
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const port = server.address().port
   for (let iteration = 0; iteration < iterations; iteration++) {

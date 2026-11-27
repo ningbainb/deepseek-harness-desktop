@@ -6,7 +6,6 @@
 import assert from 'node:assert/strict'
 import { spawn, execFile } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { createReadStream } from 'node:fs'
 import { access, mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { createServer, request as httpRequest } from 'node:http'
 import { createRequire } from 'node:module'
@@ -17,6 +16,7 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs, promisify } from 'node:util'
 import { chromium } from 'playwright'
 import { parse, stringify } from 'yaml'
+import { fileSha256 } from './file-sha256-fixture.mjs'
 import { FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
 import { sameProcess, updateOwnedProcesses } from './packaged-browser-owners.mjs'
 import { assertNativeFixtureExecutable, assertNativeFixtureStorage } from './native-fixture-storage.mjs'
@@ -87,11 +87,6 @@ function redact(value) {
     .replace(/((?:api[_-]?key|access[_-]?token|auth[_-]?token|password|secret|token)["']?\s*[:=]\s*["']?)[^\s,;"'&}]+/giu, '$1<redacted>')
 }
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
-async function fileHash(path) {
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(path)) hash.update(chunk)
-  return hash.digest('hex')
-}
 function passed(name, evidence = {}) { report.checks.push({ name, passed: true, ...evidence }) }
 async function waitUntil(check, label, timeout = 30000) {
   const end = Date.now() + timeout
@@ -564,10 +559,10 @@ try {
   assert.equal(vendor.name, 'dsh-builtin-browser'); assert.equal(vendor.version, '0.4.14')
   expectedHost = await realpath(join(browserPackage, 'lib', 'browser-electron', 'host-main.js'))
   assert.ok(within(payload, expectedHost))
-  report.payload = { version: packagedManifest.version, main: packagedManifest.main, exeSha256: await fileHash(exe),
-    exeSize: (await stat(exe)).size, asarSha256: await fileHash(archive),
+  report.payload = { version: packagedManifest.version, main: packagedManifest.main, exeSha256: await fileSha256(exe),
+    exeSize: (await stat(exe)).size, asarSha256: await fileSha256(archive),
     packagedBootstrapSha256: sha(packagedBootstrap), sourceBootstrapSha256: sha(sourceBootstrap),
-    physicalHost: expectedHost, hostSha256: await fileHash(expectedHost) }
+    physicalHost: expectedHost, hostSha256: await fileSha256(expectedHost) }
   passed('final-payload-identity-and-reviewed-bootstrap', report.payload)
 
   stage = 'loopback-guards'
@@ -750,8 +745,8 @@ document.querySelector('#fixture-trusted-submit').addEventListener('click',event
   assert.equal(report.guardControls.canaryHits, 0)
   assert.equal(report.promptRequests, 0, 'This browser probe must never submit a model prompt')
   assert.deepEqual(report.rendererErrors, [])
-  assert.equal(await fileHash(exe), report.payload.exeSha256)
-  assert.equal(await fileHash(archive), report.payload.asarSha256)
+  assert.equal(await fileSha256(exe), report.payload.exeSha256)
+  assert.equal(await fileSha256(archive), report.payload.asarSha256)
   await checkProfile(true)
   passed('fixed-loopback-probe-no-models-and-immutable-payload', { vendorChromiumGlobalEgressIntercepted: false })
 } catch (error) {

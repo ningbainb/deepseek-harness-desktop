@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { createReadStream } from 'node:fs'
+import { fileSha256 } from '../scripts/file-sha256-fixture.mjs'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile, access, link, copyFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -26,8 +26,7 @@ test('the released Electron carrier runs the standalone helper without desktop s
  const environment = { ...process.env, ELECTRON_RUN_AS_NODE: '1', NODE_OPTIONS: '', NODE_PATH: '', DSH_HOME: home,
   DSH_DESKTOP_USER_DATA: userdata, USERPROFILE: join(root, 'isolated-account'), APPDATA: join(root, 'isolated-appdata'),
   DSH_DESKTOP_BROWSER_COMPONENT_ROOT: components, DSH_DESKTOP_BROWSER_COMPONENT_CACHE: cache }
- const carrierHash = async () => { const hash = createHash('sha256'); for await (const chunk of createReadStream(carrier)) hash.update(chunk); return hash.digest('hex') }
- const originalCarrierHash = await carrierHash()
+ const originalCarrierHash = await fileSha256(carrier)
  const run = (args, nodeFlags = []) => exec(carrier, [...nodeFlags, built.entryPath, ...args], { windowsHide: true, timeout: 30000, env: environment, cwd: root })
  const probe = JSON.parse((await run(['--probe'])).stdout.trim())
  assert.equal(probe.electron, expectedCarrierVersion); assert.equal(probe.runAsNode, true)
@@ -54,7 +53,7 @@ test('the released Electron carrier runs the standalone helper without desktop s
  await assert.rejects(run([`--home=${home}`], ['--import', pathToFileURL(offline).href]), /isolated network unavailable/u)
  environment.DSH_DESKTOP_BROWSER_COMPONENT_ROOT = savedComponentRoot
  await assert.rejects(run([`--home=${join(root, 'missing-home')}`]), /Home cannot be located/u)
- assert.equal(await carrierHash(), originalCarrierHash, 'all preflight failures leave the released executable intact')
+ assert.equal(await fileSha256(carrier), originalCarrierHash, 'all preflight failures leave the released executable intact')
  assert.equal(await readFile(join(home, 'profiles/desktop/package.json'), 'utf8'), profile)
  // The production PowerShell wrapper also uses the real carrier, in an isolated install tree.
  const install = join(root, 'isolated-old-install')
@@ -76,7 +75,7 @@ test('the released Electron carrier runs the standalone helper without desktop s
  assert.match((await exec('powershell.exe', psArguments, { windowsHide: true, timeout: 30000, env: persistedEnvironment })).stdout, /browser-preflight-validated-before-shutdown/u)
  await writeFile(join(savedUserData, 'desktop-data-location.json'), '{"schemaVersion":1,"owner":"foreign","home":"ignored"}')
  await assert.rejects(exec('powershell.exe', psArguments, { windowsHide: true, timeout: 30000, env: persistedEnvironment }), error => error.code === 37 && /invalid persisted/u.test(error.stdout))
- assert.equal(await carrierHash(), originalCarrierHash)
+ assert.equal(await fileSha256(carrier), originalCarrierHash)
  const source = await readFile(built.entryPath, 'utf8')
  assert.doesNotMatch(source, /^import[^\n]+from ['"](?:fflate|yaml)['"]/mu, 'all non-builtin runtime dependencies are bundled')
  console.log(JSON.stringify({ evidence: 'released-electron-node-carrier', carrier, ...probe, isolatedHome: home, desktopStarted: false }))

@@ -12,6 +12,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { parseArgs, promisify } from 'node:util'
 import { _electron as electron } from 'playwright'
+import { fileSha256 } from './file-sha256-fixture.mjs'
 import { FIXTURE_PATH } from './release-plugins-host-fixture.mjs'
 import { sameProcess, updateOwnedProcesses, qualifyElectronMainProcess } from './packaged-browser-owners.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
@@ -84,11 +85,6 @@ async function visibleDownload(card) {
   return { ...value, text }
 }
 
-async function fileHash(path) {
-  const hash = createHash('sha256')
-  for await (const chunk of createReadStream(path)) hash.update(chunk)
-  return hash.digest('hex')
-}
 async function until(predicate, label, timeout = 60000) {
   const deadline = Date.now() + timeout
   while (Date.now() < deadline) { const value = await predicate(); if (value) return value; await delay(100) }
@@ -226,7 +222,7 @@ async function verifyActivation() {
     const path = resolve(component, file.path)
     assert.ok(within(component, path), 'Activation receipt must remain inside its persistent component')
     assert.equal((await stat(path)).size, file.size)
-    assert.equal(await fileHash(path), file.sha256, `Activated file integrity: ${file.path}`)
+    assert.equal(await fileSha256(path), file.sha256, `Activated file integrity: ${file.path}`)
   }
   assert.ok(!within(cache, component), 'Persistent activation cannot be inside disposable downloads')
   return { version: receipt.version, sha256: receipt.sha256, verifiedFiles: receipt.files.length, executable: componentExe }
@@ -321,9 +317,9 @@ document.querySelector('#fixture-submit').onclick=()=>{document.documentElement.
 
 try {
   assert.equal((await stat(archive)).size, artifact.size)
-  assert.equal(await fileHash(archive), artifact.sha256, 'Cached official ZIP must match the fixed trusted SHA256')
+  assert.equal(await fileSha256(archive), artifact.sha256, 'Cached official ZIP must match the fixed trusted SHA256')
   report.downloadEvidence.archive = archive; report.downloadEvidence.archiveSha256 = artifact.sha256
-  report.exeSha256 = await fileHash(exe)
+  report.exeSha256 = await fileSha256(exe)
   await new Promise((accept, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', accept) })
   origin = `http://127.0.0.1:${server.address().port}`
   await Promise.all([home, userData, join(temporary, 'workspace'), join(temporary, 'user-profile'), join(temporary, 'roaming'), join(temporary, 'local'), join(temporary, 'agents')].map(path => mkdir(path, { recursive: true })))
@@ -430,7 +426,7 @@ try {
   check('cache-cleanup-and-download-network-denied-restart-reuses-activated-component', offlineFacts)
   await browser(owner, 'close')
   await stop(owner)
-  assert.equal(await fileHash(exe), report.exeSha256, 'The final packaged executable was not modified')
+  assert.equal(await fileSha256(exe), report.exeSha256, 'The final packaged executable was not modified')
   const finalProfile = JSON.parse(await readFile(join(profile, 'package.json'), 'utf8'))
   assert.deepEqual(finalProfile.dsh.profile.bundles.filter(name => name !== probeName), report.originalBundles)
   }
