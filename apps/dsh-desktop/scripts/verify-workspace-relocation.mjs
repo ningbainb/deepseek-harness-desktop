@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { reopenNativeSession } from './native-session-navigation-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown } from './dock-settings-fixture.mjs'
 import { dismissStartupContinuationDialogs } from './dismiss-onboarding-fixture.mjs'
 import { rpc, rpcResult } from './runtime-rpc-fixture.mjs'
 import { existsSync } from 'node:fs'
@@ -65,6 +67,7 @@ async function launch() {
       state: 'visible',
       timeout: runtimeReadyTimeoutMs,
     })
+    await dismissFirstRunModelChooserWhenShown(page)
     await dismissStartupContinuationDialogs(page)
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')
@@ -163,36 +166,24 @@ try {
   const seededSummary = selectionSessions.items.find(item => item.sessionId === oldSessionId)
   assert.ok(seededSummary, 'seeded Session is missing from the list')
   assert.equal(seededSummary.blank, false, 'seeded Session was still classified as blank')
-  const oldGroup = selection.page.getByRole('treeitem').filter({ hasText: basename(oldPath) }).first()
-  await oldGroup.waitFor({ state: 'visible', timeout: 15_000 })
-  if (await oldGroup.getAttribute('aria-expanded') !== 'true') await oldGroup.click({ force: true })
   const history = selection.page.getByText(historyMarker, { exact: true })
-  if (!await history.isVisible().catch(() => false)) {
-    const originalSession = selection.page.locator(`[role="treeitem"][data-row-key="session:${oldSessionId}"]`)
-    try {
-      await originalSession.waitFor({ state: 'visible', timeout: 15_000 })
-      assert.ok((await originalSession.textContent()).includes(originalTitle), 'the exact retained Session must preserve its title')
-      await originalSession.getByText(originalTitle, { exact: true }).click()
-      await selection.page.locator(`[role="treeitem"][data-row-key="session:${oldSessionId}"][aria-selected="true"]`)
-        .waitFor({ state: 'visible', timeout: 15_000 })
-    } catch (error) {
-      const tree = await selection.page.locator('[role="treeitem"]').evaluateAll(rows => rows.map(row => ({
-        selected: row.getAttribute('aria-selected'),
-        text: row.textContent?.trim(),
-      })))
-      const selectionUi = await selection.page.evaluate(() => ({
-        dialogs: [...document.querySelectorAll('[role="dialog"]')].map(dialog => ({
-          text: dialog.textContent?.trim(),
-          buttons: [...dialog.querySelectorAll('button')].map(button => button.textContent?.trim()),
-        })),
-        selected: [...document.querySelectorAll('[role="treeitem"][aria-selected="true"]')].map(row => row.getAttribute('data-row-key')),
-      }))
-      if (process.env.DSH_DESKTOP_WORKSPACE_SCREENSHOT) await selection.page.screenshot({ path: process.env.DSH_DESKTOP_WORKSPACE_SCREENSHOT })
-      console.error(JSON.stringify({ selectionSessions, tree, selectionUi, rendererErrors: selection.rendererErrors }, null, 2))
-      throw error
-    }
+  try {
+    await reopenNativeSession({
+      page: selection.page, workspaceId: oldWorkspaceId, workspaceLabel: basename(oldPath),
+      sessionId: oldSessionId, sessionTitle: originalTitle, listSessions: async () => selectionSessions, timeoutMs: 15_000,
+    })
+    await history.waitFor({ state: 'visible', timeout: 15_000 })
+  } catch (error) {
+    const tree = await selection.page.getByRole('treeitem').evaluateAll(rows => rows.map(row => ({
+      key: row.getAttribute('data-row-key'), expanded: row.getAttribute('aria-expanded'),
+      selected: row.getAttribute('aria-selected'), text: row.textContent?.trim(),
+    })))
+    const dialogs = await selection.page.getByRole('dialog').allTextContents()
+    const firstRunChooserVisible = await selection.page.locator('[data-dsh-first-run-chooser]').isVisible()
+    if (process.env.DSH_DESKTOP_WORKSPACE_SCREENSHOT) await selection.page.screenshot({ path: process.env.DSH_DESKTOP_WORKSPACE_SCREENSHOT })
+    console.error(JSON.stringify({ selectionSessions, tree, dialogs, firstRunChooserVisible, rendererErrors: selection.rendererErrors }, null, 2))
+    throw error
   }
-  await history.waitFor({ state: 'visible', timeout: 15_000 })
   assert.deepEqual(selection.rendererErrors, [])
   await activeApp.close()
   activeApp = undefined
