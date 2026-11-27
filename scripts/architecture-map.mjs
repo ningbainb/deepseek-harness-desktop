@@ -4,11 +4,23 @@ import { readFileSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
 
+// pnpm reports the active workspace, including projects with no dependencies.
+const projects = await json(process.stdin)
+if (!Array.isArray(projects) || !projects.length) throw new Error('Expected pnpm workspace list on stdin')
+const workspaces = projects.map(({ path }) => ({
+  directory: relative(process.cwd(), path).split(sep).join('/') || '.',
+  manifest: JSON.parse(readFileSync(resolve(path, 'package.json'), 'utf8')),
+}))
+const sourceEntries = new Set(workspaces.flatMap(({ directory, manifest }) => {
+  if (manifest.scripts?.build || typeof manifest.main !== 'string') return []
+  return [relative(process.cwd(), resolve(directory, manifest.main)).split(sep).join('/')]
+}))
+
 // Input is the tracked tree, including staged files. Run at repository root.
 const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
   .split('\0')
   .filter(file => /\.(?:[cm]?[jt]s|[jt]sx)$/.test(file) && !file.endsWith('.d.ts'))
-  .filter(file => !/(^|\/)(?:vendor|dist|lib|node_modules|fixtures)\//.test(file))
+  .filter(file => sourceEntries.has(file) || !/(^|\/)(?:vendor|dist|lib|node_modules|fixtures)\//.test(file))
 const tracked = new Set(files)
 const localImports = []
 const bodies = new Map()
@@ -55,13 +67,6 @@ for (const file of files) {
   }
 }
 
-// pnpm reports the active workspace, including projects with no dependencies.
-const projects = await json(process.stdin)
-if (!Array.isArray(projects) || !projects.length) throw new Error('Expected pnpm workspace list on stdin')
-const workspaces = projects.map(({ path }) => ({
-  directory: relative(process.cwd(), path).split(sep).join('/') || '.',
-  manifest: JSON.parse(readFileSync(resolve(path, 'package.json'), 'utf8')),
-}))
 const names = new Set(workspaces.map(({ manifest }) => manifest.name))
 const packages = workspaces.map(({ directory, manifest }) => {
   const dependencies = []
