@@ -28,7 +28,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 1 | static-import | @deepseek-ai/dsh-session | no | public-stable | no |
 | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 10 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
 | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 1 | static-import | @deepseek-ai/dsh-llm | no | public-stable | no |
-| apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 11 | static-import | @deepseek-ai/dsh-session | no | public-stable | no |
+| apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 13 | static-import | @deepseek-ai/dsh-session | no | public-stable | no |
 | apps/dsh-desktop/src/atomic-write-adapter.mjs | 1 | static-import | @deepseek-ai/dsh-atomic-write | no | public-stable | yes |
 | apps/dsh-desktop/src/runtime-client-hmr.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | yes |
 | apps/dsh-desktop/src/runtime-community-index.mjs | 1 | static-import | @deepseek-ai/dsh-app-boot | no | public-stable | no |
@@ -951,7 +951,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-sidebar-package-pipeline.mjs | 48 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/verify-skill-discovery.mjs | 52 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-skill-market.mjs | 43 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-skin-center.mjs | 50 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-skin-center.mjs | 51 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-star-prompt.mjs | 30 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-terminal.mjs | 105 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-update-shutdown.mjs | 80 | DSH_HOME |
@@ -959,10 +959,10 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-window-chrome.mjs | 67 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workshop-lifecycle.mjs | 79 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-workspace-checkpoints.mjs | 130 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 36 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 55 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 121 | profileDir |
-| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 126 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 38 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 57 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 124 | profileDir |
+| profile-home | apps/dsh-desktop/scripts/verify-workspace-relocation.mjs | 129 | profileDir |
 | profile-home | apps/dsh-desktop/scripts/workspace-state-probe-fixture.mjs | 3 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/scripts/workspace-state-probe-fixture.mjs | 6 | ensureDesktopProfile |
 | profile-home | apps/dsh-desktop/src/automatic-repair-runner.mjs | 89 | profileDir |

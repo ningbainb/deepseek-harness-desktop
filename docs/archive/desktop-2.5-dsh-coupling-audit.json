@@ -78,7 +78,7 @@
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
       "kind": "static-import",
       "specifier": "@deepseek-ai/dsh-session",
-      "line": 11,
+      "line": 13,
       "typeOnly": false,
       "classification": "public-stable",
       "controlled": false
@@ -7690,7 +7690,7 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-skin-center.mjs",
-      "line": 50,
+      "line": 51,
       "operation": "DSH_HOME"
     },
     {
@@ -7738,25 +7738,25 @@
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 36,
+      "line": 38,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 55,
+      "line": 57,
       "operation": "DSH_HOME"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 121,
+      "line": 124,
       "operation": "profileDir"
     },
     {
       "category": "profile-home",
       "path": "apps/dsh-desktop/scripts/verify-workspace-relocation.mjs",
-      "line": 126,
+      "line": 129,
       "operation": "profileDir"
     },
     {
