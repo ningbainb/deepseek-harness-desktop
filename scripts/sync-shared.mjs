@@ -64,6 +64,7 @@ const MANIFEST = [
     targets: [
       'packages/dsh-pet/src/dsh-home.ts',
       'packages/dsh-liangshen/src/dsh-home.ts',
+      'packages/dsh-value-mode/src/dsh-home.ts',
     ],
   },
 ]
