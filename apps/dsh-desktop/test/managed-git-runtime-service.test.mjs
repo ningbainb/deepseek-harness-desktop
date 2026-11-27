@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { EventEmitter } from 'node:events'
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { PassThrough } from 'node:stream'
 import test from 'node:test'
 
 import { strToU8, zipSync } from 'fflate'
+
+import { successfulGitSpawn } from './fixtures/managed-git-spawn.mjs'
 
 import {
   installManagedGitArchive,
@@ -82,26 +82,6 @@ function releaseFor(archive) {
 
 function manifestFor(archive) {
   return { schemaVersion: 1, releases: [releaseFor(archive)] }
-}
-
-function successfulGitSpawn(version = VERSION, calls = []) {
-  return (executable, args, options) => {
-    calls.push({ executable, args, options })
-    const child = new EventEmitter()
-    child.stdout = new PassThrough()
-    child.stderr = new PassThrough()
-    child.kill = () => {
-      queueMicrotask(() => child.emit('close', null, 'SIGTERM'))
-      return true
-    }
-    queueMicrotask(() => {
-      child.stdout.write(`git version ${version}\n`)
-      child.stdout.end()
-      child.stderr.end()
-      child.emit('close', 0, null)
-    })
-    return child
-  }
 }
 
 test('bundled managed Git manifest is static, official, and complete for x64 and arm64', () => {

@@ -9,6 +9,8 @@ import test from 'node:test'
 
 import { strToU8, zipSync } from 'fflate'
 
+import { successfulGitSpawn } from './fixtures/managed-git-spawn.mjs'
+
 import {
   MANAGED_GIT_ARCHIVE_LIMITS,
   createManagedGitInstallState,
@@ -59,26 +61,6 @@ function releaseFor(archive, overrides = {}) {
       bytes: GIT_EXECUTABLE.byteLength,
     },
     ...overrides,
-  }
-}
-
-function successfulGitSpawn(version = VERSION, calls = []) {
-  return (executable, args, options) => {
-    calls.push({ executable, args, options })
-    const child = new EventEmitter()
-    child.stdout = new PassThrough()
-    child.stderr = new PassThrough()
-    child.kill = () => {
-      queueMicrotask(() => child.emit('close', null, 'SIGTERM'))
-      return true
-    }
-    queueMicrotask(() => {
-      child.stdout.write(`git version ${version}\n`)
-      child.stdout.end()
-      child.stderr.end()
-      child.emit('close', 0, null)
-    })
-    return child
   }
 }
 
@@ -276,7 +258,7 @@ test('managed Git installs only after staged archive and post-extract version ve
     const verified = await verifyManagedGitInstall({
       userDataDirectory,
       release,
-      spawn: successfulGitSpawn(),
+      spawn: successfulGitSpawn(VERSION),
       timeoutMs: 50,
     })
     assert.equal(verified.version, VERSION)
@@ -286,7 +268,7 @@ test('managed Git installs only after staged archive and post-extract version ve
       verifyManagedGitInstall({
         userDataDirectory,
         release,
-        spawn: successfulGitSpawn(),
+        spawn: successfulGitSpawn(VERSION),
         timeoutMs: 50,
       }),
       (error) => error?.code === 'MANAGED_GIT_INSTALL_INVALID',
@@ -360,7 +342,7 @@ test('managed Git restores the prior directory when the final atomic activation 
         archivePath,
         release: releaseFor(archive),
         fs: fileSystem,
-        spawn: successfulGitSpawn(),
+        spawn: successfulGitSpawn(VERSION),
         timeoutMs: 50,
       }),
       (error) => error?.code === 'MANAGED_GIT_ATOMIC_SWAP_FAILED',
@@ -406,7 +388,7 @@ test('managed Git retries a transient Windows activation lock before publishing 
       archivePath,
       release: releaseFor(archive),
       fs: fileSystem,
-      spawn: successfulGitSpawn(),
+      spawn: successfulGitSpawn(VERSION),
       timeoutMs: 50,
     })
     assert.equal(activationRenameAttempts, 3)
