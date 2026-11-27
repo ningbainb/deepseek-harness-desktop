@@ -60,7 +60,7 @@ for (const version of ['', '5.2', '05.2.0', '5.2.0-beta.01', '5.2.0\npublish=tru
 }
 
 test('preview versions support nonpublishing validation but cannot publish from a Desktop tag', async () => {
-  for (const version of ['5.3.0-rc.1', '5.3.0-beta.1', '5.3.0-alpha.0']) {
+  for (const version of ['5.3.0-rc.1', '5.3.0-beta.1', '5.3.0-alpha.0', '5.7.0-test.1']) {
     assert.deepEqual(await classify({ eventName: 'workflow_dispatch', ref: 'refs/heads/main', version }), { version, publish: false })
     assert.deepEqual(await classify({ eventName: 'push', ref: 'refs/heads/main', version }), { version, publish: false })
     await assert.rejects(classify({ eventName: 'push', ref: `refs/tags/desktop-v${version}`, version }), /stable/iu)

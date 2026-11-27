@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const STABLE_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u
-const PREVIEW_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-(?:rc|beta|alpha)\.(?:0|[1-9]\d*)$/u
+const PREVIEW_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-(?:rc|beta|alpha|test)\.(?:0|[1-9]\d*)$/u
 const DESKTOP_TAG_PREFIX = 'refs/tags/desktop-v'
 
 export function classifyDesktopReleaseMetadata({ eventName, ref, version } = {}) {
