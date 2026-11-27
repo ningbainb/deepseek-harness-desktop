@@ -37,11 +37,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type {
-  BranchesView, GitError, GraphView, RepoStatus, SwitchResult,
-} from '../core/types.ts'
+import type { GitError } from '../core/types.ts'
 import { GitApi, subscribeChanges } from './api.ts'
-import { BranchChip } from './chips/BranchChip.tsx'
+import { BranchChip, type GitGraphInjected } from './chips/BranchChip.tsx'
 import { en, zh, type GitGraphKey } from './locales.ts'
 
 export type { GitGraphKey } from './locales.ts'
@@ -82,21 +80,7 @@ const NS = 'git-graph'
 /** Required services: slots for the selector-context entry, sessions for the cwd lookup, locale for the copy. */
 export const inject = ['slots', 'sessions', 'connection', 'locale']
 
-/** Injected business face of the branch chip: git verbs, keyed by the current session id. */
-export interface GitGraphInjected {
-  /** The workspace repository snapshot; null when not a repository. */
-  repoStatus: (sessionId: SessionId | undefined) => Promise<RepoStatus | null>
-  /** Local branch list with the current branch marked. */
-  branches: (sessionId: SessionId | undefined) => Promise<BranchesView | null>
-  /** Workspace-level `git switch --no-guess <branch>`. */
-  switchBranch: (sessionId: SessionId | undefined, branch: string) => Promise<SwitchResult>
-  /** `git switch --no-guess -c <name>` from the current HEAD. */
-  createBranch: (sessionId: SessionId | undefined, name: string) => Promise<SwitchResult>
-  /** Topo-ordered commit graph. */
-  graph: (sessionId: SessionId | undefined, limit?: number) => Promise<GraphView | null>
-  /** Host-pushed branch-state changes for the session's workspace. */
-  subscribeChanges: (sessionId: SessionId | undefined, onChange: () => void) => () => void
-}
+export type { GitGraphInjected } from './chips/BranchChip.tsx'
 
 /** The session-cwd lookup failure shared by the injected verbs. */
 const NO_WORKSPACE: GitError = { code: 'workspace-unknown', message: 'session has no workspace' }

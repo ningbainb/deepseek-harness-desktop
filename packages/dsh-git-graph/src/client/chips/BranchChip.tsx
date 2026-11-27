@@ -16,13 +16,29 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { IconBranchOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { BranchesView, RepoStatus } from '../../core/types.ts'
-import type { GitGraphInjected } from '../index.ts'
+import type { BranchesView, GraphView, RepoStatus, SwitchResult } from '../../core/types.ts'
+import type { SessionId } from '@deepseek-ai/dsh-client-connection/client'
 import { Chip, cx } from './Chip.tsx'
 import { BranchPopover } from './BranchPopover.tsx'
 import { CreateBranchDialog } from './CreateBranchDialog.tsx'
 import { GraphDialog } from '../graph/GraphDialog.tsx'
 import css from './context.module.css'
+
+/** Injected business face of the branch chip: git verbs, keyed by the current session id. */
+export interface GitGraphInjected {
+  /** The workspace repository snapshot; null when not a repository. */
+  repoStatus: (sessionId: SessionId | undefined) => Promise<RepoStatus | null>
+  /** Local branch list with the current branch marked. */
+  branches: (sessionId: SessionId | undefined) => Promise<BranchesView | null>
+  /** Workspace-level `git switch --no-guess <branch>`. */
+  switchBranch: (sessionId: SessionId | undefined, branch: string) => Promise<SwitchResult>
+  /** `git switch --no-guess -c <name>` from the current HEAD. */
+  createBranch: (sessionId: SessionId | undefined, name: string) => Promise<SwitchResult>
+  /** Topo-ordered commit graph. */
+  graph: (sessionId: SessionId | undefined, limit?: number) => Promise<GraphView | null>
+  /** Host-pushed branch-state changes for the session's workspace. */
+  subscribeChanges: (sessionId: SessionId | undefined, onChange: () => void) => () => void
+}
 
 /** Full props of the branch chip: either seat's runtime share (the session-maybe context hole or the session-scoped dock fallback) + the git-graph inject face + the locale seat. */
 export type BranchChipProps =
