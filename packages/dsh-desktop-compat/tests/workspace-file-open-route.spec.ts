@@ -181,6 +181,11 @@ describe('Desktop workspace native-open authority', () => {
       expect(safe.status).toBe(200)
       expect(safe.body).toEqual({ ok: true, value: { path: join(root, 'README.md') } })
 
+      const oversized = JSON.stringify({ root, path: 'README.md' }).padEnd(1024 * 1024 + 1)
+      const tooLarge = await drive(route.handler as never, oversized)
+      expect(tooLarge.status).toBe(400)
+      expect(resolveByPath).toHaveBeenCalledTimes(1)
+
       for (const path of [
         'payload.cmd', 'payload.ps1', 'payload.lnk', 'payload.exe',
         'payload.cmd.', 'safe.txt:payload.cmd', 'https://example.test/a.pdf',

@@ -1,19 +1,14 @@
 /** Loopback-only Host route for importing an external transcript as a DSH session. */
 
-import { timingSafeEqual } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
-import type { IncomingMessage, ServerResponse } from 'node:http'
 import { basename, isAbsolute } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-workspace'
-import {
-  DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV,
-  DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_HEADER,
-  isDesktopWorkspaceFileOpenToken,
-} from './workspace-file-open-policy.ts'
+import { desktopJsonPost, writeJson } from './desktop-json-post.ts'
+import { DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV } from './workspace-file-open-policy.ts'
 
 export const DESKTOP_CONVERSATION_IMPORT_PATH = '/desktop/conversation-import'
 
@@ -103,62 +98,6 @@ function createPreparedSession(
 
 function failure(code: string, message: string): ImportFailure {
   return { ok: false, error: { code, message } }
-}
-
-function writeJson(response: ServerResponse, status: number, value: unknown): void {
-  response.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-    'x-content-type-options': 'nosniff',
-  })
-  response.end(JSON.stringify(value))
-}
-
-function isLoopbackRequest(request: IncomingMessage): boolean {
-  const address = request.socket.remoteAddress
-  if (address !== '127.0.0.1' && address !== '::1' && address !== '::ffff:127.0.0.1') return false
-  const host = request.headers.host
-  if (typeof host !== 'string') return false
-  let hostUrl: URL
-  try {
-    hostUrl = new URL(`http://${host}`)
-  } catch {
-    return false
-  }
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(hostUrl.hostname)) return false
-  if (request.headers['sec-fetch-site'] === 'cross-site') return false
-  const origin = request.headers.origin
-  if (origin === undefined) return true
-  try {
-    return new URL(origin).host === hostUrl.host
-  } catch {
-    return false
-  }
-}
-
-function capabilityTokenMatches(expected: string | undefined, supplied: string | string[] | undefined): boolean {
-  if (!isDesktopWorkspaceFileOpenToken(expected)) return false
-  const expectedBytes = Buffer.from(expected, 'utf8')
-  const suppliedBytes = typeof supplied === 'string' ? Buffer.from(supplied, 'utf8') : Buffer.alloc(0)
-  const padded = Buffer.alloc(expectedBytes.length)
-  suppliedBytes.copy(padded, 0, 0, expectedBytes.length)
-  return suppliedBytes.length === expectedBytes.length && timingSafeEqual(expectedBytes, padded)
-}
-
-async function readJsonBody(request: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = []
-  let size = 0
-  for await (const chunk of request) {
-    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array)
-    size += buffer.length
-    if (size > MAX_BODY_BYTES) return undefined
-    chunks.push(buffer)
-  }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown
-  } catch {
-    return undefined
-  }
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -328,30 +267,11 @@ export function createDesktopConversationImportRoute(
   ctx: ConversationImportContext,
   { capabilityToken = process.env[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_ENV] }: { capabilityToken?: string } = {},
 ): WebRoute {
-  const expectedCapabilityToken = capabilityToken
   return {
     kind: 'exact',
     path: DESKTOP_CONVERSATION_IMPORT_PATH,
-    handler: async (request, response) => {
-      if (!isLoopbackRequest(request)) {
-        writeJson(response, 403, failure('forbidden', 'loopback-only'))
-        return
-      }
-      if (!capabilityTokenMatches(expectedCapabilityToken, request.headers[DESKTOP_WORKSPACE_FILE_OPEN_TOKEN_HEADER])) {
-        writeJson(response, 403, failure('forbidden', 'desktop capability required'))
-        return
-      }
-      if (request.method !== 'POST') {
-        writeJson(response, 405, failure('method-not-allowed', 'POST is required'))
-        return
-      }
-      const contentType = request.headers['content-type'] ?? ''
-      if (!contentType.toLowerCase().startsWith('application/json')) {
-        writeJson(response, 415, failure('invalid-content-type', 'application/json is required'))
-        return
-      }
-
-      const requestValue = normalizeRequest(await readJsonBody(request))
+    handler: desktopJsonPost(capabilityToken, MAX_BODY_BYTES, async (body, response) => {
+      const requestValue = normalizeRequest(body)
       if (requestValue === undefined) {
         writeJson(response, 400, failure('bad-request', 'malformed conversation import request'))
         return
@@ -363,7 +283,7 @@ export function createDesktopConversationImportRoute(
       } catch (error) {
         writeJson(response, 500, failure('internal-error', error instanceof Error ? error.message : String(error)))
       }
-    },
+    }),
   }
 }
 

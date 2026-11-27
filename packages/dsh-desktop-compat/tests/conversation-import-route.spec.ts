@@ -103,12 +103,18 @@ describe('desktop conversation import route', () => {
       expect(first.read().body.title).toBe('Imported')
 
       const second = response()
-      await route.handler(request(body) as never, second.value as never)
+      // Imports accept transcripts larger than the file-open route's 1 MiB limit.
+      await route.handler(request(body.padEnd(1024 * 1024 + 1)) as never, second.value as never)
       expect(second.read().status).toBe(200)
       expect(create).toHaveBeenCalledTimes(1)
       expect(attachSession).toHaveBeenCalledTimes(2)
       expect(flush).toHaveBeenCalledTimes(2)
       expect(renameTitle).toHaveBeenCalledTimes(1)
+
+      const oversized = response()
+      await route.handler(request(body.padEnd(32 * 1024 * 1024 + 1)) as never, oversized.value as never)
+      expect(oversized.read()).toMatchObject({ status: 400, body: { error: { code: 'bad-request' } } })
+      expect(attachSession).toHaveBeenCalledTimes(2)
 
       const denied = response()
       await route.handler(request(body, { remoteAddress: '192.168.1.4' }) as never, denied.value as never)
