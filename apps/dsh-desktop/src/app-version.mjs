@@ -1,4 +1,7 @@
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+
+export const DESKTOP_MANIFEST_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u
 

@@ -1,9 +1,8 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { DESKTOP_MANIFEST_VERSION } from './app-version.mjs'
 import { deferModalReveal } from './modal-reveal.mjs'
 import { AFDIAN_SPONSOR_URL } from './community-links.mjs'
 import { renderQrDataUrl } from './optional-integrations.mjs'
+import { claimVersionPrompt } from './version-prompt-state.mjs'
 
 let sponsorQr
 export function renderSponsorQr() {
@@ -11,13 +10,8 @@ export function renderSponsorQr() {
 }
 
 // Follow the shipped Desktop manifest so release bumps cannot leave this prompt stale.
-export const STAR_PROMPT_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+export const STAR_PROMPT_VERSION = DESKTOP_MANIFEST_VERSION
 const STAR_PROMPT_SURFACE_ID = 'dsh-desktop-star-prompt'
-
-function normalizeShownVersions(value) {
-  if (!Array.isArray(value)) return []
-  return [...new Set(value.filter((version) => typeof version === 'string').slice(-32))]
-}
 
 export class StarPromptStore {
   #operation = Promise.resolve()
@@ -29,31 +23,12 @@ export class StarPromptStore {
   }
 
   claim(currentVersion) {
-    const operation = this.#operation.then(() => this.#claim(currentVersion))
+    const operation = this.#operation.then(() => {
+      if (currentVersion !== this.targetVersion) return false
+      return claimVersionPrompt(this.path, currentVersion)
+    })
     this.#operation = operation.catch(() => {})
     return operation
-  }
-
-  async #claim(currentVersion) {
-    if (currentVersion !== this.targetVersion) return false
-    let shownVersions = []
-    try {
-      const state = JSON.parse(await readFile(this.path, 'utf8'))
-      shownVersions = normalizeShownVersions(state?.shownVersions)
-    } catch (error) {
-      if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error
-    }
-    if (shownVersions.includes(currentVersion)) return false
-
-    const nextState = {
-      schemaVersion: 1,
-      shownVersions: normalizeShownVersions([...shownVersions, currentVersion]),
-    }
-    await mkdir(dirname(this.path), { recursive: true })
-    const temporaryPath = `${this.path}.${process.pid}.${Date.now()}.tmp`
-    await writeFile(temporaryPath, `${JSON.stringify(nextState, null, 2)}\n`, 'utf8')
-    await rename(temporaryPath, this.path)
-    return true
   }
 }
 

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -17,9 +17,33 @@ import {
   ReleaseGuideStore,
 } from '../src/release-guide.mjs'
 import { createApplicationMenuTemplate } from '../src/menu.mjs'
+import { StarPromptStore } from '../src/star-prompt.mjs'
 
 const require = createRequire(new URL('../../../packages/dsh-web-ui-settings/package.json', import.meta.url))
 const { JSDOM } = require('jsdom')
+
+test('both version prompts retain the latest 32 strings before deduplication and retry failed reads', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-prompt-history-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  for (const Store of [ReleaseGuideStore, StarPromptStore]) {
+    const path = join(directory, Store.name)
+    const store = new Store({ path })
+    const versions = Array.from({ length: 36 }, (_, index) => 'old-' + index)
+    await writeFile(path, JSON.stringify({ shownVersions: [...versions, false, versions[35]] }))
+    assert.equal(await store.claim(RELEASE_GUIDE_VERSION), true)
+    assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), {
+      schemaVersion: 1,
+      shownVersions: [...versions.slice(5), RELEASE_GUIDE_VERSION],
+    })
+
+    await rm(path)
+    await mkdir(path)
+    await assert.rejects(store.claim(RELEASE_GUIDE_VERSION), { code: 'EISDIR' })
+    await rm(path, { recursive: true })
+    await writeFile(path, '{invalid')
+    assert.equal(await store.claim(RELEASE_GUIDE_VERSION), true)
+  }
+})
 
 test('release guide follows desktop package version and defines bilingual highlight cards', async () => {
   const desktopVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version

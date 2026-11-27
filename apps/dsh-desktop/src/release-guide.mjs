@@ -1,9 +1,8 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { DESKTOP_MANIFEST_VERSION } from './app-version.mjs'
 import { deferModalReveal } from './modal-reveal.mjs'
+import { claimVersionPrompt, markVersionPromptPending } from './version-prompt-state.mjs'
 
-export const RELEASE_GUIDE_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
+export const RELEASE_GUIDE_VERSION = DESKTOP_MANIFEST_VERSION
 export const RELEASE_GUIDE_SURFACE_ID = 'dsh-desktop-release-guide'
 
 export const RELEASE_GUIDES = Object.freeze({
@@ -329,11 +328,6 @@ export function getReleaseGuide(version = RELEASE_GUIDE_VERSION) {
   return typeof version === 'string' && Object.hasOwn(RELEASE_GUIDES, version) ? RELEASE_GUIDES[version] : undefined
 }
 
-function normalizeShownVersions(value) {
-  if (!Array.isArray(value)) return []
-  return [...new Set(value.filter((version) => typeof version === 'string').slice(-32))]
-}
-
 export class ReleaseGuideStore {
   #operation = Promise.resolve()
 
@@ -344,60 +338,20 @@ export class ReleaseGuideStore {
   }
 
   claim(currentVersion, options = {}) {
-    const operation = this.#operation.then(() => this.#claim(currentVersion, options))
-    this.#operation = operation.catch(() => {})
-    return operation
+    return this.#update(currentVersion, () => claimVersionPrompt(this.path, currentVersion, options))
   }
 
   markPending(currentVersion) {
-    const operation = this.#operation.then(() => this.#markPending(currentVersion))
+    return this.#update(currentVersion, () => markVersionPromptPending(this.path, currentVersion))
+  }
+
+  #update(currentVersion, update) {
+    const operation = this.#operation.then(() => {
+      if (currentVersion !== this.targetVersion || !getReleaseGuide(currentVersion)) return false
+      return update()
+    })
     this.#operation = operation.catch(() => {})
     return operation
-  }
-
-  async #readState() {
-    let shownVersions = []
-    let pendingVersion
-    try {
-      const state = JSON.parse(await readFile(this.path, 'utf8'))
-      shownVersions = normalizeShownVersions(state?.shownVersions)
-      if (typeof state?.pendingVersion === 'string') pendingVersion = state.pendingVersion
-    } catch (error) {
-      if (error?.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error
-    }
-    return { shownVersions, pendingVersion }
-  }
-
-  async #writeState(nextState) {
-    await mkdir(dirname(this.path), { recursive: true })
-    const temporaryPath = `${this.path}.${process.pid}.${Date.now()}.tmp`
-    await writeFile(temporaryPath, `${JSON.stringify(nextState, null, 2)}\n`, 'utf8')
-    await rename(temporaryPath, this.path)
-  }
-
-  async #markPending(currentVersion) {
-    if (currentVersion !== this.targetVersion || !getReleaseGuide(currentVersion)) return false
-    const { shownVersions } = await this.#readState()
-    if (shownVersions.includes(currentVersion)) return false
-    await this.#writeState({
-      schemaVersion: 1,
-      shownVersions,
-      pendingVersion: currentVersion,
-    })
-    return true
-  }
-
-  async #claim(currentVersion, { suppressIfUnmarked = false } = {}) {
-    if (currentVersion !== this.targetVersion || !getReleaseGuide(currentVersion)) return false
-    const { shownVersions, pendingVersion } = await this.#readState()
-    if (shownVersions.includes(currentVersion)) return false
-    if (suppressIfUnmarked && pendingVersion !== currentVersion) return false
-
-    await this.#writeState({
-      schemaVersion: 1,
-      shownVersions: normalizeShownVersions([...shownVersions, currentVersion]),
-    })
-    return true
   }
 }
 
