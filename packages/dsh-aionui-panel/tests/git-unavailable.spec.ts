@@ -11,6 +11,7 @@
  *   spawning anything on a git-less machine.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRouteRegistry } from '../../../shared/tests/host-route-fixture.ts'
 import { registerPanelRoutes } from '../src/host/routes.ts'
 import { GitService, type GitRunner } from '../src/host/git-service.ts'
 import type { WorkspaceGate } from '../src/host/gate.ts'
@@ -32,16 +33,7 @@ function makeEnv(): {
   warn: ReturnType<typeof vi.fn>
 } {
   const warn = vi.fn()
-  const registrations: Array<{ kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }> = []
-  const ctx = {
-    logger: { warn },
-    webServer: {
-      register: (row: { kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }) => {
-        registrations.push(row)
-        return () => {}
-      },
-    },
-  }
+  const { ctx, registrations } = createRouteRegistry(warn)
   const fs = {
     verify: async (root: string) => ({ ok: true, canonical: root }),
     watch: (_root: string, _onChange: () => void) => () => {},

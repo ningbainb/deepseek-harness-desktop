@@ -4,6 +4,7 @@
  * real FsService with a fake ctx.webServer registry.
  */
 import { describe, expect, it } from 'vitest'
+import { createRouteRegistry } from '../../../shared/tests/host-route-fixture.ts'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -12,22 +13,9 @@ import { registerPanelRoutes } from '../src/host/routes.ts'
 import type { WorkspaceGate } from '../src/host/gate.ts'
 
 /** A minimal ctx fulfilling what registerPanelRoutes touches. */
-function fakeCtx(): {
-  ctx: Record<string, unknown>
-  registrations: Array<{ kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }>
-} {
-  const registrations: Array<{ kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }> = []
-  const ctx = {
-    logger: { warn: () => {} },
-    webServer: {
-      register: (row: { kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }) => {
-        registrations.push(row)
-        return () => {}
-      },
-    },
-    effect: (fn: () => void) => { fn(); return () => {} },
-  }
-  return { ctx, registrations }
+function rawRouteRegistry() {
+  const { ctx, registrations } = createRouteRegistry(() => {})
+  return { ctx: { ...ctx, effect: (fn: () => void) => { fn(); return () => {} } }, registrations }
 }
 
 /** Drive one request through the registered prefix handler. */
@@ -63,7 +51,7 @@ describe('GET /aionui-panel/raw', () => {
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01])
     await writeFile(join(root, 'assets', 'pic.png'), png)
     const gate: WorkspaceGate = async () => ({ ok: true, canonical: root })
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = rawRouteRegistry()
     registerPanelRoutes(ctx as never, new FsService(gate), { status: async () => null } as never)
     const row = registrations.find((item) => item.kind === 'prefix')
     expect(row).toBeDefined()
@@ -88,7 +76,7 @@ describe('GET /aionui-panel/raw', () => {
     await mkdir(join(root, '.git'), { recursive: true })
     await writeFile(join(root, '.git', 'config'), 'cfg')
     const gate: WorkspaceGate = async () => ({ ok: true, canonical: root })
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = rawRouteRegistry()
     registerPanelRoutes(ctx as never, new FsService(gate), { status: async () => null } as never)
     const row = registrations.find((item) => item.kind === 'prefix')!
 
@@ -109,7 +97,7 @@ describe('GET /aionui-panel/raw', () => {
 
   it('rejects non-loopback raw reads with 403 before touching the filesystem', async () => {
     const gate: WorkspaceGate = async () => ({ ok: true, canonical: '/tmp/nope' })
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = rawRouteRegistry()
     registerPanelRoutes(ctx as never, new FsService(gate), { status: async () => null } as never)
     const row = registrations.find((item) => item.kind === 'prefix')!
 

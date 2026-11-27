@@ -5,6 +5,7 @@
  * Exercises the handlers through a fake ctx.webServer registry.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createRouteRegistry, driveRoute } from '../../../shared/tests/host-route-fixture.ts'
 import type { IncomingMessage } from 'node:http'
 import { isLoopbackRequest, registerGitRoutes } from '../src/host/routes.ts'
 import type { RepoStatus } from '../src/core/types.ts'
@@ -27,24 +28,6 @@ describe('local request origin', () => {
     expect(isLoopbackRequest(request as IncomingMessage)).toBe(expected)
   })
 })
-
-/** A minimal ctx fulfilling what registerGitRoutes touches. */
-function fakeCtx(): {
-  ctx: Record<string, unknown>
-  registrations: Array<{ kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }>
-} {
-  const registrations: Array<{ kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }> = []
-  const ctx = {
-    logger: { warn: vi.fn() },
-    webServer: {
-      register: (row: { kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }) => {
-        registrations.push(row)
-        return () => {}
-      },
-    },
-  }
-  return { ctx, registrations }
-}
 
 interface RequestOptions {
   method?: string
@@ -75,57 +58,17 @@ function fakeRequest(url: string, options: RequestOptions = {}): Record<string, 
   return req
 }
 
-/** One fake ServerResponse collecting status/headers/body/writes. */
-function fakeResponse(): {
-  res: Record<string, unknown>
-  status: number
-  headers: Record<string, string>
-  body: string
-  writes: string[]
-} {
-  const state = { status: 0, headers: {} as Record<string, string>, body: '', writes: [] as string[] }
-  const res: Record<string, unknown> = {
-    writeHead: (code: number, head: Record<string, string> = {}) => {
-      state.status = code
-      state.headers = { ...head }
-    },
-    write: (chunk: unknown) => { state.writes.push(String(chunk)) },
-    end: (chunk?: unknown) => {
-      if (chunk !== undefined && chunk !== null) state.writes.push(String(chunk))
-      state.body = state.writes.join('')
-    },
-  }
-  return {
-    res,
-    get status() { return state.status },
-    get headers() { return state.headers },
-    get body() { return state.body },
-    get writes() { return state.writes },
-  }
-}
-
-/** Drive one request through a registered handler. */
-async function drive(
-  handler: (req: unknown, res: unknown) => Promise<void>,
-  url: string,
-  options: RequestOptions = {},
-): Promise<{ status: number; headers: Record<string, string>; body: string; writes: string[] }> {
-  const response = fakeResponse()
-  await handler(fakeRequest(url, options), response.res)
-  return { status: response.status, headers: response.headers, body: response.body, writes: response.writes }
-}
-
 describe('/git loopback fence', () => {
   it('serves loopback clients exactly as before', async () => {
     const status = vi.fn(async () => makeStatus())
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = createRouteRegistry(vi.fn())
     registerGitRoutes(ctx as never, { status } as never)
     const prefix = registrations.find((row) => row.kind === 'prefix')
     expect(prefix).toBeDefined()
 
-    const result = await drive(prefix!.handler, '/git/status', {
+    const result = await driveRoute(prefix!.handler, fakeRequest('/git/status', {
       body: JSON.stringify({ path: '/w' }),
-    })
+    }))
 
     expect(result.status).toBe(200)
     expect(JSON.parse(result.body)).toEqual({ ok: true, value: makeStatus() })
@@ -137,13 +80,13 @@ describe('/git loopback fence', () => {
     // the untracked/conflict/operation fields) must never leak to the client:
     // the boundary guard replaces it with a stable internal error.
     const status = vi.fn(async () => ({ root: '/w', branch: 'main', head: 'abc1234', dirtyFiles: 0 }))
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = createRouteRegistry(vi.fn())
     registerGitRoutes(ctx as never, { status } as never)
     const prefix = registrations.find((row) => row.kind === 'prefix')
 
-    const result = await drive(prefix!.handler, '/git/status', {
+    const result = await driveRoute(prefix!.handler, fakeRequest('/git/status', {
       body: JSON.stringify({ path: '/w' }),
-    })
+    }))
 
     expect(result.status).toBe(200)
     expect(JSON.parse(result.body)).toEqual({
@@ -155,15 +98,15 @@ describe('/git loopback fence', () => {
 
   it('rejects non-loopback JSON operations with 403 before touching the service', async () => {
     const status = vi.fn(async () => null)
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = createRouteRegistry(vi.fn())
     registerGitRoutes(ctx as never, { status } as never)
     const prefix = registrations.find((row) => row.kind === 'prefix')!
 
-    const result = await drive(prefix.handler, '/git/status', {
+    const result = await driveRoute(prefix.handler, fakeRequest('/git/status', {
       remoteAddress: '192.168.1.20',
       host: '192.168.1.10:3000',
       body: JSON.stringify({ path: '/w' }),
-    })
+    }))
 
     expect(result.status).toBe(403)
     expect(result.headers['content-type']).toBe('application/json; charset=utf-8')
@@ -172,15 +115,15 @@ describe('/git loopback fence', () => {
   })
 
   it('rejects non-loopback requests before method/content-type checks', async () => {
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = createRouteRegistry(vi.fn())
     registerGitRoutes(ctx as never, {} as never)
     const prefix = registrations.find((row) => row.kind === 'prefix')!
 
-    const result = await drive(prefix.handler, '/git/status', {
+    const result = await driveRoute(prefix.handler, fakeRequest('/git/status', {
       method: 'GET',
       remoteAddress: '192.168.1.20',
       host: '192.168.1.10:3000',
-    })
+    }))
 
     expect(result.status).toBe(403)
     expect(JSON.parse(result.body)).toEqual({ error: 'forbidden: loopback-only' })
@@ -188,15 +131,15 @@ describe('/git loopback fence', () => {
 
   it('rejects non-loopback SSE before opening the stream', async () => {
     const status = vi.fn(async () => null)
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = createRouteRegistry(vi.fn())
     registerGitRoutes(ctx as never, { status } as never)
     const sse = registrations.find((row) => row.kind === 'exact')!
 
-    const result = await drive(sse.handler, '/git/events?path=%2Fw', {
+    const result = await driveRoute(sse.handler, fakeRequest('/git/events?path=%2Fw', {
       method: 'GET',
       remoteAddress: '192.168.1.20',
       host: '192.168.1.10:3000',
-    })
+    }))
 
     expect(result.status).toBe(403)
     expect(JSON.parse(result.body)).toEqual({ error: 'forbidden: loopback-only' })
@@ -206,16 +149,16 @@ describe('/git loopback fence', () => {
 
   it('still opens the SSE stream for loopback clients', async () => {
     const closeHandlers: Array<() => void> = []
-    const { ctx, registrations } = fakeCtx()
+    const { ctx, registrations } = createRouteRegistry(vi.fn())
     registerGitRoutes(ctx as never, { status: async () => null } as never)
     const sse = registrations.find((row) => row.kind === 'exact')!
 
-    const result = await drive(sse.handler, '/git/events?path=%2Fw', {
+    const result = await driveRoute(sse.handler, fakeRequest('/git/events?path=%2Fw', {
       method: 'GET',
       on: (event, handler) => {
         if (event === 'close') closeHandlers.push(handler)
       },
-    })
+    }))
 
     expect(result.status).toBe(200)
     expect(result.headers['content-type']).toBe('text/event-stream; charset=utf-8')
@@ -231,16 +174,7 @@ function makePollEnv(): {
   warn: ReturnType<typeof vi.fn>
 } {
   const warn = vi.fn()
-  const registrations: Array<{ kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }> = []
-  const ctx = {
-    logger: { warn },
-    webServer: {
-      register: (row: { kind: string; path: string; handler: (req: unknown, res: unknown) => Promise<void> }) => {
-        registrations.push(row)
-        return () => {}
-      },
-    },
-  }
+  const { ctx, registrations } = createRouteRegistry(warn)
   const status = vi.fn()
   registerGitRoutes(ctx as never, { status } as never)
   const sse = registrations.find((row) => row.kind === 'exact')
