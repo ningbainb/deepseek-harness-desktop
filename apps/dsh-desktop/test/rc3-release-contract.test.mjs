@@ -8,7 +8,7 @@ const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.
 const rootManifest = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url)))
 
 test('next Desktop has an unambiguous candidate version and exact official Alpha.2 core', () => {
-  assert.equal(manifest.version, '5.6.0')
+  assert.equal(manifest.version, '5.7.0-test.1')
   assert.equal(rootManifest.version, manifest.version)
   assert.equal(manifest.dependencies['@deepseek-ai/dsh'], '0.2.3-alpha.2')
   assert.equal(manifest.dependencies['@deepseek-ai/dsh-web-app'], '0.2.3-alpha.2')
