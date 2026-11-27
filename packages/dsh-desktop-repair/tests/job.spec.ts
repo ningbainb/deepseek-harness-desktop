@@ -83,4 +83,17 @@ describe('repair job boundary', () => {
     await writeFile(jobPath, JSON.stringify(value))
     await expect(loadRepairJob(jobPath)).rejects.toThrow(/repair job fields|incident directory/u)
   })
+
+  it('requires descendants of the incident while allowing dot-prefixed directory names', async () => {
+    const { incident, jobPath } = await fixture()
+    const value = JSON.parse(await readFile(jobPath, 'utf8'))
+    value.workspace = join(incident, '..candidate')
+    await writeFile(jobPath, JSON.stringify(value))
+    expect((await loadRepairJob(jobPath)).workspace).toBe(value.workspace)
+
+    for (const workspace of [incident, join(incident, '..'), incident + '-sibling']) {
+      await writeFile(jobPath, JSON.stringify({ ...value, workspace }))
+      await expect(loadRepairJob(jobPath)).rejects.toThrow(/inside the incident directory/u)
+    }
+  })
 })

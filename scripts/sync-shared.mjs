@@ -23,6 +23,11 @@ export const REPO_ROOT = resolve(SCRIPT_DIR, '..')
  */
 const MANIFEST = [
   {
+    file: 'repair-path.mjs',
+    source: 'shared/host/repair-path.mjs',
+    targets: ['apps/dsh-desktop/src/repair-path.mjs', 'packages/dsh-desktop-repair/src/repair-path.mjs'],
+  },
+  {
     file: 'sidebar-entry-anchor.ts',
     source: 'shared/client/sidebar-entry-anchor.ts',
     targets: ['dsh-ssh', 'dsh-task-board', 'dsh-web-ui-all', 'dsh-live-stats']

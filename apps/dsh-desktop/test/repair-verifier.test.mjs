@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events'
 import { resolve } from 'node:path'
 import test from 'node:test'
 
-import { RepairVerifier } from '../src/repair-verifier.mjs'
+import { RepairVerifier, runRegisteredRepairCommand } from '../src/repair-verifier.mjs'
 
 function readyProbe(calls) {
   const probe = new EventEmitter()
@@ -108,8 +108,28 @@ test('candidate start failure is classified and reclaimed', async () => {
   assert.deepEqual(calls, ['probe-start', 'probe-stop'])
 })
 
+test('registered checks accept the workspace and its dot-prefixed children and reject a sibling', async () => {
+  const workspace = resolve('incident', 'staging')
+  const started = []
+  function spawnProcess(_executable, _args, { cwd }) {
+    started.push(cwd)
+    const child = new EventEmitter()
+    setImmediate(() => child.emit('exit', 0))
+    return child
+  }
+  const run = cwd => runRegisteredRepairCommand({ executable: process.execPath, args: [], cwd }, workspace, { spawnProcess })
+  assert.equal((await run('.')).ok, true)
+  assert.equal((await run('..candidate')).ok, true)
+  assert.throws(() => run('../staging-sibling'), /outside candidate workspace/u)
+  if (process.platform === 'win32') {
+    const otherDrive = workspace.toUpperCase().startsWith('C:') ? 'D:' : 'C:'
+    assert.throws(() => run(otherDrive + '/candidate'), /outside candidate workspace/u)
+  }
+  assert.deepEqual(started, [workspace, resolve(workspace, '..candidate')])
+})
+
 test('repair command children receive only allowlisted environment variables', async () => {
-  const { runRegisteredRepairCommand, verifierChildEnvironment } = await import('../src/repair-verifier.mjs')
+  const { verifierChildEnvironment } = await import('../src/repair-verifier.mjs')
   const seen = []
   const fakeSpawn = (executable, args, options) => {
     seen.push(options.env)

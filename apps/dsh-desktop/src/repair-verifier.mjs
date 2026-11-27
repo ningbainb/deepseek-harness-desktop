@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
+import { isWithinRepairRoot } from './repair-path.mjs'
 
 const CHECK_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/u
 
@@ -68,11 +69,6 @@ export function verifierChildEnvironment(sourceEnv = process.env) {
   })
 }
 
-function isWithin(candidate, parent) {
-  const path = relative(parent, candidate)
-  return path === '' || (!path.startsWith(`..${sep}`) && path !== '..' && !isAbsolute(path))
-}
-
 /**
  * Bounded one-line diagnostic. Component, operation, error name, truncated
  * message - never a stack, because these lines are persisted and a stack can
@@ -102,7 +98,7 @@ export function runRegisteredRepairCommand(command, workspace, {
     throw new TypeError('registered repair command is invalid')
   }
   const cwd = resolve(workspace, command.cwd)
-  if (!isWithin(cwd, resolve(workspace))) throw new TypeError('registered repair command is outside candidate workspace')
+  if (!isWithinRepairRoot(cwd, resolve(workspace))) throw new TypeError('registered repair command is outside candidate workspace')
   return new Promise((resolveRun) => {
     let child
     try {

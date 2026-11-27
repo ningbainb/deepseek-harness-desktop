@@ -13,7 +13,8 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
-import { dirname, isAbsolute, join, posix, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, posix, resolve, sep } from 'node:path'
+import { isWithinRepairRoot } from './repair-path.mjs'
 
 const ROOT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u
 const PROFILE_REPAIR_FILES = Object.freeze([
@@ -28,11 +29,6 @@ const PROFILE_REPAIR_FILES = Object.freeze([
 ])
 const EXCLUDED_DIRECTORIES = new Set(['.git'])
 const PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u
-
-function isWithin(candidate, parent) {
-  const result = relative(parent, candidate)
-  return result === '' || (!result.startsWith(`..${sep}`) && result !== '..' && !isAbsolute(result))
-}
 
 function toPortablePath(value) {
   return value.split(sep).join('/')
@@ -142,7 +138,7 @@ async function copyMaterialized(source, target, sourceRoot, budget, seenDirector
   let actual = source
   if (stat.isSymbolicLink()) {
     actual = await realpath(source)
-    if (!isWithin(actual, sourceRoot)) {
+    if (!isWithinRepairRoot(actual, sourceRoot)) {
       throw new Error('repair workspace refuses a nested link outside its declared plugin root')
     }
     stat = await lstat(actual)
@@ -420,7 +416,7 @@ export class RepairWorkspace {
         sourceReal,
         stageRoot,
         originalRoot,
-        external: descriptor.kind === 'plugin' && !isWithin(sourceReal, profileReal),
+        external: descriptor.kind === 'plugin' && !isWithinRepairRoot(sourceReal, profileReal),
         originalInventory,
       })
     }
@@ -459,7 +455,7 @@ export class RepairWorkspace {
       throw new Error('path is outside repair workspace')
     }
     const candidate = resolve(record.stageRoot, safe)
-    if (!isWithin(candidate, record.stageRoot)) throw new Error('path is outside repair workspace')
+    if (!isWithinRepairRoot(candidate, record.stageRoot)) throw new Error('path is outside repair workspace')
     return candidate
   }
 

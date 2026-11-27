@@ -10,7 +10,8 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
+import { isWithinRepairRoot } from './repair-path.mjs'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 
 import {
@@ -52,11 +53,6 @@ export interface RepairCheckResult {
 }
 
 type CommandRunner = (command: RepairJobCommand, cwd: string) => Promise<RepairCheckResult>
-
-function isWithin(candidate: string, parent: string): boolean {
-  const result = relative(parent, candidate)
-  return result === '' || (!result.startsWith(`..${sep}`) && result !== '..' && !isAbsolute(result))
-}
 
 function boundedOutput(value: string): string {
   return Buffer.from(value).subarray(0, MAX_OUTPUT_BYTES).toString('utf8')
@@ -165,7 +161,7 @@ export class RepairToolController {
   private root(id: string) {
     const root = this.roots.get(id)
     if (root === undefined) throw new Error('repair root is not declared')
-    if (!isWithin(root.path, resolve(this.job.workspace))) throw new Error('repair root is outside repair workspace')
+    if (!isWithinRepairRoot(root.path, resolve(this.job.workspace))) throw new Error('repair root is outside repair workspace')
     return root
   }
 
@@ -183,7 +179,7 @@ export class RepairToolController {
     const portable = normalized.split(sep).join('/')
     if (isCredentialPath(portable)) throw new Error('repair tools cannot access credential files')
     const target = resolve(root.path, normalized)
-    if (!isWithin(target, root.path)) throw new Error('path is outside repair workspace')
+    if (!isWithinRepairRoot(target, root.path)) throw new Error('path is outside repair workspace')
     let current = root.path
     const rootState = await state(current)
     if (rootState?.isSymbolicLink()) throw new Error('repair workspace roots cannot be filesystem links')
@@ -193,7 +189,7 @@ export class RepairToolController {
       const currentState = await state(current)
       if (currentState === undefined) break
       if (currentState.isSymbolicLink()) throw new Error('repair tools refuse filesystem links')
-      if (!isWithin(await realpath(current), realRoot)) throw new Error('repair tools refuse filesystem links')
+      if (!isWithinRepairRoot(await realpath(current), realRoot)) throw new Error('repair tools refuse filesystem links')
     }
     return target
   }
@@ -280,7 +276,7 @@ export class RepairToolController {
       const command = this.commands.get(name)
       if (command === undefined) throw new Error('repair check is not a registered repair check')
       const cwd = resolve(this.job.workspace, command.cwd)
-      if (!isWithin(cwd, resolve(this.job.workspace))) throw new Error('repair check cwd is outside repair workspace')
+      if (!isWithinRepairRoot(cwd, resolve(this.job.workspace))) throw new Error('repair check cwd is outside repair workspace')
       const result = await this.runCommand(command, cwd)
       return {
         exitCode: result.exitCode,

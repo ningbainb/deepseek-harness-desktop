@@ -6,6 +6,18 @@ import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, writeFile 
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 import { defineTool } from "@deepseek-ai/dsh-tools";
+//#region src/repair-path.mjs
+/**
+* Compare resolved repair paths lexically. Callers traversing the filesystem
+* validate links and real paths separately.
+* @param {string} candidate
+* @param {string} parent
+*/
+function isWithinRepairRoot(candidate, parent) {
+	const path = relative(parent, candidate);
+	return path === "" || path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
+}
+//#endregion
 //#region src/job.ts
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/u;
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u;
@@ -32,10 +44,6 @@ function immutable(value) {
 	if (Array.isArray(value)) return Object.freeze(value.map(immutable));
 	if (value !== null && typeof value === "object") return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, immutable(item)])));
 	return value;
-}
-function isWithin$1(candidate, parent) {
-	const result = relative(parent, candidate);
-	return result === "" || !result.startsWith(`..${sep}`) && result !== ".." && !isAbsolute(result);
 }
 function safeId(value, label) {
 	if (typeof value !== "string" || !ID_PATTERN.test(value)) throw new TypeError(`${label} is invalid`);
@@ -89,7 +97,7 @@ function commandEntry(value, workspace) {
 	if (typeof input.executable !== "string" || !isAbsolute(input.executable)) throw new TypeError("repair job command executable is invalid");
 	if (!Array.isArray(input.args) || input.args.length > 64 || input.args.some((arg) => typeof arg !== "string" || arg.length > 1e3)) throw new TypeError("repair job command arguments are invalid");
 	const cwd = safeRepairRelativePath(input.cwd, "repair command cwd");
-	if (!isWithin$1(resolve(workspace, cwd), workspace)) throw new TypeError("repair command cwd is outside repair workspace");
+	if (!isWithinRepairRoot(resolve(workspace, cwd), workspace)) throw new TypeError("repair command cwd is outside repair workspace");
 	return {
 		name: safeId(input.name, "repair command name"),
 		executable: resolve(input.executable),
@@ -152,11 +160,11 @@ async function loadRepairJob(jobPath) {
 	if (typeof input.resultPath !== "string" || !isAbsolute(input.resultPath)) throw new TypeError("repair result path is invalid");
 	const workspace = resolve(input.workspace);
 	const resultPath = resolve(input.resultPath);
-	if (!isWithin$1(workspace, incidentDir) || workspace === incidentDir || !isWithin$1(resultPath, incidentDir) || resultPath === incidentDir) throw new TypeError("repair job paths must stay inside the incident directory");
+	if (!isWithinRepairRoot(workspace, incidentDir) || workspace === incidentDir || !isWithinRepairRoot(resultPath, incidentDir) || resultPath === incidentDir) throw new TypeError("repair job paths must stay inside the incident directory");
 	if (!Array.isArray(input.roots) || input.roots.length === 0 || input.roots.length > 256) throw new TypeError("repair job roots are invalid");
 	const roots = input.roots.map(rootEntry);
 	if (new Set(roots.map((root) => root.id)).size !== roots.length || roots.filter((root) => root.kind === "profile").length !== 1) throw new TypeError("repair job roots are duplicated or incomplete");
-	for (const root of roots) if (!isWithin$1(resolve(workspace, root.relativePath), workspace)) throw new TypeError("repair root is outside repair workspace");
+	for (const root of roots) if (!isWithinRepairRoot(resolve(workspace, root.relativePath), workspace)) throw new TypeError("repair root is outside repair workspace");
 	if (!Array.isArray(input.commands) || input.commands.length > 64) throw new TypeError("repair job commands are invalid");
 	const commands = input.commands.map((command) => commandEntry(command, workspace));
 	if (new Set(commands.map((command) => command.name)).size !== commands.length) throw new TypeError("repair job commands are duplicated");
@@ -344,10 +352,6 @@ const CREDENTIAL_NAMES = /* @__PURE__ */ new Set([
 	"id_ed25519",
 	"known_hosts"
 ]);
-function isWithin(candidate, parent) {
-	const result = relative(parent, candidate);
-	return result === "" || !result.startsWith(`..${sep}`) && result !== ".." && !isAbsolute(result);
-}
 function boundedOutput(value) {
 	return Buffer.from(value).subarray(0, MAX_OUTPUT_BYTES).toString("utf8");
 }
@@ -457,7 +461,7 @@ var RepairToolController = class {
 	root(id) {
 		const root = this.roots.get(id);
 		if (root === void 0) throw new Error("repair root is not declared");
-		if (!isWithin(root.path, resolve(this.job.workspace))) throw new Error("repair root is outside repair workspace");
+		if (!isWithinRepairRoot(root.path, resolve(this.job.workspace))) throw new Error("repair root is outside repair workspace");
 		return root;
 	}
 	async candidatePath(rootId, relativePath, { allowRoot = false } = {}) {
@@ -471,7 +475,7 @@ var RepairToolController = class {
 		}
 		if (isCredentialPath(normalized.split(sep).join("/"))) throw new Error("repair tools cannot access credential files");
 		const target = resolve(root.path, normalized);
-		if (!isWithin(target, root.path)) throw new Error("path is outside repair workspace");
+		if (!isWithinRepairRoot(target, root.path)) throw new Error("path is outside repair workspace");
 		let current = root.path;
 		if ((await state(current))?.isSymbolicLink()) throw new Error("repair workspace roots cannot be filesystem links");
 		const realRoot = await realpath(root.path);
@@ -480,7 +484,7 @@ var RepairToolController = class {
 			const currentState = await state(current);
 			if (currentState === void 0) break;
 			if (currentState.isSymbolicLink()) throw new Error("repair tools refuse filesystem links");
-			if (!isWithin(await realpath(current), realRoot)) throw new Error("repair tools refuse filesystem links");
+			if (!isWithinRepairRoot(await realpath(current), realRoot)) throw new Error("repair tools refuse filesystem links");
 		}
 		return target;
 	}
@@ -568,7 +572,7 @@ var RepairToolController = class {
 			const command = this.commands.get(name);
 			if (command === void 0) throw new Error("repair check is not a registered repair check");
 			const cwd = resolve(this.job.workspace, command.cwd);
-			if (!isWithin(cwd, resolve(this.job.workspace))) throw new Error("repair check cwd is outside repair workspace");
+			if (!isWithinRepairRoot(cwd, resolve(this.job.workspace))) throw new Error("repair check cwd is outside repair workspace");
 			const result = await this.runCommand(command, cwd);
 			return {
 				exitCode: result.exitCode,

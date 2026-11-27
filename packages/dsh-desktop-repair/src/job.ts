@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { isWithinRepairRoot } from './repair-path.mjs'
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,79}$/u
 const FINGERPRINT_PATTERN = /^[a-f0-9]{64}$/u
@@ -95,11 +96,6 @@ function immutable<T>(value: T): T {
   return value
 }
 
-function isWithin(candidate: string, parent: string): boolean {
-  const result = relative(parent, candidate)
-  return result === '' || (!result.startsWith(`..${sep}`) && result !== '..' && !isAbsolute(result))
-}
-
 function safeId(value: unknown, label: string): string {
   if (typeof value !== 'string' || !ID_PATTERN.test(value)) throw new TypeError(`${label} is invalid`)
   return value
@@ -183,7 +179,7 @@ function commandEntry(value: unknown, workspace: string): RepairJobCommand {
     throw new TypeError('repair job command arguments are invalid')
   }
   const cwd = safeRepairRelativePath(input.cwd, 'repair command cwd')
-  if (!isWithin(resolve(workspace, cwd), workspace)) throw new TypeError('repair command cwd is outside repair workspace')
+  if (!isWithinRepairRoot(resolve(workspace, cwd), workspace)) throw new TypeError('repair command cwd is outside repair workspace')
   return {
     name: safeId(input.name, 'repair command name'),
     executable: resolve(input.executable),
@@ -249,7 +245,7 @@ export async function loadRepairJob(jobPath: string): Promise<RepairJob> {
   if (typeof input.resultPath !== 'string' || !isAbsolute(input.resultPath)) throw new TypeError('repair result path is invalid')
   const workspace = resolve(input.workspace)
   const resultPath = resolve(input.resultPath)
-  if (!isWithin(workspace, incidentDir) || workspace === incidentDir || !isWithin(resultPath, incidentDir) || resultPath === incidentDir) {
+  if (!isWithinRepairRoot(workspace, incidentDir) || workspace === incidentDir || !isWithinRepairRoot(resultPath, incidentDir) || resultPath === incidentDir) {
     throw new TypeError('repair job paths must stay inside the incident directory')
   }
   if (!Array.isArray(input.roots) || input.roots.length === 0 || input.roots.length > 256) {
@@ -260,7 +256,7 @@ export async function loadRepairJob(jobPath: string): Promise<RepairJob> {
     throw new TypeError('repair job roots are duplicated or incomplete')
   }
   for (const root of roots) {
-    if (!isWithin(resolve(workspace, root.relativePath), workspace)) throw new TypeError('repair root is outside repair workspace')
+    if (!isWithinRepairRoot(resolve(workspace, root.relativePath), workspace)) throw new TypeError('repair root is outside repair workspace')
   }
   if (!Array.isArray(input.commands) || input.commands.length > 64) throw new TypeError('repair job commands are invalid')
   const commands = input.commands.map(command => commandEntry(command, workspace))
