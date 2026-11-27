@@ -6,6 +6,7 @@
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { openDesktopSurface } from '@linxin666/dsh-desktop-client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -211,6 +212,8 @@ export function apply(ctx: ClientContext): void {
   }
   if (!dockSetting) ctx.effect(
     () => installDesktopManagementRouting(document, ctx.locale.bind('web-ui-plugins'), nativeDesktopSettings ? {
+      get panelInfo() { return ctx.get('layout')?.panelInfo },
+      get generation() { return (ctx.get('connection') as ConnectionHandle | undefined)?.generation },
       openPlugins() {
         const navigation = ctx.get('pluginNavigation') as { openList(): void } | undefined
         if (!navigation) return false

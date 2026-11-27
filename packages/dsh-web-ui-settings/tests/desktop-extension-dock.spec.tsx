@@ -25,6 +25,139 @@ import { zh } from '../src/client/locales.ts'
 
 const t = ((key: keyof typeof zh) => zh[key]) as never
 
+describe('Desktop experimental plugin navigation', () => {
+  let openPage: (destination: string) => void
+  let dispose: () => void
+  let routeChange: () => void
+  let connectionChange: () => void
+  let activePanelId: string | null
+  let generation: { id: number } | undefined
+  const offPanel = vi.fn()
+  const offConnection = vi.fn()
+  const navigation = {
+    openPlugins: vi.fn(() => { activePanelId = 'plugins'; routeChange(); return true }),
+    openSettings: vi.fn(() => true),
+    panelInfo: {
+      getSnapshot: () => ({ activePanelId }),
+      subscribe: (listener: () => void) => { routeChange = listener; return offPanel },
+    },
+    generation: {
+      getSnapshot: () => generation,
+      subscribe: (listener: () => void) => { connectionChange = listener; return offConnection },
+    },
+  }
+  const more = vi.fn()
+
+  function mountPanel() {
+    const panel = document.createElement('section')
+    panel.setAttribute('data-plugin-panel', '')
+    panel.setAttribute('aria-busy', 'true')
+    document.body.append(panel)
+    return panel
+  }
+
+  function finishInventory(panel: HTMLElement) {
+    panel.innerHTML = '<div role="tabpanel" id="plugins-installed-panel"><section data-plugin-group="extensions"><div><h3></h3><button>More</button></div></section></div>'
+    panel.querySelector('button')!.addEventListener('click', more)
+    panel.setAttribute('aria-busy', 'false')
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    activePanelId = null
+    generation = { id: 1 }
+    document.body.innerHTML = '<aside data-pane="sidebar"></aside>'
+    Object.assign(window, { dshDesktop: { onNativePageOpen(listener: typeof openPage) { openPage = listener } } })
+    desktop.hasCapability.mockResolvedValue(true)
+    dispose = installDesktopManagementRouting(document, t, navigation)
+    await Promise.resolve()
+  })
+
+  afterEach(() => {
+    dispose()
+    document.body.replaceChildren()
+    vi.useRealTimers()
+  })
+
+  it('opens More on the first render after a slow inventory without another timer tick', async () => {
+    openPage('experimental-plugins')
+    await vi.advanceTimersByTimeAsync(46_000)
+    const panel = mountPanel()
+    await Promise.resolve()
+    finishInventory(panel)
+    await Promise.resolve()
+    expect(more).toHaveBeenCalledOnce()
+    finishInventory(panel)
+    await Promise.resolve()
+    expect(more).toHaveBeenCalledOnce()
+    expect(navigation.openPlugins).toHaveBeenCalledOnce()
+    expect(offConnection).toHaveBeenCalledOnce()
+  })
+
+  it.each(['native destination', 'keyboard', 'SDK panel switch', 'disconnect', 'panel replacement', 'dispose'])(
+    'cancels pending More on %s', async reason => {
+      openPage('experimental-plugins')
+      const panel = mountPanel()
+      await Promise.resolve()
+      if (reason === 'native destination') openPage('appearance')
+      if (reason === 'keyboard') fireEvent.keyDown(document.body, { key: 'Tab' })
+      if (reason === 'SDK panel switch') { activePanelId = 'settings'; routeChange() }
+      if (reason === 'disconnect') { generation = undefined; connectionChange() }
+      if (reason === 'panel replacement') panel.remove()
+      if (reason === 'dispose') dispose()
+      finishInventory(panel.isConnected ? panel : mountPanel())
+      await vi.advanceTimersByTimeAsync(250)
+      expect(more).not.toHaveBeenCalled()
+      expect(offPanel).toHaveBeenCalledOnce()
+      expect(offConnection).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('waits for the list to replace a previously open More view', async () => {
+    const panel = mountPanel()
+    panel.setAttribute('aria-busy', 'false')
+    panel.innerHTML = '<section data-plugin-group="more"></section>'
+    openPage('experimental-plugins')
+    finishInventory(panel)
+    await Promise.resolve()
+    expect(more).toHaveBeenCalledOnce()
+  })
+
+  it('cancels a retry while the navigation service is still registering', async () => {
+    navigation.openPlugins.mockReturnValueOnce(false)
+    openPage('experimental-plugins')
+    openPage('appearance')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(navigation.openPlugins).toHaveBeenCalledOnce()
+    expect(navigation.openSettings).toHaveBeenCalledWith('appearance')
+    expect(offConnection).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    '<div role="tabpanel" id="plugins-installed-panel"><p>No plugins</p></div>',
+    '<div data-plugin-body><header data-plugin-bar></header><div><p>No plugins</p></div></div>',
+  ])('finishes an already empty inventory without following a future refresh', async markup => {
+    const panel = mountPanel()
+    panel.setAttribute('aria-busy', 'false')
+    panel.innerHTML = markup
+    openPage('experimental-plugins')
+    expect(offPanel).toHaveBeenCalledOnce()
+    finishInventory(panel)
+    await Promise.resolve()
+    expect(more).not.toHaveBeenCalled()
+  })
+
+  it('waits for the installed tab when the previous Discover tab is empty', async () => {
+    const panel = mountPanel()
+    panel.setAttribute('aria-busy', 'false')
+    panel.innerHTML = '<div role="tabpanel" id="plugins-discover-panel"><p>No matches</p></div>'
+    openPage('experimental-plugins')
+    finishInventory(panel)
+    await Promise.resolve()
+    expect(more).toHaveBeenCalledOnce()
+  })
+})
+
 beforeEach(() => {
   desktop.getDockEntryState.mockResolvedValue({ available: true, showNudge: true })
   desktop.hasCapability.mockResolvedValue(true)

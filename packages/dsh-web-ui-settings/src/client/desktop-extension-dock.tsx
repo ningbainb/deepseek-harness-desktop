@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { createPortal } from 'react-dom'
 import type { DiscoverFace } from '@deepseek-ai/dsh-client-ui-plugin-market/client'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   dismissDockNudge,
   getDockEntryState,
@@ -29,6 +30,13 @@ type ManagementTab = 'plugins' | 'skills'
 type PluginSettingsRequest = Readonly<{ name?: unknown }>
 type NativePageRequest = string | Readonly<{ destination: string; sourceUrl?: string; notice?: { name: string; applied: boolean } }>
 type WorkshopRetries = { sources: boolean; listing: boolean }
+type ManagementNavigation = {
+  openPlugins(): boolean
+  openSettings(destination: string): boolean
+  workshopDiscovery?(): WorkshopDiscovery | undefined
+  panelInfo?: HostObservable<{ activePanelId: string | null }>
+  generation?: HostObservable<{ id: number } | undefined>
+}
 export type WorkshopDiscovery = Pick<DiscoverFace, 'reload' | 'retry' | 'select'> & {
   hooks: { discover: Pick<DiscoverFace['hooks']['discover'], 'getSnapshot'> }
 }
@@ -101,6 +109,82 @@ export async function openRuntimePluginSettings(
   })
 }
 
+/** The SDK owns list selection, inventory and permissions. More is exposed only as a button. */
+function openExperimentalPlugins(doc: Document, navigation: ManagementNavigation, request: AbortController): void {
+  let panel: Element | null = null
+  let loading = false
+  let retry: ReturnType<typeof setTimeout> | undefined
+  const stop = () => request.abort()
+  const inspect = (records?: MutationRecord[]) => {
+    if (panel && !panel.isConnected) { stop(); return }
+    if (!panel) {
+      panel = doc.querySelector('[data-plugin-panel]')
+      if (!panel) return
+      observer.disconnect()
+      observer.observe(panel, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-busy'] })
+      // Notice removal of the panel or an enclosing slot without subscribing to sibling subtrees.
+      for (let ancestor = panel.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        observer.observe(ancestor, { childList: true })
+      }
+    } else if (records && !records.some(record => panel?.contains(record.target))) return
+    // openList may still be committing over Discover or More. Inspect the installed list only.
+    const tab = panel.querySelector('[role="tabpanel"]')
+    if (tab && !tab.id.endsWith('-installed-panel')) return
+    const inventory = tab ?? panel.querySelector('[data-plugin-body] > [data-plugin-bar] ~ div:not([data-client-sync-failure])')
+    const heading = inventory?.querySelector('[data-plugin-group="extensions"] h3')
+    const more = heading?.parentElement?.querySelector<HTMLButtonElement>('button')
+    if (more) {
+      stop()
+      more.click()
+      return
+    }
+    const busy = panel.getAttribute('aria-busy') === 'true'
+    if (inventory && !busy && (loading || inventory.querySelector(':scope > p:only-child, [data-plugin-group], [role="alert"]'))) stop()
+    loading = busy
+  }
+  const observer = new MutationObserver(inspect)
+  const onKey = (event: KeyboardEvent) => {
+    if (!['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) stop()
+  }
+  const { panelInfo, generation: connection } = navigation
+  let previousPanel = panelInfo?.getSnapshot().activePanelId
+  const offPanel = panelInfo?.subscribe(() => {
+    const active = panelInfo.getSnapshot().activePanelId
+    if (active !== previousPanel && active !== 'plugins') stop()
+    previousPanel = active
+  })
+  let generation = connection?.getSnapshot()
+  const offConnection = connection?.subscribe(() => {
+    const current = connection.getSnapshot()
+    if (generation && current?.id !== generation.id) stop()
+    generation = current
+  })
+  doc.addEventListener('keydown', onKey, true)
+  request.signal.addEventListener('abort', () => {
+    clearTimeout(retry)
+    observer.disconnect()
+    doc.removeEventListener('keydown', onKey, true)
+    offPanel?.()
+    offConnection?.()
+  }, { once: true })
+
+  // The navigation service may still be mounting. Once it selects the list,
+  // wait for the official rendering without polling slow inventory reads.
+  const started = Date.now()
+  const openList = () => {
+    const opened = navigation.openPlugins()
+    if (request.signal.aborted) return
+    if (!opened) {
+      if (Date.now() - started < 45_000) retry = setTimeout(openList, 200)
+      else stop()
+      return
+    }
+    observer.observe(doc.body, { childList: true, subtree: true })
+    inspect()
+  }
+  openList()
+}
+
 /**
  * Reuse the Runtime's existing Plugins and Skill Center sidebar rows while
  * making the Extension Dock their single Desktop destination. The original
@@ -109,7 +193,7 @@ export async function openRuntimePluginSettings(
 export function installDesktopManagementRouting(
   ownerDocument: Document,
   t: (key: WebUIPluginsKey, params?: Record<string, unknown>) => string,
-  navigation?: { openPlugins(): boolean; openSettings(destination: string): boolean; workshopDiscovery?(): WorkshopDiscovery | undefined },
+  navigation?: ManagementNavigation,
 ): () => void {
   let disposed = false
   let observer: MutationObserver | undefined
@@ -121,6 +205,12 @@ export function installDesktopManagementRouting(
   let unsubscribePluginSettings: (() => void) | undefined
   let unsubscribeNativePage: (() => void) | undefined
   let pageRequest = 0
+  let experimentalRequest: AbortController | undefined
+  const cancelPage = (): void => {
+    ++pageRequest
+    experimentalRequest?.abort()
+    experimentalRequest = undefined
+  }
   let notice: HTMLElement | undefined
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -163,7 +253,7 @@ export function installDesktopManagementRouting(
     entry.insertAdjacentElement('afterend', message)
   }
   const onClick = (event: Event): void => {
-    if (event.isTrusted) ++pageRequest
+    if (event.isTrusted) cancelPage()
     const target = event.target instanceof Element
       ? event.target.closest<HTMLElement>('[data-dsh-desktop-management-entry]')
       : null
@@ -171,7 +261,7 @@ export function installDesktopManagementRouting(
     const tab = target.dataset.dshDesktopManagementEntry
     if (tab !== 'plugins' && tab !== 'skills') return
     if (tab === 'plugins' && navigation) {
-      ++pageRequest
+      cancelPage()
       return
     }
     if (nativeClicks.has(target)) {
@@ -211,6 +301,7 @@ export function installDesktopManagementRouting(
     observer.observe(ownerDocument.body, { childList: true, subtree: true })
     scan()
     unsubscribePluginSettings = mainBridge()?.onPluginSettingsOpen?.((request) => {
+      cancelPage()
       const name = typeof request?.name === 'string' ? request.name : ''
       const entry = ownerDocument.querySelector<HTMLElement>('[data-dsh-desktop-management-entry="plugins"]')
       if (entry !== null) {
@@ -227,8 +318,14 @@ export function installDesktopManagementRouting(
       const destination = typeof payload === 'string' ? payload : payload.destination
       const outcome = typeof payload === 'string' ? undefined : payload.notice
       const sourceUrl = typeof payload === 'string' ? undefined : payload.sourceUrl
-      const request = ++pageRequest
-      if (destination !== 'plugins' && destination !== 'workshop' && destination !== 'experimental-plugins') {
+      cancelPage()
+      if (destination === 'experimental-plugins') {
+        experimentalRequest = new AbortController()
+        openExperimentalPlugins(ownerDocument, navigation, experimentalRequest)
+        return
+      }
+      const request = pageRequest
+      if (destination !== 'plugins' && destination !== 'workshop') {
         navigation.openSettings(destination)
         return
       }
@@ -252,17 +349,6 @@ export function installDesktopManagementRouting(
             notice = entry
             noticeTimer = setTimeout(() => entry.remove(), 10_000)
           }
-          return
-        }
-        if (destination === 'experimental-plugins') {
-          if (opened) {
-            const panel = ownerDocument.querySelector('[data-plugin-panel]')
-            if (panel?.querySelector('[data-plugin-group="more"]')) return
-            const heading = panel?.querySelector('[data-plugin-group="extensions"] h3')
-            const more = heading?.parentElement?.querySelector<HTMLButtonElement>('button')
-            if (more) { more.click(); return }
-          }
-          if (Date.now() - startsAt < 45_000) globalThis.setTimeout(openDestination, 200)
           return
         }
         const tab = ownerDocument.querySelector<HTMLButtonElement>('[data-plugin-panel] [role="tab"][id$="-discover"]')
@@ -294,6 +380,7 @@ export function installDesktopManagementRouting(
 
   return () => {
     disposed = true
+    cancelPage()
     notice?.remove()
     clearTimeout(noticeTimer)
     observer?.disconnect()
