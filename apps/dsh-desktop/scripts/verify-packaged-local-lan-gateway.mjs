@@ -12,7 +12,8 @@ import { isPrivateLanIpv4 } from '../src/local-lan-gateway.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 
 const appDir = resolve(fileURLToPath(new URL('..', import.meta.url)))
-const appPath = resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
+const sourceMode = process.argv.includes('--source')
+const appPath = sourceMode ? (await import('electron')).default : resolve(process.env.DSH_DESKTOP_E2E_EXECUTABLE
   ?? join(appDir, 'dist', 'win-unpacked', 'DeepSeek Harness Desktop.exe'))
 const temporary = await mkdtemp(join(tmpdir(), 'dsh-packaged-local-lan-gateway-'))
 const userData = join(temporary, 'user-data')
@@ -84,7 +85,7 @@ try {
   delete environment.DSH_DESKTOP_REMOTE_HOST
   delete environment.DSH_DESKTOP_REMOTE_PORT
 
-  app = await electron.launch({ executablePath: appPath, cwd: appDir, env: environment })
+  app = await electron.launch({ executablePath: appPath, args: sourceMode ? [join(appDir, 'src/main.mjs')] : [], cwd: appDir, env: environment })
   const page = await app.firstWindow()
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 120_000 })
   await waitForAsyncPageFunction(page, async () => {
