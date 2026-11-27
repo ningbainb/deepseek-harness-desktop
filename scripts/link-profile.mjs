@@ -24,6 +24,7 @@
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, rmdirSync, symlinkSync, unlinkSync } from 'node:fs'
 import { dirname, join, relative, resolve as resolvePath } from 'node:path'
 import { homedir } from 'node:os'
+import { familyPackageManifests } from './family-package-manifests.mjs'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
@@ -59,20 +60,11 @@ const FAMILY_SCOPE = '@linxin666/'
 /** Every family package: packages/* and packages/skins/* that has a package.json with a name. */
 function familyPackages() {
   const found = []
-  const roots = [
-    join(REPO_ROOT, 'packages'),
-    join(REPO_ROOT, 'packages', 'skins'),
-  ]
-  for (const root of roots) {
-    if (!existsSync(root)) continue
-    for (const entry of readdirSync(root).sort()) {
-      const pkgJson = join(root, entry, 'package.json')
-      if (!existsSync(pkgJson)) continue
-      let name
-      try { name = JSON.parse(readFileSync(pkgJson, 'utf8')).name } catch { continue }
-      if (name && name.startsWith(FAMILY_SCOPE)) {
-        found.push({ name: name.slice(FAMILY_SCOPE.length), dir: join(root, entry) })
-      }
+  for (const manifest of familyPackageManifests(REPO_ROOT)) {
+    let name
+    try { name = JSON.parse(readFileSync(manifest, 'utf8')).name } catch { continue }
+    if (name && name.startsWith(FAMILY_SCOPE)) {
+      found.push({ name: name.slice(FAMILY_SCOPE.length), dir: dirname(manifest) })
     }
   }
   return found

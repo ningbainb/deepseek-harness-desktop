@@ -17,25 +17,16 @@
  * Usage: node scripts/release-assets.mjs <vX.Y.Z> <outDir>
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { familyPackageManifests } from './family-package-manifests.mjs'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(SCRIPT_DIR, '..')
 
-/** Every package.json under packages/ (non-recursive, both roots). */
 export function packageFiles(cwd) {
-  const out = []
-  for (const root of ['packages', join('packages', 'skins')]) {
-    const abs = join(cwd, root)
-    if (!existsSync(abs)) continue
-    for (const entry of readdirSync(abs)) {
-      const pkgPath = join(abs, entry, 'package.json')
-      if (existsSync(pkgPath)) out.push(pkgPath)
-    }
-  }
-  return out.sort()
+  return familyPackageManifests(cwd).sort()
 }
 
 /**

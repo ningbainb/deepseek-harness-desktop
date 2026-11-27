@@ -20,6 +20,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, relative, resolve } from 'node:path'
+import { familyPackageManifests } from './family-package-manifests.mjs'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -116,19 +117,6 @@ function headingSlugs(file) {
   return slugs
 }
 
-/** All package directories (packages/* and packages/skins/* with a package.json). */
-function packageDirs() {
-  const dirs = []
-  for (const base of [resolve(root, 'packages'), resolve(root, 'packages/skins')]) {
-    if (!existsSync(base)) continue
-    for (const name of readdirSync(base)) {
-      const dir = resolve(base, name)
-      if (existsSync(resolve(dir, 'package.json'))) dirs.push(dir)
-    }
-  }
-  return dirs
-}
-
 function isExternal(url) {
   return url.startsWith('//') || url.startsWith('/') || /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)
 }
@@ -136,8 +124,9 @@ function isExternal(url) {
 export { countWords, blobHash, signature, sigEqual, slugify, isExternal }
 if (import.meta.main) {
   /* ---------- 1 + 2 + 5. README triplets, pairing, heading levels ---------- */
+  const packageDirs = familyPackageManifests(root).map(file => dirname(file))
   const pairs = []
-  for (const dir of packageDirs()) {
+  for (const dir of packageDirs) {
     const rel = relative(root, dir)
     const en = resolve(dir, 'README.md')
     const zh = resolve(dir, 'README.zh.md')
@@ -239,7 +228,7 @@ if (import.meta.main) {
   }
 
   /* ---------- 6. No scaffold placeholders ---------- */
-  for (const dir of packageDirs()) {
+  for (const dir of packageDirs) {
     const pkg = JSON.parse(readFileSync(resolve(dir, 'package.json'), 'utf8'))
     if (pkg.description && /<edit me/i.test(pkg.description)) fail(relative(root, dir) + ': package.json description still contains a scaffold placeholder')
   }

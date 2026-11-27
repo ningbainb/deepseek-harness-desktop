@@ -10,8 +10,9 @@
  *
  * Usage: node scripts/verify-version.mjs <x.y.z|vX.Y.Z>
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { familyPackageManifests } from './family-package-manifests.mjs'
 import { fileURLToPath } from 'node:url'
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
@@ -25,21 +26,7 @@ if (match === null) {
 }
 const version = match[1]
 
-/** Every package.json under packages/ (non-recursive, both roots). */
-function packageFiles() {
-  const out = []
-  for (const root of ['packages', join('packages', 'skins')]) {
-    const abs = join(REPO_ROOT, root)
-    if (!existsSync(abs)) continue
-    for (const entry of readdirSync(abs)) {
-      const pkgPath = join(abs, entry, 'package.json')
-      if (existsSync(pkgPath)) out.push(pkgPath)
-    }
-  }
-  return out.sort()
-}
-
-const files = packageFiles()
+const files = familyPackageManifests(REPO_ROOT).sort()
 if (files.length === 0) {
   console.error('no package.json found under packages/')
   process.exit(1)
