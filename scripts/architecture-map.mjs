@@ -82,10 +82,14 @@ const packages = workspaces.map(({ directory, manifest }) => {
 
 const duplicateFunctions = [...bodies.values()].filter(group => group.files.length > 1)
 if (process.argv.includes('--check')) {
-  // Only static value imports imply eager ESM initialization order.
+  // Plugin source contracts also obey the direction of module dependencies.
+  // Dynamic imports and require remain visible in the report as separate edge kinds.
+  const pluginSource = /^packages\/(?:skins\/)?[^/]+\/src\//u
   const imports = new Map(files.map(file => [file, []]))
   for (const { file, target, kind } of localImports) {
-    if (kind === 'static') imports.get(file).push(target)
+    if (kind === 'static' || (kind === 'type' && pluginSource.test(file) && pluginSource.test(target))) {
+      imports.get(file).push(target)
+    }
   }
   const finished = new Set()
   const active = new Set()
@@ -93,7 +97,7 @@ if (process.argv.includes('--check')) {
     if (finished.has(file)) return
     if (active.has(file)) {
       const cycle = [...active].slice([...active].indexOf(file)).concat(file)
-      throw new Error('Static import cycle: ' + cycle.join(' -> '))
+      throw new Error('Source dependency cycle: ' + cycle.join(' -> '))
     }
     active.add(file)
     for (const dependency of imports.get(file)) check(dependency)
@@ -101,7 +105,7 @@ if (process.argv.includes('--check')) {
     finished.add(file)
   }
   for (const file of files) check(file)
-  console.log(`Checked static relative imports across ${files.length} source files.`)
+  console.log(`Checked relative static imports and plugin type dependencies across ${files.length} source files.`)
 } else {
   process.stdout.write(JSON.stringify({ packages, files, localImports, duplicateFunctions }, null, 2) + '\n')
 }

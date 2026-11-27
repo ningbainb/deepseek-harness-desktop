@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -29,4 +29,18 @@ test('architecture check distinguishes a type reference from a circular value im
   const cycle = spawnSync(process.execPath, [script, '--check'], options)
   assert.equal(cycle.status, 1)
   assert.match(cycle.stderr, /a\.ts -> b\.ts -> a\.ts/)
+
+  // The same two modules under a plugin's source boundary must have a one-way
+  // contract, even when the reverse dependency is erased by the compiler.
+  unlinkSync(join(cwd, 'a.ts'))
+  unlinkSync(join(cwd, 'b.ts'))
+  const src = join(cwd, 'packages/example/src')
+  mkdirSync(src, { recursive: true })
+  writeFileSync(join(src, 'view.ts'), "import { load } from './catalog.ts'\nexport interface Row {}\nexport { load }\n")
+  writeFileSync(join(src, 'catalog.ts'), "import type { Row } from './view.ts'\nexport const load = (): Row => ({})\n")
+  const reversed = spawnSync(process.execPath, [script, '--check'], options)
+  assert.equal(reversed.status, 1)
+  assert.match(reversed.stderr, /catalog\.ts -> packages\/example\/src\/view\.ts -> packages\/example\/src\/catalog\.ts/)
+  writeFileSync(join(src, 'catalog.ts'), 'export interface Row {}\nexport const load = (): Row => ({})\n')
+  execFileSync(process.execPath, [script, '--check'], options)
 })
