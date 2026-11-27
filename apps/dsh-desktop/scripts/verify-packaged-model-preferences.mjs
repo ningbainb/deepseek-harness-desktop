@@ -35,7 +35,7 @@ async function launch() {
   await seedPrimaryRuntimePermissionForTest({ userData })
   const instance = await electron.launch({
     executablePath: appPath,
-    args: [...sourceMode ? [appDir] : [], '--force-renderer-accessibility'],
+    args: [...(sourceMode ? [join(appDir, 'src/main.mjs')] : []), '--force-renderer-accessibility'],
     cwd: appDir,
     env: {
       ...process.env,

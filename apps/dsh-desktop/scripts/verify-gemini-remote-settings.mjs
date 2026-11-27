@@ -157,7 +157,7 @@ try {
   const branch = nativeComposer.locator('[data-gitgraph-chip]')
   const officeApps = nativeComposer.locator('[data-dsh-office-apps-trigger]')
   const send = nativeComposer.locator('button[aria-busy]')
-  async function verifyToolbar(mode, state = 'empty') {
+  async function verifyToolbar(mode, state = 'empty', { allowWrapping = false } = {}) {
     await branch.waitFor({ timeout })
     assert.equal(await nativeComposer.locator('[data-dsh-acp-engines]').count(), 0)
     assert.equal(await nativeComposer.getByText(/^ACP 引擎$/u).count(), 0)
@@ -180,15 +180,23 @@ try {
       return [id, metrics]
     })))
     const card = await nativeComposer.boundingBox()
-    const bounds = Object.values(buttons).map(button => button.bounds).sort((left, right) => left.x - right.x)
+    const viewportWidth = await page.evaluate(() => innerWidth)
+    assert.ok(card.x >= -1 && card.x + card.width <= viewportWidth + 1, 'the composer card fits in the viewport')
+    const bounds = Object.values(buttons).map(button => button.bounds)
     const native = buttons.commands
     const middle = native.bounds.y + native.bounds.height / 2
     for (const box of bounds) {
       assert.ok(box.width > 0 && box.height > 0, 'each toolbar action is visible')
-      assert.ok(Math.abs(box.y + box.height / 2 - middle) <= 2, 'actions belong on one row: ' + JSON.stringify(buttons))
-      assert.ok(box.x >= card.x && box.right <= card.x + card.width + 1, 'each action fits inside the card')
+      if (!allowWrapping) assert.ok(Math.abs(box.y + box.height / 2 - middle) <= 2, 'actions belong on one row: ' + JSON.stringify(buttons))
+      assert.ok(box.x >= card.x - 1 && box.right <= card.x + card.width + 1
+        && box.y >= card.y - 1 && box.bottom <= card.y + card.height + 1, 'each action fits inside the card')
     }
-    for (let i = 1; i < bounds.length; i++) assert.ok(bounds[i - 1].right <= bounds[i].x + 1, 'toolbar actions must not overlap')
+    for (const [index, box] of bounds.entries()) {
+      for (const other of bounds.slice(index + 1)) {
+        assert.ok(box.right <= other.x + 1 || other.right <= box.x + 1
+          || box.bottom <= other.y + 1 || other.bottom <= box.y + 1, 'toolbar actions must not overlap')
+      }
+    }
     for (const button of [buttons.branch, buttons.office].filter(Boolean)) {
       assert.equal(button.bounds.width, native.bounds.width)
       assert.equal(button.bounds.height, native.bounds.height)
@@ -211,6 +219,7 @@ try {
   await page.getByRole('menuitem', { name: branchName, exact: true }).waitFor({ timeout })
   await page.keyboard.press('Escape')
   assert.equal(await branch.getAttribute('aria-expanded'), 'false')
+  assert.ok(await branch.evaluate(element => element.ownerDocument.activeElement === element), 'closing the menu returns focus to the Git button')
   assert.equal(await nativeComposer.locator('[data-dsh-office-apps-trigger]').count(), 0)
   await page.locator('[data-mode-tab="office"]').click()
   await officeApps.waitFor({ timeout })
@@ -269,8 +278,9 @@ try {
   await transcript.waitFor({ state: 'detached', timeout })
   console.log('PASS Gemini reuses the native editor and model picker for clicks, Enter, and streaming')
 
-  async function openEngines() {
-    await commands.click({ timeout })
+  async function openEngines(trigger = 'menu') {
+    if (trigger === 'slash') await nativeEditor.fill('/acp')
+    else await commands.click({ timeout })
     await page.locator('[data-trigger-menu]').getByRole('option').filter({ hasText: /ACP/iu }).click({ timeout })
     await page.locator('[data-dsh-acp-workbench]').waitFor({ timeout })
   }
@@ -278,7 +288,7 @@ try {
   await page.keyboard.press('Escape')
   await page.locator('[data-dsh-acp-workbench]').waitFor({ state: 'hidden', timeout })
   assert.ok(await nativeEditor.evaluate(element => element.ownerDocument.activeElement === element), 'closing ACP returns focus to the native editor')
-  await openEngines()
+  await openEngines('slash')
   await page.locator('[data-dsh-acp-agent="codex"]').click({ timeout })
   await page.waitForFunction(() => window.geminiFixture.starts.some(start => start.agentId === 'codex'), undefined, { timeout })
   assert.equal(await nativeEditor.evaluate(element => element === window.originalGeminiComposer), true)
@@ -345,7 +355,9 @@ try {
     browserWindow.setContentSize(780, 700)
     return browserWindow.getContentSize()[0]
   })
+  assert.ok(narrowWidth < originalSize[0], 'the test window reached a narrower width')
   await page.waitForFunction(width => innerWidth === width, narrowWidth, { timeout })
+  await verifyToolbar('office', 'narrow', { allowWrapping: true })
   const narrowDock = await statisticsDock.evaluate(dock => ({ clientWidth: dock.clientWidth, scrollWidth: dock.scrollWidth }))
   assert.ok(narrowDock.scrollWidth <= narrowDock.clientWidth + 1,
     `The statistics dock fits a narrow office conversation: ${JSON.stringify(narrowDock)}`)
