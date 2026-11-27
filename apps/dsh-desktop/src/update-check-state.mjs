@@ -1,6 +1,5 @@
-import { randomBytes } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writePrivateJson } from './atomic-write-adapter.mjs'
+import { readFile } from 'node:fs/promises'
 
 export const UPDATE_CHECK_SUCCESS_INTERVAL_MS = 6 * 60 * 60 * 1000
 export const UPDATE_CHECK_OFFLINE_RETRY_MS = 60 * 60 * 1000
@@ -87,32 +86,6 @@ function backoffFor(errorType, consecutiveFailures) {
   return schedule[Math.min(Math.max(1, consecutiveFailures), schedule.length) - 1]
 }
 
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  const suffix = `${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true }).catch(() => {})
-    if (movedExisting) {
-      await rm(path, { force: true }).catch(() => {})
-      await rename(backup, path).catch(() => {})
-    }
-    throw error
-  }
-}
-
 /**
  * Desktop-owned automatic update cadence. The file contains only bounded
  * timestamps, a release channel and fixed error categories. Manual checks are
@@ -191,7 +164,7 @@ export class DesktopUpdateCheckStore {
     const operation = this.writeQueue.then(async () => {
       const current = await this.load(safeChannel)
       const next = normalizeUpdateCheckState(transform(current, this.now()), safeChannel)
-      await atomicWrite(this.path, `${JSON.stringify(next, null, 2)}\n`)
+      await writePrivateJson(this.path, next)
       return next
     })
     this.writeQueue = operation.catch(() => {})

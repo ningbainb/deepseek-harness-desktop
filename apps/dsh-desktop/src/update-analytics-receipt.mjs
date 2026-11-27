@@ -1,6 +1,5 @@
-import { randomBytes } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writePrivateJson } from './atomic-write-adapter.mjs'
+import { readFile, rm } from 'node:fs/promises'
 import { validUpdateDiagnostic } from './update-diagnostics.mjs'
 
 const VERSION_PATTERN = /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,20})?$/u
@@ -25,32 +24,6 @@ function normalizeReceipt(value) {
     || !Number.isFinite(Date.parse(value.updatedAt))
   ) return undefined
   return Object.freeze({ ...value })
-}
-
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  const suffix = `${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true }).catch(() => {})
-    if (movedExisting) {
-      await rm(path, { force: true }).catch(() => {})
-      await rename(backup, path).catch(() => {})
-    }
-    throw error
-  }
 }
 
 export class UpdateAnalyticsReceiptStore {
@@ -78,14 +51,14 @@ export class UpdateAnalyticsReceiptStore {
       if (!(updatedAt instanceof Date) || !Number.isFinite(updatedAt.valueOf())) {
         throw new TypeError('update analytics receipt clock is invalid')
       }
-      await atomicWrite(this.path, `${JSON.stringify({
+      await writePrivateJson(this.path, {
         schemaVersion: validUpdateDiagnostic(update) ? 2 : 1,
         sourceVersion,
         targetVersion,
         phase: 'install-requested',
         updatedAt: updatedAt.toISOString(),
         ...(validUpdateDiagnostic(update) ? { update } : {}),
-      }, null, 2)}\n`)
+      })
       return true
     })
   }

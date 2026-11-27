@@ -1,6 +1,5 @@
-import { randomBytes } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { writePrivateJson } from './atomic-write-adapter.mjs'
+import { readFile } from 'node:fs/promises'
 
 export const DOCK_NUDGE_LAUNCH_LIMIT = 3
 
@@ -16,32 +15,6 @@ function shownLaunchesOf(value) {
     || value.shownLaunches > DOCK_NUDGE_LAUNCH_LIMIT
   ) return undefined
   return value.shownLaunches
-}
-
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  const suffix = `${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true }).catch(() => {})
-    if (movedExisting) {
-      await rm(path, { force: true }).catch(() => {})
-      await rename(backup, path).catch(() => {})
-    }
-    throw error
-  }
 }
 
 /** Persists only how many app launches actually displayed the Dock nudge. */
@@ -83,10 +56,10 @@ export class DockNudgeStore {
       }
     }
     if (shownLaunches >= DOCK_NUDGE_LAUNCH_LIMIT) return false
-    await atomicWrite(this.path, `${JSON.stringify({
+    await writePrivateJson(this.path, {
       schemaVersion: 1,
       shownLaunches: shownLaunches + 1,
-    }, null, 2)}\n`)
+    })
     return true
   }
 }

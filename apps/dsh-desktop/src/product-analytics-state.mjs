@@ -1,6 +1,6 @@
+import { writePrivateJson } from './atomic-write-adapter.mjs'
 import { createHmac, randomBytes } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { readFile } from 'node:fs/promises'
 
 const STATE_SCHEMA_VERSION = 1
 const SECRET_BYTES = 32
@@ -18,32 +18,6 @@ function normalizeState(value) {
   ) return undefined
   const secret = Buffer.from(value.secret, 'base64url')
   return secret.length === SECRET_BYTES ? secret : undefined
-}
-
-async function atomicWrite(path, content) {
-  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  const suffix = `${process.pid}-${Date.now()}-${randomBytes(6).toString('hex')}`
-  const temporary = `${path}.tmp-${suffix}`
-  const backup = `${path}.bak-${suffix}`
-  await writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 })
-  let movedExisting = false
-  try {
-    try {
-      await rename(path, backup)
-      movedExisting = true
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    await rename(temporary, path)
-    if (movedExisting) await rm(backup, { force: true })
-  } catch (error) {
-    await rm(temporary, { force: true }).catch(() => {})
-    if (movedExisting) {
-      await rm(path, { force: true }).catch(() => {})
-      await rename(backup, path).catch(() => {})
-    }
-    throw error
-  }
 }
 
 function periodActor(secret, period) {
@@ -96,10 +70,10 @@ export class ProductAnalyticsIdentityStore {
       // Missing and malformed product-only state both receive a new identity.
     }
     const secret = randomBytes(SECRET_BYTES)
-    await atomicWrite(this.path, `${JSON.stringify({
+    await writePrivateJson(this.path, {
       schemaVersion: STATE_SCHEMA_VERSION,
       secret: secret.toString('base64url'),
-    }, null, 2)}\n`)
+    })
     return new ProductAnalyticsIdentity(secret)
   }
 }
