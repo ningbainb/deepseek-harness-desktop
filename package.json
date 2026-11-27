@@ -17,6 +17,8 @@
     "skin-center:check": "node scripts/skin-center-bundles --check",
     "community:check": "node scripts/community-index --check",
     "runtime-deps:check": "node scripts/runtime-deps-check.mjs",
+    "architecture:map": "pnpm -r list --depth -1 --json | node scripts/architecture-map.mjs",
+    "architecture:check": "pnpm architecture:map --check",
     "runtime-graph:check": "node scripts/runtime-graph-check.mjs",
     "upstream-web:check": "node scripts/verify-upstream-web-cohort.mjs",
     "dsh-imports:check": "node scripts/dsh-import-boundary.mjs --check",
@@ -29,7 +31,7 @@
     "community-plugin-quality:check": "node scripts/generate-community-plugin-quality-report.mjs --check",
     "test:scripts": "node --test scripts/*.test.mjs",
     "desktop-version:check": "node scripts/verify-desktop-version-floor.mjs",
-    "verify": "pnpm upstream-web:check && pnpm feature-baseline:check && pnpm typecheck && pnpm test && pnpm test:scripts && pnpm desktop-version:check && pnpm runtime-deps:check && pnpm runtime-graph:check && pnpm dsh-imports:check && pnpm dsh-audit:check && pnpm runtime-support:check && pnpm runtime-support-matrix:check && pnpm community-plugin-quality:check && pnpm sync-shared:check && pnpm release:notes:check && pnpm website:check && pnpm aggregate:check && pnpm gallery:check && pnpm skin-center:check && pnpm community:check && pnpm docs:check",
+    "verify": "pnpm upstream-web:check && pnpm feature-baseline:check && pnpm typecheck && pnpm test && pnpm test:scripts && pnpm desktop-version:check && pnpm runtime-deps:check && pnpm runtime-graph:check && pnpm architecture:check && pnpm dsh-imports:check && pnpm dsh-audit:check && pnpm runtime-support:check && pnpm runtime-support-matrix:check && pnpm community-plugin-quality:check && pnpm sync-shared:check && pnpm release:notes:check && pnpm website:check && pnpm aggregate:check && pnpm gallery:check && pnpm skin-center:check && pnpm community:check && pnpm docs:check",
     "skin:new": "node scripts/dsh-skin-new",
     "pr:review": "node scripts/pr-review.mjs",
     "gallery:build": "node scripts/gallery-build",
@@ -51,11 +53,12 @@
   },
   "packageManager": "pnpm@11.22.0",
   "devDependencies": {
+    "@deepseek-ai/dsh-error": "0.2.3-alpha.2",
     "lightningcss": "^1.32.0",
     "playwright": "^1.62.1",
     "tsdown": "^0.22.2",
-    "unrun": "0.3.1",
-    "@deepseek-ai/dsh-error": "0.2.3-alpha.2"
+    "typescript": "^6.0.3",
+    "unrun": "0.3.1"
   },
   "license": "Apache-2.0"
 }

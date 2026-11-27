@@ -72,6 +72,9 @@ jobs:
       - name: Runtime dependency check
         run: pnpm runtime-deps:check
 
+      - name: Static module dependency check
+        run: pnpm architecture:check
+
       - name: Runtime identity graph check
         run: pnpm runtime-graph:check
 
