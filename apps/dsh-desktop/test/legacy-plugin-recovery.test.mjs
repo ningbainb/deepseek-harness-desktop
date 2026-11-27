@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import test from 'node:test'
 
 import {
@@ -104,6 +104,41 @@ test('legacy recovery recognizes packages already present after a completed migr
   const paths = await fixture(t, { targetDependencies: { '@community/enabled': '1.2.3' } })
   const state = await new LegacyPluginRecovery({ ...paths }).getState()
   assert.equal(state.plugins.find((plugin) => plugin.name === '@community/enabled').status, 'installed')
+})
+
+test('restart reconciles a v1 installing journal with the target profile and retries only missing npm packages', async t => {
+  const paths = await fixture(t, { targetDependencies: { '@community/enabled': '1.2.3' } })
+  const manifest = await readFile(join(paths.sourceProfile, 'package.json'))
+  const lock = await readFile(join(paths.sourceProfile, 'pnpm-lock.yaml'))
+  const sourceFingerprint = createHash('sha256').update(manifest).update('\0').update(lock).digest('hex')
+  const journal = {
+    schemaVersion: 1, sourceFingerprint, sourceClassification: 'legacy-community',
+    createdAt: '2026-09-14T00:00:00.000Z', updatedAt: '2026-09-14T01:00:00.000Z',
+    plugins: [
+      { id: 'ZGhXSnM6jLezSTt_cuw85x3F', name: '@community/enabled', sourceKind: 'npm', requested: '1.2.3', enabled: true, status: 'installing' },
+      { id: '0xREs91emy6LbvNRwiZ73-g2', name: '@community/disabled', sourceKind: 'npm', requested: '2.0.0', enabled: false, status: 'installing' },
+      { id: 'nTy9iILae6nqGNpA2nUSM9Ae', name: '@community/git', sourceKind: 'git', requested: 'github:owner/repository#main',
+        pinnedSpec: 'github:owner/repository#0123456789abcdef0123456789abcdef01234567', enabled: true, status: 'installing' },
+    ],
+  }
+  await mkdir(dirname(paths.statePath), { recursive: true })
+  await writeFile(paths.statePath, JSON.stringify(journal, null, 2) + '\n')
+  const interruptedWrite = paths.statePath + '.423144a8-76f4-4549-b4c4-c3b3f4866a6d.tmp'
+  await writeFile(interruptedWrite, '{"plugins":[]')
+  const resumed = new LegacyPluginRecovery(paths)
+  const recovered = await resumed.initialize()
+  assert.deepEqual(recovered.plugins.map(plugin => plugin.status), ['installed', 'pending', 'awaiting-confirmation'])
+  await assert.rejects(resumed.restoreNpm(async ({ specs, enabledNames }) => {
+    assert.deepEqual(specs, ['@community/disabled@2.0.0'])
+    assert.deepEqual(enabledNames, [])
+    throw new Error('network offline')
+  }), /network offline/u)
+  const retry = new LegacyPluginRecovery(paths)
+  assert.equal((await retry.getState()).plugins[1].failureCategory, 'network-error')
+  await retry.restoreNpm(async ({ specs }) => { assert.deepEqual(specs, ['@community/disabled@2.0.0']) })
+  assert.deepEqual((await retry.getState()).plugins.map(plugin => plugin.status), ['installed', 'installed', 'awaiting-confirmation'])
+  assert.equal(await readFile(interruptedWrite, 'utf8'), '{"plugins":[]')
+  assert.deepEqual(await readFile(join(paths.sourceProfile, 'pnpm-lock.yaml')), lock)
 })
 
 test('legacy Git recovery stops when the displayed source fingerprint changes', async (t) => {

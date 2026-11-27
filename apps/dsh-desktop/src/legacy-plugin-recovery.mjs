@@ -1,7 +1,7 @@
 import { readFileIfPresent } from './read-file-if-present.mjs'
-import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, rename, stat, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { writeJsonAtomic } from './atomic-write-adapter.mjs'
+import { createHash } from 'node:crypto'
+import { join, resolve } from 'node:path'
 import semver from 'semver'
 import { parse as parseYaml } from 'yaml'
 
@@ -22,23 +22,9 @@ const COMMIT = /(?<![a-f0-9])[a-f0-9]{40}(?![a-f0-9])/iu
 const GITHUB = /^(?:github:|git\+https:\/\/github\.com\/)([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:#(.*))?$/u
 const ERROR_LIMIT = 360
 
-async function exists(path) {
-  try { await stat(path); return true } catch (error) {
-    if (error?.code === 'ENOENT') return false
-    throw error
-  }
-}
-
 function parseJson(source) {
   if (source === undefined) return undefined
   try { return JSON.parse(source) } catch { return undefined }
-}
-
-async function writeJsonAtomic(path, value) {
-  await mkdir(dirname(path), { recursive: true })
-  const temporary = `${path}.${randomUUID()}.tmp`
-  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
-  await rename(temporary, path)
 }
 
 function fingerprint(manifest, lockfile) {

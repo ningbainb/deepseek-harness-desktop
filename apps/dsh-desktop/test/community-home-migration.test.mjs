@@ -168,3 +168,29 @@ test('rollback removes only the pending target owned by the transaction', async 
   assert.equal((await readFile(join(source, 'sessions', 'one.jsonl'), 'utf8')).includes('session'), true)
   await assert.rejects(migration.rollback(prepared.transactionId), /does not own/u)
 })
+
+test('a restart resumes the committed v1 journal and rolls back a pending Home after failed validation', async t => {
+  const { source, target, journal } = await fixture(t)
+  const id = '65fc0a97-c7a7-4eca-8931-a437b424631c'
+  const at = '2026-09-14T00:00:00.000Z'
+  await writeCommunitySource(source)
+  await mkdir(target, { recursive: true })
+  const marker = join(target, COMMUNITY_HOME_MARKER)
+  await writeFile(marker, JSON.stringify({ schemaVersion: 1, owner: 'deepseek-harness-community',
+    health: 'pending', transactionId: id, desktopVersion: '4.0.0', sourceClassification: 'legacy-community' }))
+  await writeFile(journal, JSON.stringify({ schemaVersion: 1, id, sourceHome: source, targetHome: target,
+    classification: 'legacy-community', migrated: true, sourceRetained: true, desktopVersion: '4.0.0',
+    createdAt: at, updatedAt: at, state: 'TARGET_PREPARED', history: [{ state: 'TARGET_PREPARED', at }] }))
+  const interruptedWrite = journal + '.9d46d8c6-abb8-41af-8071-40af2f34fdcf.tmp'
+  await writeFile(interruptedWrite, '{"state":"COMMITTED"')
+  const restarted = new CommunityHomeMigration({ sourceHome: source, targetHome: target, journalPath: journal, desktopVersion: '5.7.0-test.1' })
+  assert.equal((await restarted.prepare()).transactionId, id)
+  await assert.rejects(restarted.commitHealthy(id), /before package and Runtime validation/u)
+  await assert.rejects(restarted.rollback('another-transaction'), /does not own/u)
+  assert.equal((await restarted.rollback(id, 'runtime-health-failed')).state, 'PAUSED')
+  await assert.rejects(stat(target), { code: 'ENOENT' })
+  assert.equal(await readFile(join(source, 'sessions', 'one.jsonl'), 'utf8'), '{"type":"session"}\n')
+  const final = JSON.parse(await readFile(journal, 'utf8'))
+  assert.deepEqual(final.history.map(entry => entry.state), ['TARGET_PREPARED', 'ROLLING_BACK', 'PAUSED'])
+  assert.equal(await readFile(interruptedWrite, 'utf8'), '{"state":"COMMITTED"')
+})

@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { copyFile, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
+import { writeJsonAtomic } from './atomic-write-adapter.mjs'
 
 export const COMMUNITY_HOME_MARKER = 'community-home.json'
 export const COMMUNITY_HOME_MIGRATION_STATES = Object.freeze([
@@ -86,13 +87,6 @@ async function inventory(root) {
   const digest = createHash('sha256')
   for (const file of files) digest.update(`${file.path}\0${file.size}\0${file.mtimeMs}\n`)
   return Object.freeze({ files, count: files.length, bytes: files.reduce((sum, file) => sum + file.size, 0), digest: digest.digest('hex') })
-}
-
-async function writeJsonAtomic(path, value) {
-  await mkdir(dirname(path), { recursive: true })
-  const temporary = `${path}.${randomUUID()}.tmp`
-  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf8')
-  await rename(temporary, path)
 }
 
 async function copySnapshot(source, target, sourceInventory) {
