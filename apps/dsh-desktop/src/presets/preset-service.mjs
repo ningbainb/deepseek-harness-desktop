@@ -1,3 +1,4 @@
+import { readFileIfPresent } from '../read-file-if-present.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { cp, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, sep } from 'node:path'
@@ -14,17 +15,8 @@ function hash(value) {
   return createHash('sha256').update(value).digest('hex')
 }
 
-async function readOptional(path) {
-  try {
-    return await readFile(path)
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
-
 async function readOptionalJson(path, fallback) {
-  const value = await readOptional(path)
+  const value = await readFileIfPresent(path)
   if (value === undefined) return fallback
   try {
     return JSON.parse(value.toString('utf8'))
@@ -34,7 +26,7 @@ async function readOptionalJson(path, fallback) {
 }
 
 async function readOptionalYaml(path, fallback) {
-  const value = await readOptional(path)
+  const value = await readFileIfPresent(path)
   if (value === undefined) return fallback
   try {
     return YAML.parse(value.toString('utf8')) ?? fallback
@@ -335,8 +327,8 @@ export class PresetService {
     const templatesChoice = validateChoice(decisions.taskTemplates, 'task templates', 'preset')
     await mkdir(this.dshHome, { recursive: true })
     await mkdir(this.skillsRoot, { recursive: true })
-    const settingsBefore = await readOptional(this.settingsPath)
-    const templatesBefore = await readOptional(this.taskTemplatesPath)
+    const settingsBefore = await readFileIfPresent(this.settingsPath)
+    const templatesBefore = await readFileIfPresent(this.taskTemplatesPath)
     let settingsAfter
     if (settingsChoice === 'preset') {
       let current = {}

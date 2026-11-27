@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
@@ -183,15 +184,6 @@ function defaultState() {
   }
 }
 
-async function readOptional(path) {
-  try {
-    return await readFile(path, 'utf8')
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
-
 async function writeAtomic(path, content) {
   const temporary = `${path}.tmp-${process.pid}-${randomUUID()}`
   const backup = `${path}.bak-${process.pid}-${randomUUID()}`
@@ -267,7 +259,7 @@ export class PluginRecoveryStore extends EventEmitter {
   async #initialize() {
     if (this.initialized) return
     await mkdir(this.snapshotsDir, { recursive: true })
-    const source = await readOptional(this.statePath)
+    const source = await readFileIfPresent(this.statePath, 'utf8')
     if (source !== undefined) {
       try {
         const parsed = JSON.parse(source)
@@ -393,7 +385,7 @@ export class PluginRecoveryStore extends EventEmitter {
     return this.#enqueue(async () => {
       await this.#initialize()
       const manifest = await readFile(join(this.profileDir, 'package.json'), 'utf8')
-      const lock = await readOptional(join(this.profileDir, 'pnpm-lock.yaml'))
+      const lock = await readFileIfPresent(join(this.profileDir, 'pnpm-lock.yaml'), 'utf8')
       const hash = snapshotHash(manifest, lock)
       const existing = this.state.snapshots.find((item) => item.hash === hash)
       if (existing) return { ...existing }

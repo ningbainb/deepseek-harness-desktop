@@ -1,3 +1,4 @@
+import { readFileIfPresent } from '../read-file-if-present.mjs'
 import { EventEmitter } from 'node:events'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -195,10 +196,7 @@ export class QqBotCredentialStore {
   }
 
   async load() {
-    const content = await readFile(this.path, 'utf8').catch((error) => {
-      if (error?.code === 'ENOENT') return undefined
-      throw error
-    })
+    const content = await readFileIfPresent(this.path, 'utf8')
     if (content === undefined) return undefined
     if (!this.safeStorage.isEncryptionAvailable()) {
       throw new Error('operating-system credential encryption is unavailable')

@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -14,13 +15,6 @@ const BACKUP_FILES = Object.freeze([
   'profiles/desktop/pnpm-lock.yaml',
   'profiles/desktop/.desktop-managed-packages.json',
 ])
-
-async function readOptional(path) {
-  try { return await readFile(path) } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
 
 async function writeAtomic(path, content) {
   await mkdir(dirname(path), { recursive: true })
@@ -106,7 +100,7 @@ export class DesktopV41Migration {
     const captured = []
     const hash = createHash('sha256').update(DESKTOP_V41_MIGRATION_VERSION)
     for (const relativePath of BACKUP_FILES) {
-      const content = await readOptional(join(this.dshHome, relativePath))
+      const content = await readFileIfPresent(join(this.dshHome, relativePath))
       captured.push({ relativePath, content })
       hash.update(relativePath).update(content ?? Buffer.alloc(0))
     }
@@ -169,7 +163,7 @@ export class DesktopV41Migration {
     for (const relativePath of BACKUP_FILES) {
       const source = join(backupRoot, relativePath)
       const target = join(this.dshHome, relativePath)
-      const content = await readOptional(source)
+      const content = await readFileIfPresent(source)
       if (content === undefined) await rm(target, { force: true })
       else await writeAtomic(target, content)
     }

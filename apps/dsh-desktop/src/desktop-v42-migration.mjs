@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -19,13 +20,6 @@ export const DESKTOP_V42_BACKUP_FILES = Object.freeze([
   'profiles/desktop/.desktop-managed-packages.json',
   'profiles/desktop/.dsh-desktop-links.json',
 ])
-
-async function readOptional(path) {
-  try { return await readFile(path) } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
 
 async function writeAtomic(path, content) {
   await mkdir(dirname(path), { recursive: true })
@@ -95,7 +89,7 @@ export class DesktopV42Migration {
     const backupHashes = {}
     const hash = createHash('sha256').update(this.migrationVersion)
     for (const relativePath of this.backupFiles) {
-      const content = await readOptional(join(this.dshHome, relativePath))
+      const content = await readFileIfPresent(join(this.dshHome, relativePath))
       captured.push({ relativePath, content })
       hash.update(relativePath).update(content === undefined ? 'missing' : 'present')
       if (content !== undefined) {
@@ -146,7 +140,7 @@ export class DesktopV42Migration {
       if (!allowed.has(relativePath) || seen.has(relativePath)) throw new Error('Desktop 4.2 migration backup contains an unexpected file')
       seen.add(relativePath)
       const backup = join(backupRoot, relativePath)
-      const content = await readOptional(backup)
+      const content = await readFileIfPresent(backup)
       if (content === undefined) throw new Error('Desktop 4.2 migration backup is incomplete')
       if (createHash('sha256').update(content).digest('hex') !== marker.backupHashes[relativePath]) {
         throw new Error('Desktop 4.2 migration backup checksum mismatch')

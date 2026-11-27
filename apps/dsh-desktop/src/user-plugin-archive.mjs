@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { immutableSnapshot } from './immutable-snapshot.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { constants as fsConstants, createReadStream } from 'node:fs'
@@ -158,15 +159,6 @@ function normalizeProfileArtifacts(value) {
 async function lstatIfPresent(path) {
   try {
     return await lstat(path)
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
-
-async function readTextIfPresent(path) {
-  try {
-    return await readFile(path, 'utf8')
   } catch (error) {
     if (error?.code === 'ENOENT') return undefined
     throw error
@@ -748,7 +740,7 @@ export class UserPluginArchive {
   }
 
   async #readJournal(transactionId) {
-    const source = await readTextIfPresent(this.#journalPath(transactionId))
+    const source = await readFileIfPresent(this.#journalPath(transactionId), 'utf8')
     if (source === undefined) throw new Error('user plugin archive journal is missing')
     try {
       return assertJournal(JSON.parse(source))
@@ -766,7 +758,7 @@ export class UserPluginArchive {
   }
 
   async #clearActiveJournal(transactionId) {
-    const source = await readTextIfPresent(this.activeJournalPath)
+    const source = await readFileIfPresent(this.activeJournalPath, 'utf8')
     if (source === undefined) return
     let marker
     try {
@@ -788,7 +780,7 @@ export class UserPluginArchive {
   }
 
   async #readActiveJournal() {
-    const source = await readTextIfPresent(this.activeJournalPath)
+    const source = await readFileIfPresent(this.activeJournalPath, 'utf8')
     if (source === undefined) return undefined
     let marker
     try {
@@ -804,7 +796,7 @@ export class UserPluginArchive {
 
   async #readSnapshot(snapshotId) {
     const directory = this.#snapshotDir(snapshotId)
-    const source = await readTextIfPresent(join(directory, METADATA_FILE))
+    const source = await readFileIfPresent(join(directory, METADATA_FILE), 'utf8')
     if (source === undefined) {
       throw new UserPluginArchiveRecoveryBlockedError(
         USER_PLUGIN_ARCHIVE_RECOVERY_CODES.SNAPSHOT_INCOMPLETE,
@@ -821,7 +813,7 @@ export class UserPluginArchive {
         { cause: error },
       )
     }
-    const inventorySource = await readTextIfPresent(join(directory, INVENTORY_FILE))
+    const inventorySource = await readFileIfPresent(join(directory, INVENTORY_FILE), 'utf8')
     if (inventorySource === undefined) {
       throw new UserPluginArchiveRecoveryBlockedError(
         USER_PLUGIN_ARCHIVE_RECOVERY_CODES.INVENTORY_INVALID,

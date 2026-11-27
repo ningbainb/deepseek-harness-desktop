@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
@@ -18,15 +19,6 @@ async function readJson(path) {
   } catch (error) {
     if (error?.code === 'ENOENT') return undefined
     throw new Error(`web profile manifest is invalid: ${path}`, { cause: error })
-  }
-}
-
-async function readOptional(path) {
-  try {
-    return await readFile(path)
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
   }
 }
 
@@ -232,7 +224,7 @@ export class WebProfileMigrationService {
         ...(current?.version ? { currentVersion: current.version } : {}),
       }))
     }
-    const sourcePatch = parsePatch(await readOptional(join(this.webProfileDir, 'cordis.patch.yml')), 'web profile cordis.patch.yml')
+    const sourcePatch = parsePatch(await readFileIfPresent(join(this.webProfileDir, 'cordis.patch.yml')), 'web profile cordis.patch.yml')
     const packageNames = new Set(Object.keys(dependencies))
     const configuration = planConfiguration(sourcePatch, idsByPackage, packageNames)
     const id = randomUUID()
@@ -282,7 +274,7 @@ export class WebProfileMigrationService {
       .filter((item) => item.packages.some((name) => selected.has(name)))
       .map((item) => structuredClone(item.value))
     const target = join(this.desktopProfileDir, 'cordis.patch.yml')
-    const before = await readOptional(target)
+    const before = await readFileIfPresent(target)
     const next = replaceManagedSection(before, rows)
     let active = true
     let applied = false

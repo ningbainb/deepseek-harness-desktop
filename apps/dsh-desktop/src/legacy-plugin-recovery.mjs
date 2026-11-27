@@ -1,5 +1,6 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { mkdir, rename, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import semver from 'semver'
 import { parse as parseYaml } from 'yaml'
@@ -24,13 +25,6 @@ const ERROR_LIMIT = 360
 async function exists(path) {
   try { await stat(path); return true } catch (error) {
     if (error?.code === 'ENOENT') return false
-    throw error
-  }
-}
-
-async function readOptional(path) {
-  try { return await readFile(path, 'utf8') } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
     throw error
   }
 }
@@ -166,18 +160,18 @@ export class LegacyPluginRecovery {
   }
 
   async #readSource() {
-    const manifestSource = await readOptional(join(this.sourceProfileDir, 'package.json'))
-    const lockfile = await readOptional(join(this.sourceProfileDir, 'pnpm-lock.yaml'))
+    const manifestSource = await readFileIfPresent(join(this.sourceProfileDir, 'package.json'), 'utf8')
+    const lockfile = await readFileIfPresent(join(this.sourceProfileDir, 'pnpm-lock.yaml'), 'utf8')
     return { manifestSource, lockfile, manifest: parseJson(manifestSource) }
   }
 
   async #readTargetNames() {
-    const target = parseJson(await readOptional(join(this.targetProfileDir, 'package.json')))
+    const target = parseJson(await readFileIfPresent(join(this.targetProfileDir, 'package.json'), 'utf8'))
     return new Set(Object.keys(target?.dependencies ?? {}))
   }
 
   async #readState() {
-    const state = parseJson(await readOptional(this.statePath))
+    const state = parseJson(await readFileIfPresent(this.statePath, 'utf8'))
     if (
       state?.schemaVersion !== LEGACY_PLUGIN_RECOVERY_SCHEMA_VERSION
       || typeof state.sourceFingerprint !== 'string'

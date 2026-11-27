@@ -1,3 +1,4 @@
+import { readFileIfPresent } from '../read-file-if-present.mjs'
 import { execFile, spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, isAbsolute, join, win32 } from 'node:path'
@@ -317,15 +318,6 @@ async function readManifest(profileDir) {
   return JSON.parse(await readFile(join(profileDir, 'package.json'), 'utf8'))
 }
 
-async function readOptionalFile(path) {
-  try {
-    return await readFile(path, 'utf8')
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
-
 async function readInstalledManifest(profileDir, name) {
   try {
     return JSON.parse(await readFile(
@@ -465,7 +457,7 @@ async function writeManifest(profileDir, manifest) {
 async function captureProfileSnapshot(profileDir) {
   return Object.freeze({
     manifest: await readFile(join(profileDir, 'package.json'), 'utf8'),
-    lock: await readOptionalFile(join(profileDir, 'pnpm-lock.yaml')),
+    lock: await readFileIfPresent(join(profileDir, 'pnpm-lock.yaml'), 'utf8'),
   })
 }
 
@@ -688,7 +680,7 @@ export class PluginManager {
         // dependencies in the clone before validating or stopping the runtime.
         await this.#runPnpm([...addArgs, '--prefer-offline'], staged.stageDir)
       }
-      const lock = await readOptionalFile(join(staged.stageDir, 'pnpm-lock.yaml'))
+      const lock = await readFileIfPresent(join(staged.stageDir, 'pnpm-lock.yaml'), 'utf8')
       for (const item of items) {
         if (typeof item.integrity === 'string' && (lock === undefined || !lock.includes(item.integrity))) {
           throw new Error(`installed lockfile integrity does not match ${item.spec}`)
@@ -814,7 +806,7 @@ export class PluginManager {
       // Managed Desktop packages (including repair) are linked from the app.
       // A normal built-in-only profile has no pnpm lock and needs no registry I/O.
       if (names.length === 0) return Object.freeze([])
-      const lock = await readOptionalFile(join(this.profileDir, 'pnpm-lock.yaml'))
+      const lock = await readFileIfPresent(join(this.profileDir, 'pnpm-lock.yaml'), 'utf8')
       if (lock === undefined) throw new Error('desktop profile lockfile is required for preset export')
       const installed = await readInstalledManifests(this.profileDir, names)
       return Object.freeze(names.map((name) => {
@@ -1194,7 +1186,7 @@ export class PluginManager {
       const previous = await readInstalledManifests(this.profileDir, names)
       try {
         await this.#runPnpm(['add', ...items.map((item) => item.spec), '--save-exact', '--offline'])
-        const lock = await readOptionalFile(join(this.profileDir, 'pnpm-lock.yaml'))
+        const lock = await readFileIfPresent(join(this.profileDir, 'pnpm-lock.yaml'), 'utf8')
         if (lock === undefined) throw new Error('installed lockfile is missing')
         for (const item of items) {
           if (!lock.includes(item.integrity)) {

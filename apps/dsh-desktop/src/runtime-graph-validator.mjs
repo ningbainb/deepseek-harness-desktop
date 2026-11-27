@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { createHash } from 'node:crypto'
 import { lstat, readFile, readdir, realpath } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -6,15 +7,6 @@ import semver from 'semver'
 
 import { packagePathSegments } from './profile.mjs'
 import { PnpmLockGraph } from './pnpm-lock-graph.mjs'
-
-async function readOptional(path, read) {
-  try {
-    return await read(path, 'utf8')
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
 
 function graphError(code, message, details = {}) {
   const error = new Error(message)
@@ -247,7 +239,7 @@ export async function validateProtectedRuntimeGraph({
     checkedLinks.push({ name, version: installed.version, realPath: actualRealPath })
   }
 
-  const lockSource = await readOptional(join(profileDir, 'pnpm-lock.yaml'), read)
+  const lockSource = await readFileIfPresent(join(profileDir, 'pnpm-lock.yaml'), 'utf8', read)
   const communityNames = communityDependencyNames(manifest, policy)
   const legacyProtectedNodes = lockSource === undefined && communityNames.length > 0
     ? await inspectLocklessCommunityGraph({

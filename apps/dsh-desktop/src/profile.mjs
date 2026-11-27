@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { createRequire } from 'node:module'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -1574,10 +1575,7 @@ export async function ensureDesktopProfile({
   validateDesktopPatchSyntax(existingPatch, 'profile patch')
   if (isSemanticallyEmptyPatch(existingPatch)) existingPatch = ''
   const homePatchPath = join(dshHome, 'cordis.patch.yml')
-  let homePatch = await readFile(homePatchPath, 'utf8').catch((error) => {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  })
+  let homePatch = await readFileIfPresent(homePatchPath, 'utf8')
   validateDesktopPatchSyntax(homePatch, 'home patch')
   const originalHomePatch = homePatch
   if (preserveUserProfile) {

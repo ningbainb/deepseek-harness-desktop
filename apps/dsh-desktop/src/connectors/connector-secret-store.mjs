@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { readFileIfPresent } from '../read-file-if-present.mjs'
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 const SAFE_SEGMENT_PATTERN = /^[a-zA-Z0-9._-]{1,64}$/u
@@ -94,10 +95,7 @@ export class ConnectorSecretStore {
   }
 
   async #readAll() {
-    const content = await readFile(this.path, 'utf8').catch((error) => {
-      if (error?.code === 'ENOENT') return undefined
-      throw error
-    })
+    const content = await readFileIfPresent(this.path, 'utf8')
     if (content === undefined) return {}
     this.#assertEncryptionAvailable()
     try {

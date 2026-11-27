@@ -1,5 +1,6 @@
+import { readFileIfPresent } from '../read-file-if-present.mjs'
 import { createHash } from 'node:crypto'
-import { access, lstat, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises'
+import { access, lstat, mkdir, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 
 const SAFE_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/u
@@ -99,10 +100,7 @@ export class ConnectorPackageManager {
   }
 
   async #readState() {
-    const content = await readFile(this.statePath, 'utf8').catch((error) => {
-      if (error?.code === 'ENOENT') return undefined
-      throw error
-    })
+    const content = await readFileIfPresent(this.statePath, 'utf8')
     if (content === undefined) return { version: STATE_VERSION, connectors: {} }
     let parsed
     try { parsed = JSON.parse(content) } catch {

@@ -1,3 +1,4 @@
+import { readFileIfPresent } from './read-file-if-present.mjs'
 import { randomUUID } from 'node:crypto'
 import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
@@ -144,15 +145,6 @@ function stripDesktopManagedSections(source) {
     .trim()
 }
 
-async function readTextIfPresent(path) {
-  try {
-    return await readFile(path, 'utf8')
-  } catch (error) {
-    if (error?.code === 'ENOENT') return undefined
-    throw error
-  }
-}
-
 /**
  * A private, reversible baseline for opaque user loaders. Configuration bytes
  * live below Desktop's app-data recovery directory; a moved node_modules tree
@@ -187,7 +179,7 @@ export class DesktopProfileBaselineQuarantine {
   }
 
   async #readActive() {
-    const source = await readTextIfPresent(this.activePath)
+    const source = await readFileIfPresent(this.activePath, 'utf8')
     if (source === undefined) return undefined
     let marker
     try {
@@ -328,9 +320,9 @@ export class DesktopProfileBaselineQuarantine {
   hasUntrustedActivation() {
     return this.#enqueue(async () => {
       const [profilePatch, homePatch, profileManifest] = await Promise.all([
-        readTextIfPresent(join(this.profileDir, 'cordis.patch.yml')),
-        readTextIfPresent(join(this.dshHome, 'cordis.patch.yml')),
-        readTextIfPresent(join(this.profileDir, 'package.json')),
+        readFileIfPresent(join(this.profileDir, 'cordis.patch.yml'), 'utf8'),
+        readFileIfPresent(join(this.dshHome, 'cordis.patch.yml'), 'utf8'),
+        readFileIfPresent(join(this.profileDir, 'package.json'), 'utf8'),
       ])
       if (stripDesktopManagedSections(profilePatch ?? '').length > 0) return true
       if (stripDesktopManagedSections(homePatch ?? '').length > 0) return true
@@ -357,7 +349,7 @@ export class DesktopProfileBaselineQuarantine {
    */
   hasUserActivation() {
     return this.#enqueue(async () => {
-      const profileManifest = await readTextIfPresent(join(this.profileDir, 'package.json'))
+      const profileManifest = await readFileIfPresent(join(this.profileDir, 'package.json'), 'utf8')
       if (profileManifest === undefined) return false
       try {
         return hasUserOwnedProfilePackage(JSON.parse(profileManifest))
