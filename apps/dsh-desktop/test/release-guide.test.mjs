@@ -81,12 +81,25 @@ test('ReleaseGuideStore claims only once per version, handles concurrency, and t
     // Simulate pre-seeded star-prompt profile without pending release-guide claim, then explicit markPending().
     const suppressedPath = join(directory, 'suppressed.json')
     const suppressedStore = new ReleaseGuideStore({ path: suppressedPath })
+    assert.equal(await suppressedStore.isUnread(RELEASE_GUIDE_VERSION), true)
+    assert.equal(await suppressedStore.isUnread('0.0.0-old'), false)
     assert.equal(await suppressedStore.claim(RELEASE_GUIDE_VERSION, { suppressIfUnmarked: true }), false)
+    assert.equal(await suppressedStore.isUnread(RELEASE_GUIDE_VERSION), true)
     assert.equal(await suppressedStore.markPending(RELEASE_GUIDE_VERSION), true)
     assert.equal(await suppressedStore.claim(RELEASE_GUIDE_VERSION, { suppressIfUnmarked: true }), true)
+    assert.equal(await suppressedStore.isUnread(RELEASE_GUIDE_VERSION), false)
     assert.equal(await suppressedStore.claim(RELEASE_GUIDE_VERSION, { suppressIfUnmarked: true }), false)
     const finalSuppressedState = JSON.parse(await readFile(suppressedPath, 'utf8'))
     assert.deepEqual(finalSuppressedState, { schemaVersion: 1, shownVersions: [RELEASE_GUIDE_VERSION] })
+
+    // Direct markSeen() clears unread state and clears any pending version cleanly.
+    const seenPath = join(directory, 'seen.json')
+    const seenStore = new ReleaseGuideStore({ path: seenPath })
+    assert.equal(await seenStore.isUnread(RELEASE_GUIDE_VERSION), true)
+    assert.equal(await seenStore.markSeen(RELEASE_GUIDE_VERSION), true)
+    assert.equal(await seenStore.isUnread(RELEASE_GUIDE_VERSION), false)
+    assert.equal(await seenStore.markSeen(RELEASE_GUIDE_VERSION), false)
+    assert.equal(await seenStore.markSeen('0.0.0-old'), false)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -104,6 +117,8 @@ test('release guide surface script renders 4 cards, triggers dock actions, and c
       return true
     },
   }
+  const seenEvents = []
+  window.addEventListener('dsh-release-guide-seen', (event) => seenEvents.push(event.detail))
   const script = createReleaseGuideSurfaceScript({ forceVisible: true, showDelayMs: 0 })
   const context = vm.createContext({
     document,
@@ -120,7 +135,10 @@ test('release guide surface script renders 4 cards, triggers dock actions, and c
   assert.ok(root)
   assert.equal(root.hidden, false)
   assert.equal(root.querySelectorAll('.dsh-rg-card').length, 4)
+  assert.ok(root.querySelector('.dsh-rg-badge-dot'))
   assert.ok(root.textContent.includes(`v${RELEASE_GUIDE_VERSION}`))
+  assert.equal(seenEvents.length, 1)
+  assert.equal(seenEvents[0].version, RELEASE_GUIDE_VERSION)
 
   const actionButtons = [...root.querySelectorAll('.dsh-rg-action')]
   actionButtons[0].click()

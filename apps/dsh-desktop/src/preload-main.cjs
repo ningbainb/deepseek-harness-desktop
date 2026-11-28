@@ -128,6 +128,7 @@ const api = Object.freeze({
   openExtensionDock: (options) => ipcRenderer.invoke('desktop:dock-open', options),
   claimStarPrompt: () => ipcRenderer.invoke('desktop:star-prompt-claim'),
   claimReleaseGuide: () => ipcRenderer.invoke('desktop:release-guide-claim'),
+  getReleaseGuideState: () => ipcRenderer.invoke('desktop:release-guide-state'),
   requestPluginInstall: (source) => ipcRenderer.invoke('desktop:plugin-install-request', source),
   getUpdateStatus: () => ipcRenderer.invoke('desktop:update-status'),
   getUpdateChannel: () => ipcRenderer.invoke('desktop:update-channel-get'),

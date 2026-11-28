@@ -219,12 +219,46 @@ html[data-dsh-desktop-window-chrome="true"] body > [role="listbox"] {
   margin-left: auto;
 }
 
+#${WINDOW_CHROME_ID} .dsh-window-chrome-whats-new,
 #${WINDOW_CHROME_ID} .dsh-window-chrome-tools,
 #${WINDOW_CHROME_ID} .dsh-window-chrome-help {
   -webkit-app-region: no-drag;
   position: relative;
   z-index: 2;
   font: 12px/1.4 system-ui, "Microsoft YaHei UI", sans-serif;
+}
+
+#${WINDOW_CHROME_ID} .dsh-window-chrome-whats-new[hidden] {
+  display: none;
+}
+
+#${WINDOW_CHROME_ID} .dsh-window-chrome-whats-new-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#${WINDOW_CHROME_ID} .dsh-window-chrome-whats-new-button[data-unread="true"] {
+  padding-right: 14px;
+  font-weight: 500;
+}
+
+#${WINDOW_CHROME_ID} .dsh-window-chrome-unread-dot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-state-business-primary, #4d78e8);
+  box-shadow: 0 0 0 1.5px var(--dsh-desktop-chrome-bg, #071117);
+  pointer-events: none;
+}
+
+#${WINDOW_CHROME_ID} .dsh-window-chrome-whats-new-button[data-unread="true"] .dsh-window-chrome-unread-dot {
+  display: block;
 }
 
 #${WINDOW_CHROME_ID} .dsh-window-chrome-menu-button {
@@ -606,6 +640,51 @@ export function createWindowChromeScript({ showHelpMenu = false, showToolsMenu =
         root.append(button, menu);
         menus.append(root);
       };
+      if (canShowHelp) {
+        const whatsNewWrap = document.createElement('div');
+        whatsNewWrap.className = 'dsh-window-chrome-whats-new';
+        const englishChrome = document.documentElement.lang.toLowerCase().startsWith('en');
+        const whatsNewButton = document.createElement('button');
+        whatsNewButton.type = 'button';
+        whatsNewButton.className = 'dsh-window-chrome-menu-button dsh-window-chrome-whats-new-button';
+        whatsNewButton.dataset.dshWhatsNewButton = 'true';
+        whatsNewButton.dataset.unread = 'false';
+        whatsNewButton.title = englishChrome ? "What's New" : '新功能介绍';
+        const whatsNewLabel = document.createElement('span');
+        whatsNewLabel.className = 'dsh-window-chrome-whats-new-label';
+        whatsNewLabel.textContent = englishChrome ? "What's New" : '新功能';
+        const unreadDot = document.createElement('span');
+        unreadDot.className = 'dsh-window-chrome-unread-dot';
+        unreadDot.setAttribute('aria-hidden', 'true');
+        whatsNewButton.append(whatsNewLabel, unreadDot);
+        whatsNewButton.addEventListener('click', () => {
+          closeMenus();
+          whatsNewButton.dataset.unread = 'false';
+          void Promise.resolve(window.dshDesktop?.helpAction?.('release-guide')).catch(() => {});
+        });
+        window.addEventListener('dsh-release-guide-seen', () => {
+          if (whatsNewButton.isConnected) whatsNewButton.dataset.unread = 'false';
+        });
+        if (typeof window.dshDesktop?.getReleaseGuideState === 'function') {
+          Promise.resolve(window.dshDesktop.getReleaseGuideState())
+            .then((state) => {
+              if (!whatsNewButton.isConnected) return;
+              if (!state?.available) {
+                whatsNewWrap.hidden = true;
+                return;
+              }
+              if (state.version) {
+                whatsNewButton.title = englishChrome
+                  ? "What's New in v" + state.version
+                  : 'v' + state.version + ' 新功能介绍';
+              }
+              whatsNewButton.dataset.unread = state.unread ? 'true' : 'false';
+            })
+            .catch(() => {});
+        }
+        whatsNewWrap.append(whatsNewButton);
+        menus.append(whatsNewWrap);
+      }
       if (canShowTools) addMenu({
         kind: 'tools',
         label: '工具',

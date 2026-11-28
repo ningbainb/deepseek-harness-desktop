@@ -38,6 +38,7 @@ const HELP_ACTIONS = new Set([
   'export-diagnostics',
   'feedback',
   'project',
+  'release-guide',
   'sponsor',
   'privacy',
   'updates',
@@ -514,6 +515,7 @@ export function registerDesktopIpc({
   showNotification = async () => false,
   notificationService,
   getBackgroundStatus = () => undefined,
+  getReleaseGuideState = () => undefined,
   getRuntimeOrigin = () => undefined,
   getWorkspaceFileOpenToken = () => undefined,
   openWorkspaceTarget = openWorkspaceFile,
@@ -560,6 +562,7 @@ export function registerDesktopIpc({
     'desktop:window-chrome-theme',
     'desktop:star-prompt-claim',
     'desktop:release-guide-claim',
+    'desktop:release-guide-state',
     'desktop:update-status',
     'desktop:repair-status',
     'desktop:repair-retry',
@@ -690,6 +693,11 @@ export function registerDesktopIpc({
   }))
   handle('desktop:star-prompt-claim', main, async () => await claimStarPrompt?.() === true)
   handle('desktop:release-guide-claim', main, async () => await claimReleaseGuide?.() === true)
+  handle('desktop:release-guide-state', main, async () => (await getReleaseGuideState?.()) ?? {
+    available: false,
+    version,
+    unread: false,
+  })
   handle('desktop:update-status', main, () => publicUpdateStatus(getUpdateController?.()?.getStatus?.()))
   handle('desktop:update-channel-get', main, () => publicUpdateChannel(getUpdateChannel()))
   handle('desktop:update-channel-set', main, async (_event, _surface, rawChannel) => {

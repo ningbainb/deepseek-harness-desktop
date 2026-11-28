@@ -39,3 +39,15 @@ export async function markVersionPromptPending(path, version) {
   await writeState(path, shownVersions, version)
   return true
 }
+
+export async function isVersionPromptShown(path, version) {
+  const { shownVersions } = await readState(path)
+  return shownVersions.includes(version)
+}
+
+export async function markVersionPromptShown(path, version) {
+  const { shownVersions } = await readState(path)
+  if (shownVersions.includes(version)) return false
+  await writeState(path, normalizeShownVersions([...shownVersions, version]))
+  return true
+}

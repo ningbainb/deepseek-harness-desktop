@@ -27,6 +27,8 @@ const userData = resolve(temporary, 'user-data')
 const dshHome = resolve(temporary, 'dsh-home')
 const traceDirectory = process.env.DSH_DESKTOP_WINDOW_CHROME_TRACE_DIRECTORY
   ? resolve(process.env.DSH_DESKTOP_WINDOW_CHROME_TRACE_DIRECTORY) : undefined
+const releaseGuideScreenshotDir = process.env.DSH_DESKTOP_RELEASE_GUIDE_SCREENSHOT_DIR
+  ? resolve(process.env.DSH_DESKTOP_RELEASE_GUIDE_SCREENSHOT_DIR) : undefined
 const diagnostic = { temporary, stage: 'startup' }
 const settingsActivationErrors = []
 let electronApp
@@ -482,6 +484,29 @@ try {
     popup?.close()
     return allowed
   }), true)
+  const whatsNewButton = page.locator('[data-dsh-whats-new-button="true"]')
+  await page.locator('[data-dsh-whats-new-button="true"][data-unread="true"]').waitFor({ state: 'visible', timeout: 5_000 })
+  const whatsNewDotVisible = await whatsNewButton.locator('.dsh-window-chrome-unread-dot').evaluate((el) => {
+    const rect = el.getBoundingClientRect()
+    return getComputedStyle(el).display !== 'none' && rect.width >= 5 && rect.height >= 5
+  })
+  assert.equal(whatsNewDotVisible, true, 'unread corner badge must be visible before viewing release guide')
+  if (releaseGuideScreenshotDir) {
+    await mkdir(releaseGuideScreenshotDir, { recursive: true })
+    await page.screenshot({ path: resolve(releaseGuideScreenshotDir, 'topbar-badge-light.png') })
+  }
+  await whatsNewButton.click()
+  const releaseGuide = page.locator('#dsh-desktop-release-guide')
+  await page.locator('#dsh-desktop-release-guide[data-open="true"]').waitFor({ state: 'visible', timeout: 5_000 })
+  assert.equal(await releaseGuide.locator('.dsh-rg-card').count(), 4)
+  assert.equal(await whatsNewButton.getAttribute('data-unread'), 'false')
+  assert.equal(await whatsNewButton.locator('.dsh-window-chrome-unread-dot').isVisible(), false)
+  if (releaseGuideScreenshotDir) {
+    await page.waitForTimeout(300)
+    await page.screenshot({ path: resolve(releaseGuideScreenshotDir, 'release-guide-light.png') })
+  }
+  await page.keyboard.press('Escape')
+  await releaseGuide.waitFor({ state: 'hidden', timeout: 5_000 })
   const toolsButton = page.getByRole('button', { name: '工具', exact: true })
   await toolsButton.click()
   assert.equal(await toolsButton.getAttribute('aria-expanded'), 'true')
@@ -549,6 +574,7 @@ try {
   assert.equal(electronApp.windows().filter((window) => window.url().includes('community.html')).length, 1)
   assert.equal(await communityPage.getByRole('button', { name: '帮助' }).count(), 0)
   assert.equal(await communityPage.getByRole('button', { name: '工具' }).count(), 0)
+  assert.equal(await communityPage.locator('[data-dsh-whats-new-button]').count(), 0)
   const communitySession = await electronApp.evaluate(({ BrowserWindow, session }, partition) => {
     const windows = BrowserWindow.getAllWindows()
     const main = windows.find((window) => window.webContents.getURL().startsWith('dsh-runtime://app/'))
@@ -583,6 +609,15 @@ try {
   })
   await page.waitForFunction(() => document.documentElement.dataset.dshDesktopChromeTheme === 'dark')
   assert.equal(await page.locator('#dsh-desktop-window-chrome').evaluate((element) => getComputedStyle(element).backgroundColor), 'rgb(7, 17, 23)')
+  if (releaseGuideScreenshotDir) {
+    await page.keyboard.press('Escape')
+    await page.evaluate(() => window.dshDesktop.helpAction('release-guide'))
+    await page.locator('#dsh-desktop-release-guide[data-open="true"]').waitFor({ state: 'visible', timeout: 5_000 })
+    await page.waitForTimeout(300)
+    await page.screenshot({ path: resolve(releaseGuideScreenshotDir, 'release-guide-dark.png') })
+    await page.keyboard.press('Escape')
+    await page.locator('#dsh-desktop-release-guide').waitFor({ state: 'hidden', timeout: 5_000 })
+  }
   async function assertDialogUsesSafeViewport(dialog) {
     await dialog.waitFor({ state: 'visible' })
     const handle = await dialog.elementHandle()

@@ -133,7 +133,7 @@ import { installSettingsWindow } from './settings-window.mjs'
 import { exportStartupDiagnostics } from './startup-diagnostics.mjs'
 import { SettingsWindowStateStore } from './settings-window-state.mjs'
 import { installStarPromptSurface, STAR_PROMPT_VERSION, StarPromptStore } from './star-prompt.mjs'
-import { applyReleaseGuideSurface, installReleaseGuideSurface, RELEASE_GUIDE_VERSION, ReleaseGuideStore } from './release-guide.mjs'
+import { applyReleaseGuideSurface, getReleaseGuide, installReleaseGuideSurface, RELEASE_GUIDE_VERSION, ReleaseGuideStore } from './release-guide.mjs'
 import { createDesktopTerminalPanel } from './terminal-window.mjs'
 import { TerminalShellPreferencesStore } from './terminal-shell-preferences.mjs'
 import { ProductTelemetryClient } from './telemetry-client.mjs'
@@ -1300,6 +1300,11 @@ export async function startElectronApp(metadata) {
     }
   }
   let starPromptClaimedThisSession = false
+  const openReleaseGuideSurface = async () => {
+    productMetrics.recordSurface('help')
+    await releaseGuideStore.markSeen(RELEASE_GUIDE_VERSION).catch(() => {})
+    return applyReleaseGuideSurface({ webContents: mainWindow?.webContents, forceVisible: true, showDelayMs: 0 })
+  }
   const closePreferencesStore = new DesktopClosePreferencesStore(desktopPreferencesPath)
   const updateChannelStore = new DesktopUpdateChannelStore(updateChannelPreferencesPath)
   let closeBehavior = (await closePreferencesStore.load()).closeBehavior
@@ -2203,6 +2208,7 @@ export async function startElectronApp(metadata) {
     exitApp: () => app.quit(),
     handleHelpAction: (action) => {
       if (action === 'community') return createCommunityWindow()
+      if (action === 'release-guide') return openReleaseGuideSurface()
       if (action === 'updates') {
         productMetrics.recordSurface('updates')
         return updateController?.check({ manual: true })
@@ -2305,6 +2311,19 @@ export async function startElectronApp(metadata) {
       } catch (error) {
         await logStore.append(`[release-guide] failed to persist display state: ${error instanceof Error ? error.message : String(error)}`)
         return false
+      }
+    },
+    getReleaseGuideState: async () => {
+      const available = Boolean(getReleaseGuide(RELEASE_GUIDE_VERSION))
+      if (!available) return { available: false, version: RELEASE_GUIDE_VERSION, unread: false }
+      try {
+        return {
+          available: true,
+          version: RELEASE_GUIDE_VERSION,
+          unread: await releaseGuideStore.isUnread(RELEASE_GUIDE_VERSION),
+        }
+      } catch {
+        return { available: true, version: RELEASE_GUIDE_VERSION, unread: false }
       }
     },
     getUpdateController: () => updateController,
@@ -3484,10 +3503,7 @@ export async function startElectronApp(metadata) {
       productMetrics.recordSurface('help')
       return shell.openExternal(GITHUB_PROJECT_URL)
     },
-    openReleaseGuide: () => {
-      productMetrics.recordSurface('help')
-      return applyReleaseGuideSurface({ webContents: mainWindow?.webContents, forceVisible: true, showDelayMs: 0 })
-    },
+    openReleaseGuide: () => openReleaseGuideSurface(),
     openPrivacy: () => {
       productMetrics.recordSurface('help')
       return shell.openExternal(PRIVACY_POLICY_URL)

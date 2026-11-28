@@ -331,6 +331,8 @@ test('window chrome uses a native overlay with a compact caption area', () => {
   assert.doesNotMatch(WINDOW_CHROME_CSS, /dsh-desktop-window-chrome::before/)
   assert.doesNotMatch(WINDOW_CHROME_CSS, /dsh-window-chrome-icon/)
   assert.match(WINDOW_CHROME_CSS, /dsh-window-chrome-menus/)
+  assert.match(WINDOW_CHROME_CSS, /dsh-window-chrome-whats-new-button/)
+  assert.match(WINDOW_CHROME_CSS, /dsh-window-chrome-unread-dot/)
   assert.match(WINDOW_CHROME_CSS, /-webkit-app-region: no-drag/)
 })
 
@@ -397,6 +399,10 @@ test('main window chrome exposes accessible Tools and Help dropdowns with fixed 
     assert.match(script, new RegExp(`action: '${action}'`))
   }
   assert.match(script, /window\.dshDesktop\.helpAction/)
+  assert.match(script, /dsh-window-chrome-whats-new-button/)
+  assert.match(script, /getReleaseGuideState/)
+  assert.match(script, /helpAction\?\.\('release-guide'\)/)
+  assert.match(script, /dsh-release-guide-seen/)
   assert.match(script, /event\.key === 'Escape'/)
   assert.match(script, /document\.addEventListener\('pointerdown'/)
 })

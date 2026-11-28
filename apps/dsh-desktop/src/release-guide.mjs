@@ -1,6 +1,11 @@
 import { DESKTOP_MANIFEST_VERSION } from './app-version.mjs'
 import { deferModalReveal } from './modal-reveal.mjs'
-import { claimVersionPrompt, markVersionPromptPending } from './version-prompt-state.mjs'
+import {
+  claimVersionPrompt,
+  isVersionPromptShown,
+  markVersionPromptPending,
+  markVersionPromptShown,
+} from './version-prompt-state.mjs'
 
 export const RELEASE_GUIDE_VERSION = DESKTOP_MANIFEST_VERSION
 export const RELEASE_GUIDE_SURFACE_ID = 'dsh-desktop-release-guide'
@@ -85,7 +90,7 @@ export const RELEASE_GUIDES = Object.freeze({
       badge: '版本新功能',
       title: '欢迎使用 DeepSeek Harness Desktop 5.6.0',
       subtitle: '多助手同窗协作、读写代码更省额度、Ctrl+K 秒搜历史、改文件自带恢复点，并内置国内加速更新。',
-      hint: '可在顶部「帮助 → 本版本新功能」随时查看',
+      hint: '可随时点击顶部状态栏「新功能」再次查看',
       done: '开始使用',
       closeLabel: '关闭版本新功能引导',
       items: Object.freeze([
@@ -99,19 +104,19 @@ export const RELEASE_GUIDES = Object.freeze({
         }),
         Object.freeze({
           id: 'search-docs-and-office',
-          icon: 'inbox',
+          icon: 'search',
           title: 'Ctrl+K 搜索与办公文档直读',
           description: '一键搜遍历史对话与工作区文档；拖入 Word、Excel、PPT、PDF 直接解析，办公模式输入栏更干净专注。',
         }),
         Object.freeze({
           id: 'checkpoints-and-artifacts',
-          icon: 'layout',
+          icon: 'history',
           title: '改文件恢复点与流程图存图',
           description: '每轮修改自动留档，支持左右分栏对比、单文件或整轮还原及撤销；流程图可离线渲染并导出 SVG/PNG 图片。',
         }),
         Object.freeze({
           id: 'cdn-im-and-reliability',
-          icon: 'sparkles',
+          icon: 'bolt',
           title: '国内加速更新与飞书钉钉企微通知',
           description: '内置国内加速下载线路并在异常时自动切回 GitHub；支持飞书/钉钉/企微通知、按需桌面操控及多项稳定性修复。',
           actionLabel: '打开拓展坞',
@@ -123,7 +128,7 @@ export const RELEASE_GUIDES = Object.freeze({
       badge: "What's New",
       title: 'Welcome to DeepSeek Harness Desktop 5.6.0',
       subtitle: 'Switch local AI assistants, save tokens on code edits, search history with Ctrl+K, undo file changes safely, and update faster.',
-      hint: "Reopen anytime via Help → What's New",
+      hint: "Reopen anytime from What's New in the top bar",
       done: 'Get started',
       closeLabel: "Close What's New guide",
       items: Object.freeze([
@@ -137,19 +142,19 @@ export const RELEASE_GUIDES = Object.freeze({
         }),
         Object.freeze({
           id: 'search-docs-and-office',
-          icon: 'inbox',
+          icon: 'search',
           title: 'Ctrl+K Search & Office Documents',
           description: 'Search past chats and project docs in seconds, drop in Word/Excel/PPT/PDF files directly, and enjoy a cleaner Office-mode composer.',
         }),
         Object.freeze({
           id: 'checkpoints-and-artifacts',
-          icon: 'layout',
+          icon: 'history',
           title: 'Safe Restore Points & Diagram Export',
           description: 'Compare edits side by side after each turn, restore individual files or whole turns, undo restores, and export Mermaid diagrams to SVG or PNG.',
         }),
         Object.freeze({
           id: 'cdn-im-and-reliability',
-          icon: 'sparkles',
+          icon: 'bolt',
           title: 'Faster Updates & Team Notifications',
           description: 'Built-in faster update mirror with automatic GitHub fallback, Feishu/DingTalk/WeCom alerts, on-demand desktop control, and key stability fixes.',
           actionLabel: 'Open Extension Dock',
@@ -345,6 +350,14 @@ export class ReleaseGuideStore {
     return this.#update(currentVersion, () => markVersionPromptPending(this.path, currentVersion))
   }
 
+  isUnread(currentVersion) {
+    return this.#update(currentVersion, async () => !(await isVersionPromptShown(this.path, currentVersion)))
+  }
+
+  markSeen(currentVersion) {
+    return this.#update(currentVersion, () => markVersionPromptShown(this.path, currentVersion))
+  }
+
   #update(currentVersion, update) {
     const operation = this.#operation.then(() => {
       if (currentVersion !== this.targetVersion || !getReleaseGuide(currentVersion)) return false
@@ -369,11 +382,13 @@ export const RELEASE_GUIDE_CSS = `
   --dsh-rg-card: #f7f8fb;
   --dsh-rg-border: #e4e7ef;
   --dsh-rg-accent: #3370ff;
+  --dsh-rg-mask: rgb(15 23 42 / 34%);
+  --dsh-rg-shadow: 0 24px 60px -12px rgb(15 23 42 / 22%), 0 2px 10px rgb(15 23 42 / 8%);
   color: var(--dsw-alias-label-primary, var(--dsh-rg-fg));
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 220ms ease;
+  transition: opacity 200ms ease;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID}[hidden] { display: none; }
@@ -386,29 +401,33 @@ html[data-dsh-desktop-chrome-theme="dark"] #${RELEASE_GUIDE_SURFACE_ID} {
   --dsh-rg-card: #1c2432;
   --dsh-rg-border: #283244;
   --dsh-rg-accent: #6390ff;
+  --dsh-rg-mask: rgb(3 7 15 / 56%);
+  --dsh-rg-shadow: 0 28px 68px -12px rgb(0 0 0 / 56%), 0 0 0 1px rgb(255 255 255 / 4%) inset;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-mask {
   position: absolute;
   inset: 0;
-  background: rgb(0 0 0 / 42%);
+  background: var(--dsh-rg-mask);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-panel {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: min(650px, calc(100vw - 40px));
+  width: min(676px, calc(100vw - 40px));
   max-height: calc(100vh - 64px);
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2, var(--dsh-rg-border));
-  border-radius: 16px;
+  border-radius: 18px;
   outline: none;
   background: var(--dsw-alias-bg-layer-1, var(--dsh-rg-surface));
-  box-shadow: 0 20px 54px rgb(0 0 0 / 24%);
+  box-shadow: var(--dsh-rg-shadow);
   transform: translateY(10px) scale(0.985);
   opacity: 0;
-  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID}[data-open="true"] .dsh-rg-panel {
@@ -421,35 +440,48 @@ html[data-dsh-desktop-chrome-theme="dark"] #${RELEASE_GUIDE_SURFACE_ID} {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 22px 14px;
+  padding: 22px 24px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--dsw-alias-border-l2, var(--dsh-rg-border)) 65%, transparent);
+  background: radial-gradient(ellipse 80% 120% at 12% 0%, color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 9%, transparent), transparent 72%);
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
-  margin: 0 0 8px;
+  gap: 6px;
+  padding: 3px 10px;
+  margin: 0 0 10px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 22%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary, var(--dsh-rg-accent)) 11%, transparent);
-  color: var(--dsw-alias-brand-primary, var(--dsh-rg-accent));
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 10%, transparent);
+  color: var(--dsw-alias-state-business-primary, var(--dsh-rg-accent));
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   line-height: 1.4;
+}
+
+#${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-title {
   margin: 0;
   color: var(--dsw-alias-label-primary, var(--dsh-rg-fg));
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
   line-height: 1.35;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-subtitle {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   color: var(--dsw-alias-label-tertiary, var(--dsh-rg-muted));
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-close {
@@ -464,6 +496,7 @@ html[data-dsh-desktop-chrome-theme="dark"] #${RELEASE_GUIDE_SURFACE_ID} {
   color: var(--dsw-alias-label-tertiary, var(--dsh-rg-muted));
   background: transparent;
   cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-close:hover {
@@ -477,22 +510,24 @@ html[data-dsh-desktop-chrome-theme="dark"] #${RELEASE_GUIDE_SURFACE_ID} {
   gap: 12px;
   min-height: 0;
   overflow: auto;
-  padding: 2px 22px 18px;
+  padding: 16px 24px 20px;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 15px;
+  gap: 10px;
+  padding: 16px 17px;
   border: 1px solid var(--dsw-alias-border-l2, var(--dsh-rg-border));
-  border-radius: 12px;
+  border-radius: 14px;
   background: var(--dsw-alias-bg-layer-2, var(--dsh-rg-card));
-  transition: border-color 140ms ease, background-color 140ms ease;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-card:hover {
-  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary, var(--dsh-rg-accent)) 28%, var(--dsw-alias-border-l2, var(--dsh-rg-border)));
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 34%, var(--dsw-alias-border-l2, var(--dsh-rg-border)));
+  box-shadow: 0 6px 18px -6px rgb(15 23 42 / 10%);
+  transform: translateY(-1px);
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-card-head {
@@ -505,17 +540,18 @@ html[data-dsh-desktop-chrome-theme="dark"] #${RELEASE_GUIDE_SURFACE_ID} {
   display: grid;
   place-items: center;
   flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  color: var(--dsw-alias-brand-primary, var(--dsh-rg-accent));
-  background: color-mix(in srgb, var(--dsw-alias-brand-primary, var(--dsh-rg-accent)) 10%, transparent);
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 18%, transparent);
+  border-radius: 9px;
+  color: var(--dsw-alias-state-business-primary, var(--dsh-rg-accent));
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 10%, transparent);
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-card h3 {
   margin: 0;
   color: var(--dsw-alias-label-primary, var(--dsh-rg-fg));
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   line-height: 1.4;
 }
@@ -524,54 +560,68 @@ html[data-dsh-desktop-chrome-theme="dark"] #${RELEASE_GUIDE_SURFACE_ID} {
   margin: 0;
   flex: 1;
   color: var(--dsw-alias-label-secondary, var(--dsh-rg-muted));
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 12.25px;
+  line-height: 1.58;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   align-self: flex-start;
-  padding: 2px 0 0;
+  padding: 4px 10px;
+  margin-top: 2px;
   border: 0;
-  background: transparent;
-  color: var(--dsw-alias-brand-primary, var(--dsh-rg-accent));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 10%, transparent);
+  color: var(--dsw-alias-state-business-primary, var(--dsh-rg-accent));
   cursor: pointer;
   font: inherit;
   font-size: 12px;
   font-weight: 500;
+  transition: background-color 140ms ease;
 }
 
-#${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-action:hover { text-decoration: underline; }
+#${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-action:hover {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary, var(--dsh-rg-accent)) 16%, transparent);
+}
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 22px 18px;
+  padding: 14px 24px 18px;
   border-top: 1px solid var(--dsw-alias-border-l2, var(--dsh-rg-border));
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2, var(--dsh-rg-card)) 55%, transparent);
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-hint {
   margin: 0;
   color: var(--dsw-alias-label-tertiary, var(--dsh-rg-muted));
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.45;
 }
 
 #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-primary {
   height: 36px;
-  padding: 0 20px;
+  padding: 0 22px;
   border: 0;
-  border-radius: 9px;
-  background: var(--dsw-alias-brand-primary, var(--dsh-rg-accent));
-  color: #ffffff;
+  border-radius: 10px;
+  background: var(--dsw-alias-button-primary-fill, var(--dsh-rg-accent));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+  color: var(--dsw-alias-label-primary-foreground, #ffffff);
   font: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 550;
   cursor: pointer;
+  transition: background-color 140ms ease, filter 140ms ease;
 }
 
-#${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-primary:hover { filter: brightness(1.06); }
+#${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-primary:hover {
+  background: var(--dsw-alias-button-primary-hover, var(--dsw-alias-button-primary-fill, var(--dsh-rg-accent)));
+  filter: brightness(1.04);
+}
 
 #${RELEASE_GUIDE_SURFACE_ID} button:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary, var(--dsh-rg-accent));
@@ -580,7 +630,8 @@ html[data-dsh-desktop-chrome-theme="dark"] #${RELEASE_GUIDE_SURFACE_ID} {
 
 @media (prefers-reduced-motion: reduce) {
   #${RELEASE_GUIDE_SURFACE_ID},
-  #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-panel { transition: none !important; }
+  #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-panel,
+  #${RELEASE_GUIDE_SURFACE_ID} .dsh-rg-card { transition: none !important; transform: none !important; }
 }
 
 @media (max-width: 580px) {
@@ -595,6 +646,9 @@ const FEATURE_ICON_PATHS = {
   inbox: '<path d="M4 13l2.4-6.5h11.2L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M4 13h5l1 2h4l1-2h5" />',
   terminal: '<polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />',
   layout: '<rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" />',
+  search: '<circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" />',
+  history: '<path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" />',
+  bolt: '<path d="M13 2L4.5 13.5H12L11 22L19.5 10.5H12L13 2Z" />',
 }
 
 export function createReleaseGuideSurfaceScript({
@@ -638,7 +692,10 @@ export function createReleaseGuideSurfaceScript({
     const headingGroup = document.createElement('div');
     const badge = document.createElement('p');
     badge.className = 'dsh-rg-badge';
-    badge.textContent = 'v' + options.version + ' · ' + copy.badge;
+    const badgeDot = document.createElement('span');
+    badgeDot.className = 'dsh-rg-badge-dot';
+    badgeDot.setAttribute('aria-hidden', 'true');
+    badge.append(badgeDot, document.createTextNode('v' + options.version + ' · ' + copy.badge));
     const title = document.createElement('h2');
     title.id = 'dsh-rg-title';
     title.className = 'dsh-rg-title';
@@ -734,16 +791,28 @@ export function createReleaseGuideSurfaceScript({
     document.body.append(root);
 
     let previousFocus;
+    let hideTimer;
     const hide = () => {
       root.dataset.open = 'false';
-      setTimeout(() => {
+      if (hideTimer !== undefined) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        hideTimer = undefined;
         root.hidden = true;
         if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus();
       }, 220);
     };
     const show = () => {
+      if (hideTimer !== undefined) {
+        clearTimeout(hideTimer);
+        hideTimer = undefined;
+      }
       previousFocus = document.activeElement;
       root.hidden = false;
+      if (typeof window.CustomEvent === 'function') {
+        window.dispatchEvent(new window.CustomEvent('dsh-release-guide-seen', {
+          detail: { version: options.version },
+        }));
+      }
       requestAnimationFrame(() => {
         root.dataset.open = 'true';
         panel.focus({ preventScroll: true });
