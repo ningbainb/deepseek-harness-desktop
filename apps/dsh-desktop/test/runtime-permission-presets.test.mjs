@@ -58,7 +58,7 @@ test('legacy full-user plus ask starts the real SDK permission service without r
   assert.notEqual(catalog.defaultPreset, 'custom')
   assert.deepEqual(service.resolve(catalog.defaultPreset), {
     sandbox: 'danger-full-access', approval: 'ask',
-    name: '完整文件权限，操作前询问',
+    name: '询问', description: '完整文件权限，操作前询问',
   })
   assert.equal(service.resolve('danger-full-access').approval, 'never')
   assert.equal(service.resolve('workspace-write').sandbox, 'workspace-write')

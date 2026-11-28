@@ -10,7 +10,7 @@ function preserveDesktopPermissionDefault(ctx, config) {
   // Do not select an existing broader preset just to satisfy SDK validation.
   // Keep both actual knobs, user catalogs and explicit defaults authoritative.
   const selected = config.defaultPreset.get()
-  const desktopSpec = { sandbox: 'danger-full-access', approval: 'ask', name: '完整文件权限，操作前询问' }
+  const desktopSpec = { sandbox: 'danger-full-access', approval: 'ask', name: '询问', description: '完整文件权限，操作前询问' }
   let presets = config.presets
   // The official form persists only the selected ID. Reconstruct our own
   // encoded combination after restart, never a missing arbitrary user preset.

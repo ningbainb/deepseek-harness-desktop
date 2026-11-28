@@ -162,7 +162,7 @@ try {
     else assert.equal(await branch.count(), 0, 'office mode hides the Git branch icon')
     assert.equal(await nativeComposer.locator('[data-dsh-acp-engines]').count(), 0)
     assert.equal(await nativeComposer.getByText(/^ACP 引擎$/u).count(), 0)
-    await modelTrigger.getByText('供应商默认', { exact: true }).waitFor({ timeout })
+    await modelTrigger.getByText('默认', { exact: true }).waitFor({ timeout })
     const controls = {
       commands, model: modelTrigger, send,
       skills: nativeComposer.getByRole('button', { name: '技能库' }),
