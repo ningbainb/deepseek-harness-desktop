@@ -375,6 +375,7 @@ allowBuilds:
   node-pty: true
   protobufjs: true
   ssh2: true
+  tesseract.js: false
 
 minimumReleaseAgeExclude:
   # Exact official cohort selected for Desktop 5.2.0 compatibility evaluation.
