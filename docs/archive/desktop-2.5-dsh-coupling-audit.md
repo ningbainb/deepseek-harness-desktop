@@ -841,7 +841,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-background-residency.mjs | 94 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-bai-onboarding.mjs | 35 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-beta-usability.mjs | 95 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-chat-artifacts.mjs | 211 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-chat-artifacts.mjs | 212 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-context-prompt-customizer.mjs | 54 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-control-approval.mjs | 82 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-conversation-scroll.mjs | 31 | profileDir |
@@ -878,7 +878,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 152 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 166 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-browser-component.mjs | 284 | DSH_HOME |
-| profile-home | apps/dsh-desktop/scripts/verify-packaged-image-drop.mjs | 379 | DSH_HOME |
+| profile-home | apps/dsh-desktop/scripts/verify-packaged-image-drop.mjs | 380 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-local-lan-gateway.mjs | 81 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-model-preferences.mjs | 46 | DSH_HOME |
 | profile-home | apps/dsh-desktop/scripts/verify-packaged-orphaned-managed-link.mjs | 20 | profileDir |
