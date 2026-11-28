@@ -40,9 +40,10 @@ describe('memory client registration', () => {
     expect(locale.register).toHaveBeenCalledWith('memory', expect.any(Object))
     expect(registration).toHaveLength(5)
     expect(registration.some(item => item.contribution.name === 'conversation.session.header.actions')).toBe(false)
+    expect(registration.some(item => item.contribution.name === 'sidebar.footer.action')).toBe(false)
     expect(registration.map(item => item.contribution.name)).toEqual([
       'web-ui.plugin.item',
-      'sidebar.footer.action',
+      'shell.overlay',
       'conversation.session.panel.section',
       'conversation.session.panel.section.actions',
       'sidebar.right.tab.files.actions',

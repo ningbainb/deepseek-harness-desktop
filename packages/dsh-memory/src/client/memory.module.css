@@ -510,11 +510,6 @@
   min-width: 0;
 }
 
-:global([data-pane='sidebar'] [class*='footerActions']):has(.quickFooterWrap[data-wide='wide']) {
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
-
 .quickFooterWrap[data-wide='wide'] {
   box-sizing: border-box;
   flex-basis: 100%;

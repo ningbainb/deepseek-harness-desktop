@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { normalizeMemoryConfig, type MemoryConfig } from '../core/config.ts'
 import { MEMORY_SETTINGS_NAMESPACE } from '../core/schema.ts'
 import { MemorySettingsCard } from './MemorySettingsCard.tsx'
-import { QuickSearchSidebarEntry, openQuickSearch, toggleQuickSearch } from './QuickSearchDialog.tsx'
+import { QuickSearchDialog, openQuickSearch, toggleQuickSearch } from './QuickSearchDialog.tsx'
 import { FilesTreeKnowledgeButton, WorkspaceKnowledgeCount, WorkspaceKnowledgeSection } from './WorkspaceKnowledgeSection.tsx'
 import { en, zh, type MemoryLocaleKey } from './locales.ts'
 
@@ -26,7 +26,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
   interface SlotMap {
     'web-ui.plugin.item': { kind: 'list'; scope: 'root'; owner: { children?: never } }
-    'sidebar.footer.action': { kind: 'list'; scope: 'root'; owner: { wide: boolean } }
+    'shell.overlay': { kind: 'list'; scope: 'root'; owner: { children?: never } }
     'conversation.session.panel.section': {
       kind: 'list'
       scope: 'session'
@@ -86,15 +86,14 @@ export function apply(ctx: ClientContext): void {
         onOpenSession: ctx.get('uiWorkspace' as never, false) ? openSession : undefined,
       }),
     }, MemorySettingsCard))
-    scope.slots.inject('sidebar.footer.action', () => scope.slots.register({
-      name: 'sidebar.footer.action',
+    scope.slots.inject('shell.overlay', () => scope.slots.register({
+      name: 'shell.overlay',
       id: 'local-search-quick',
-      order: 15,
       locale: 'memory',
       inject: () => ({
         onOpenSession: ctx.get('uiWorkspace' as never, false) ? openSession : undefined,
       }),
-    }, QuickSearchSidebarEntry))
+    }, QuickSearchDialog))
     scope.slots.inject('conversation.session.panel.section', () => scope.slots.register({
       name: 'conversation.session.panel.section',
       id: 'workspace-knowledge',
