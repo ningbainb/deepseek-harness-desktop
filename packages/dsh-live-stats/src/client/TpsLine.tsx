@@ -106,9 +106,9 @@ export const TpsLine = memo(function TpsLine({ useProjection, t = defaultTransla
       signal: controller.signal,
     })
       .then(res => (res.ok ? res.json() : undefined))
-      .then((data: { counters?: { denoiseTokensSaved?: number; filesReadInBatches?: number } } | undefined) => {
+      .then((data: { counters?: { denoiseTokensSaved?: number; spillTokensSaved?: number; filesReadInBatches?: number } } | undefined) => {
         if (controller.signal.aborted || !data?.counters) return
-        const saved = Number(data.counters.denoiseTokensSaved ?? 0)
+        const saved = Number(data.counters.denoiseTokensSaved ?? 0) + Number(data.counters.spillTokensSaved ?? 0)
         const files = Number(data.counters.filesReadInBatches ?? 0)
         if (saved > 0 || files > 0) setNbfastStats({ saved, files })
       })

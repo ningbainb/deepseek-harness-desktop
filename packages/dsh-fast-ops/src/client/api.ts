@@ -10,6 +10,7 @@ export interface FastOpsStateResponse {
     toolsActivated: number
     astCalls: number
     denoiseTokensSaved: number
+    spillTokensSaved?: number
   }
   cache: {
     totalRefs: number

@@ -1,9 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { LocaleServiceLike, SlotsServiceLike } from '../core/host-types.ts'
 import { FastOpsCard } from './FastOpsCard.tsx'
+import { FastOpsDockBadge } from './FastOpsDockBadge.tsx'
 import { en, zh } from './locales.ts'
 
 export { FastOpsCard } from './FastOpsCard.tsx'
+export { FastOpsDockBadge, formatCompactTokens, summarizeFastOpsBadge } from './FastOpsDockBadge.tsx'
 export { en, zh } from './locales.ts'
 
 export const inject = ['slots', 'locale'] as const
@@ -29,4 +31,12 @@ export function apply(ctx: Context): void {
     locale: NAMESPACE,
     inject: () => ({}),
   }, FastOpsCard)), 'fast-ops: settings card')
+
+  accessor.effect(() => slots.inject('conversation.composer.dock', () => slots.register({
+    name: 'conversation.composer.dock',
+    id: 'fast-ops-dock',
+    order: 105,
+    locale: NAMESPACE,
+    inject: () => ({}),
+  }, FastOpsDockBadge)), 'fast-ops: composer dock badge')
 }

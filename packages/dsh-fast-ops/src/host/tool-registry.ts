@@ -54,6 +54,7 @@ export interface FastOpsCounters {
   toolsActivated: number
   astCalls: number
   denoiseTokensSaved: number
+  spillTokensSaved: number
 }
 
 export const FAST_OPS_RESULTS_SERVICE = 'fastOpsResults'
@@ -79,6 +80,7 @@ export class FastOpsController implements FastOpsResultsService {
     toolsActivated: 0,
     astCalls: 0,
     denoiseTokensSaved: 0,
+    spillTokensSaved: 0,
   }
 
   private readonly activated = new WeakMap<object, Set<string>>()
@@ -158,6 +160,13 @@ export class FastOpsController implements FastOpsResultsService {
     const text = `${compact}\n[compressed ${rawBytes} B -> ${projectedBytes} B, saved ~${percent}%; full raw output: ${ref.refId} via fast_result]`
     this.counters.denoiseTokensSaved += Math.max(0, Math.floor((original.text.length - text.length) / 4))
     return { ...decision, content: [{ ...original, text }] }
+  }
+
+  private recordSpillSavings(spilledBytes: number, inlinePayload: unknown): void {
+    if (spilledBytes <= 0) return
+    const serialized = typeof inlinePayload === 'string' ? inlinePayload : JSON.stringify(inlinePayload)
+    const inlineBytes = Buffer.byteLength(serialized ?? '', 'utf8')
+    this.counters.spillTokensSaved += Math.floor(Math.max(0, spilledBytes - inlineBytes) / 4)
   }
 
   private resolveWorkspaceRoot(agent?: AgentLike): string {
@@ -385,7 +394,10 @@ export class FastOpsController implements FastOpsResultsService {
             ttlMs: settings.resultCacheTtlMs,
             cache: this.cache,
           })
-          if (result.spilled) this.counters.cacheSpills++
+          if (result.spilled) {
+            this.counters.cacheSpills++
+            this.recordSpillSavings(result.ref?.totalBytes ?? 0, result)
+          }
           return result
         },
       })
@@ -424,7 +436,12 @@ export class FastOpsController implements FastOpsResultsService {
               cache: this.cache,
             },
           )
-          if ('spilled' in res && res.spilled) this.counters.cacheSpills++
+          if ('spilled' in res && res.spilled) {
+            this.counters.cacheSpills++
+            const refBytes = 'ref' in res ? (res.ref?.totalBytes ?? 0) : 0
+            const contextRefBytes = 'contextRef' in res ? (res.contextRef?.totalBytes ?? 0) : 0
+            this.recordSpillSavings(refBytes + contextRefBytes, res)
+          }
           return res
         },
       })
@@ -575,7 +592,11 @@ export class FastOpsController implements FastOpsResultsService {
               cache: this.cache,
             },
           )
-          if ('spilled' in res && res.spilled) this.counters.cacheSpills++
+          if ('spilled' in res && res.spilled) {
+            this.counters.cacheSpills++
+            const refBytes = 'ref' in res ? (res.ref?.totalBytes ?? 0) : 0
+            this.recordSpillSavings(refBytes, res)
+          }
           return res
         },
       })
@@ -616,6 +637,9 @@ export class FastOpsController implements FastOpsResultsService {
           const text = JSON.stringify(result.context)
           if (Buffer.byteLength(text, 'utf8') <= this.getSettings().maxInlineBytes) return result
           const contextRef = this.putText({ agent: exec?.agent, producerTool: 'fast_ast_search', text })
+          if (contextRef) {
+            this.recordSpillSavings(Buffer.byteLength(text, 'utf8'), contextRef)
+          }
           return contextRef ? { ...result, context: [], contextRef, contextEncoding: 'json-text' } : result
         },
       })

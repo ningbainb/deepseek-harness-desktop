@@ -292,6 +292,32 @@ describe('dsh-fast-ops controller & routes', () => {
       const refId = text.match(/ref:\/\/[^\s\]]+/u)?.[0]
       const page = registered.get('fast_result')!({ action: 'page', refId }, { agent })
       expect(page.items.map((item: { text: string }) => item.text).join('')).toBe(raw)
+      expect(controller.counters.denoiseTokensSaved).toBeGreaterThan(0)
+      expect(controller.counters.spillTokensSaved).toBe(0)
+    } finally {
+      stop()
+    }
+  })
+
+  it('tracks spillTokensSaved when fast_read_files overflows into ref:// cache', async () => {
+    const ws = mkdtempSync(join(tmpdir(), 'dsh-fast-ops-spill-save-'))
+    dirs.push(ws)
+    writeFileSync(join(ws, 'big.txt'), 'alpha beta gamma delta epsilon\n'.repeat(250), 'utf8')
+    const ctx = new Context() as Context & Record<string, any>
+    const registered = new Map<string, (args: any, exec: any) => any>()
+    ctx.tools = { register: (spec: any) => { registered.set(spec.name, spec.execute) } }
+    const controller = new FastOpsController({
+      ctx,
+      getSettings: () => ({ ...defaultSettings(), maxInlineBytes: 1024 }),
+    })
+    const stop = controller.mount()
+    const exec = { agent: { session: { id: 'spill-save' }, workspace: { path: ws } } }
+    try {
+      const res = await registered.get('fast_read_files')!({ files: [{ path: 'big.txt', offset: 1, limit: 250 }] }, exec)
+      expect(res.spilled).toBe(true)
+      expect(controller.counters.cacheSpills).toBe(1)
+      expect(controller.counters.spillTokensSaved).toBeGreaterThan(500)
+      expect(controller.counters.denoiseTokensSaved).toBe(0)
     } finally {
       stop()
     }

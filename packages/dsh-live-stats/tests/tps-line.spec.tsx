@@ -150,7 +150,7 @@ describe('TPS composer line', () => {
         return {
           ok: true,
           json: async () => ({
-            counters: { denoiseTokensSaved: 3_200, filesReadInBatches: 14 },
+            counters: { denoiseTokensSaved: 3_200, spillTokensSaved: 1_800, filesReadInBatches: 14 },
           }),
         }
       }
@@ -165,7 +165,7 @@ describe('TPS composer line', () => {
       const summary = view.container.querySelector('summary') as HTMLElement
       fireEvent.click(summary)
       await vi.waitFor(() => {
-        expect(view.container.textContent).toContain('nbfast 省流~3.2K tok · 14 文件')
+        expect(view.container.textContent).toContain('nbfast 省流~5K tok · 14 文件')
       })
     } finally {
       vi.unstubAllGlobals()

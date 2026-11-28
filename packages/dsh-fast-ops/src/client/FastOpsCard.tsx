@@ -59,6 +59,7 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
       setDraft(res.settings)
       setState(prev => (prev ? { ...prev, settings: res.settings } : prev))
       setFeedback({ kind: 'ok', text: t('savedNotice') })
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('dsh-fast-ops:state-changed'))
     } catch {
       setFeedback({ kind: 'err', text: t('errorNotice') })
     } finally {
@@ -73,6 +74,7 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
       const res = await reclaimFastOpsCache()
       setState(prev => (prev ? { ...prev, cache: res.cache } : prev))
       setFeedback({ kind: 'ok', text: t('reclaimedNotice') })
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('dsh-fast-ops:state-changed'))
     } catch {
       setFeedback({ kind: 'err', text: t('errorNotice') })
     } finally {
@@ -93,7 +95,11 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
     toolsActivated: 0,
     astCalls: 0,
     denoiseTokensSaved: 0,
+    spillTokensSaved: 0,
   }
+  const denoiseSaved = counters.denoiseTokensSaved ?? 0
+  const spillSaved = counters.spillTokensSaved ?? 0
+  const totalSaved = denoiseSaved + spillSaved
   const cache = state?.cache ?? { totalRefs: 0, totalBytes: 0, sessionCount: 0 }
   const isDirty = state !== null && JSON.stringify(draft) !== JSON.stringify(state.settings)
 
@@ -151,8 +157,11 @@ export function FastOpsCard({ t }: FastOpsCardProps) {
           {state && <div className={css.metricSub}>{t(state.astAvailable ? 'astNative' : 'astFallback')}</div>}
         </div>
         <div className={css.metricCard}>
-          <div className={css.metricValue}>{counters.denoiseTokensSaved}</div>
+          <div className={css.metricValue}>{totalSaved}</div>
           <div className={css.metricLabel}>{t('statsDenoiseTokens')}</div>
+          {spillSaved > 0 && (
+            <div className={css.metricSub}>{`${t('statsTotalSavedSubDenoise')} ${denoiseSaved} · ${t('statsTotalSavedSubSpill')} ${spillSaved}`}</div>
+          )}
         </div>
       </div>
 
