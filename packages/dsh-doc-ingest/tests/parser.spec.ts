@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
@@ -9,7 +9,7 @@ import { runParseWorker } from '../src/host/worker.ts'
 let workspace: string
 
 beforeEach(async () => {
-  workspace = await mkdtemp(join(tmpdir(), 'dsh-doc-parser-'))
+  workspace = await realpath(await mkdtemp(join(tmpdir(), 'dsh-doc-parser-')))
 })
 
 afterEach(async () => {

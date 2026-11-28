@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -14,7 +14,7 @@ const toolRun = {
 } as unknown as ToolRunContext
 
 beforeEach(async () => {
-  workspace = await mkdtemp(join(tmpdir(), 'dsh-doc-tools-'))
+  workspace = await realpath(await mkdtemp(join(tmpdir(), 'dsh-doc-tools-')))
 })
 
 afterEach(async () => {

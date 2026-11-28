@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -8,7 +8,7 @@ let home: string
 let workspace: string
 
 beforeEach(async () => {
-  home = await mkdtemp(join(tmpdir(), 'dsh-doc-workspace-'))
+  home = await realpath(await mkdtemp(join(tmpdir(), 'dsh-doc-workspace-')))
   workspace = join(home, 'workspace')
   await mkdir(workspace)
 })
