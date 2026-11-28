@@ -89,11 +89,32 @@ const HOVER_CLOSE_DELAY_MS = 120
 export const TpsLine = memo(function TpsLine({ useProjection, t = defaultTranslation }: TpsLineProps) {
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
+  const [nbfastStats, setNbfastStats] = useState<{ saved: number; files: number }>()
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => () => {
     if (hoverCloseTimer.current !== undefined) clearTimeout(hoverCloseTimer.current)
   }, [])
+
+  const isOpen = pinned || hovered
+  useEffect(() => {
+    if (!isOpen || typeof fetch !== 'function') return
+    const controller = new AbortController()
+    void fetch('/api/dsh-fast-ops/state', {
+      cache: 'no-store',
+      headers: { 'x-dsh-fast-ops': '1' },
+      signal: controller.signal,
+    })
+      .then(res => (res.ok ? res.json() : undefined))
+      .then((data: { counters?: { denoiseTokensSaved?: number; filesReadInBatches?: number } } | undefined) => {
+        if (controller.signal.aborted || !data?.counters) return
+        const saved = Number(data.counters.denoiseTokensSaved ?? 0)
+        const files = Number(data.counters.filesReadInBatches ?? 0)
+        if (saved > 0 || files > 0) setNbfastStats({ saved, files })
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [isOpen])
 
   const projection = useProjection('liveTokenUsage')
   const rate = projection?.tokensPerSecond
@@ -106,7 +127,6 @@ export const TpsLine = memo(function TpsLine({ useProjection, t = defaultTransla
   // A zero initial projection is not evidence of a billed conversation.
   if (projection === undefined || !(input > 0 || output > 0 || validMeasurement(rate) || validMeasurement(peak))) return null
   const estimated = projection.estimated ? '~' : ''
-  const isOpen = pinned || hovered
 
   const handleMouseEnter = (): void => {
     if (hoverCloseTimer.current !== undefined) {
@@ -163,6 +183,17 @@ export const TpsLine = memo(function TpsLine({ useProjection, t = defaultTransla
           )}
           {validMeasurement(rate) && <><dt>{t('stats.rolling')}</dt><dd>{formatTokensPerSecond(rate)} tok/s</dd></>}
           {validMeasurement(peak) && <><dt>{t('stats.peak')}</dt><dd>{formatTokensPerSecond(peak)} tok/s</dd></>}
+          {nbfastStats && (nbfastStats.saved > 0 || nbfastStats.files > 0) && (
+            <>
+              <dt>{t('stats.nbfastSaved')}</dt>
+              <dd>
+                {[
+                  nbfastStats.saved > 0 ? `~${formatCompactTokens(nbfastStats.saved)} tok` : '',
+                  nbfastStats.files > 0 ? `${nbfastStats.files} ${t('stats.nbfastFiles')}` : '',
+                ].filter(Boolean).join(' · ')}
+              </dd>
+            </>
+          )}
         </dl>
         <p className={styles.note}>{t('stats.explanation')}</p>
       </div>

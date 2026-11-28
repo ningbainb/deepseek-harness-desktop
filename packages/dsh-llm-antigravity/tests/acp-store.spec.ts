@@ -180,29 +180,49 @@ describe('Antigravity interactive ACP store and plugin registration', () => {
     const injectedSlots: string[] = []
     const registeredSlots: string[] = []
     let bind!: Bind
+    const registeredTabs: unknown[] = []
+    const slots = {
+      inject: (slot: string, fn: () => unknown) => { injectedSlots.push(slot); fn(); return () => {} },
+      register: (opts: { name: string; inject?: Bind }) => {
+        registeredSlots.push(opts.name)
+        if (opts.name === 'conversation.input.right') bind = opts.inject!
+        return () => {}
+      },
+    }
     const fakeCtx = {
       effect: (fn: () => unknown) => fn(),
       locale: { register: vi.fn(), bind: () => (key: string) => key },
       configForms: { get: () => ({}) },
       inject: (deps: string[], fn: (scope: unknown) => void) => {
-        expect(deps).toEqual(['commandUi'])
-        fn({ effect: (effect: () => unknown) => effect(), get: (name: string) => {
-          expect(name).toBe('commandUi')
-          return { register: (command: Command) => { commands.push(command); return () => {} } }
-        } })
+        if (deps[0] === 'commandUi') {
+          fn({ effect: (effect: () => unknown) => effect(), get: (name: string) => {
+            expect(name).toBe('commandUi')
+            return { register: (command: Command) => { commands.push(command); return () => {} } }
+          } })
+        } else {
+          expect(deps).toEqual(['slots', 'sidebarRightTabs'])
+          fn({
+            effect: (effect: () => unknown) => effect(),
+            slots,
+            sidebarRightTabs: { register: (def: unknown) => { registeredTabs.push(def); return () => {} } },
+          })
+        }
       },
-      slots: {
-        inject: (slot: string, fn: () => unknown) => { injectedSlots.push(slot); fn(); return () => {} },
-        register: (opts: { name: string; inject?: Bind }) => {
-          registeredSlots.push(opts.name)
-          if (opts.name === 'conversation.input.right') bind = opts.inject!
-          return () => {}
-        },
-      },
+      slots,
     }
     apply(fakeCtx as never)
-    expect(injectedSlots).toEqual(['web-ui.plugin.item', 'conversation.hero.frame', 'conversation.input.right'])
+    expect(injectedSlots).toEqual([
+      'sidebar.right.pane.tab',
+      'web-ui.plugin.item',
+      'conversation.hero.frame',
+      'conversation.input.model.options',
+      'conversation.input.model.pane',
+      'model-preferences.menu.options',
+      'model-preferences.menu.pane',
+      'conversation.input.right',
+    ])
     expect(registeredSlots).toEqual(injectedSlots)
+    expect(registeredTabs).toHaveLength(1)
     expect(commands).toHaveLength(1)
     const [command] = commands
     expect([command.name, command.label(), command.ui.kind]).toEqual(['acp', 'engines', 'action'])

@@ -1,18 +1,74 @@
 .tail {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
   margin: 4px 0;
-  color: var(--dsw-alias-label-secondary);
+  color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
 }
 
 .tail > span {
-  margin-inline-end: 4px;
-  padding: 3px 8px;
-  border-radius: 12px;
+  margin-inline-end: 2px;
+  padding: 2px 7px;
+  border-radius: 999px;
   background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.sectionCount {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.sessionSection {
+  display: grid;
+  gap: 6px;
+}
+
+.sessionList {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sessionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+.sessionItemMain {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sessionItemTitle {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.sessionItemMeta {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sessionItemActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
 }
 
 .button,

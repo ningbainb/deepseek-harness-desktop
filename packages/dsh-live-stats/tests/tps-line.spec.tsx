@@ -143,4 +143,32 @@ describe('TPS composer line', () => {
       vi.useRealTimers()
     }
   })
+
+  it('shows nbfast token and batch file savings inside the opened details panel when available', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      if (String(input).includes('/api/dsh-fast-ops/state')) {
+        return {
+          ok: true,
+          json: async () => ({
+            counters: { denoiseTokensSaved: 3_200, filesReadInBatches: 14 },
+          }),
+        }
+      }
+      return { ok: false }
+    }))
+    try {
+      const useProjection = (() => ({
+        estimated: true, uncachedInputTokens: 100, cacheReadTokens: 0,
+        cacheWriteTokens: 0, outputTokens: 20, estimatedCost: 0.1,
+      })) as UseProjection
+      const view = render(<TpsLine useProjection={useProjection} />)
+      const summary = view.container.querySelector('summary') as HTMLElement
+      fireEvent.click(summary)
+      await vi.waitFor(() => {
+        expect(view.container.textContent).toContain('nbfast 省流~3.2K tok · 14 文件')
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
 })

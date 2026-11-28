@@ -41,6 +41,7 @@ const zh = {
   stale: '工作区状态已变化。请重新预览恢复。',
   workspaceBusy: '当前工作区有 Agent 正在运行。请等待其结束再恢复。',
   refresh: '重新加载',
+  filesShort: '{files} 文件',
 } as const
 
 export type CheckpointKey = keyof typeof zh
@@ -88,6 +89,7 @@ const en: Record<CheckpointKey, string> = {
   stale: 'The workspace changed. Preview the restore again.',
   workspaceBusy: 'An agent is still working in this workspace. Wait for it to finish before restoring.',
   refresh: 'Reload',
+  filesShort: '{files} files',
 }
 
 export const dictionaries = { zh, en }

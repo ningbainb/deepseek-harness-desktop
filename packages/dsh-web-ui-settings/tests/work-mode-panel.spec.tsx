@@ -181,7 +181,9 @@ describe('Unified Office Apps Integration & Experience Mode Switcher', () => {
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog')
     expect(trigger.getAttribute('data-connected')).toBe('true')
 
-    // Blank session in office mode renders starter chips; connected chip launches prompt directly
+    // Blank session in office mode hides disconnected gray placeholders and shows connected + local doc chips
+    expect(screen.queryByRole('button', { name: /整理飞书纪要/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /解析本地文档/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /生成周报/ }))
     expect(runPrompt).toHaveBeenCalledWith('新建腾讯文档周报')
 

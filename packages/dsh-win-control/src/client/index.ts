@@ -1,11 +1,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { LocaleServiceLike, SlotsServiceLike } from '../core/host-types.ts'
 import { WinControlCard } from './WinControlCard.tsx'
-import { WinControlPill } from './WinControlPill.tsx'
+import { WinControlMenuOption, WinControlPill } from './WinControlPill.tsx'
 import { en, zh } from './locales.ts'
 
 export { WinControlCard } from './WinControlCard.tsx'
-export { WinControlPill } from './WinControlPill.tsx'
+export { WinControlMenuOption, WinControlPill } from './WinControlPill.tsx'
 export { en, zh } from './locales.ts'
 
 export const inject = ['slots', 'locale'] as const
@@ -31,6 +31,22 @@ export function apply(ctx: Context): void {
     locale: NAMESPACE,
     inject: (sessionId?: string) => ({ sessionId }),
   }, WinControlPill)), 'win-control: composer pill')
+
+  accessor.effect(() => slots.inject('conversation.input.model.options', () => slots.register({
+    name: 'conversation.input.model.options',
+    id: 'win-control-option',
+    order: 70,
+    locale: NAMESPACE,
+    inject: (sessionId?: string) => ({ sessionId }),
+  }, WinControlMenuOption)), 'win-control: model menu option')
+
+  accessor.effect(() => slots.inject('model-preferences.menu.options', () => slots.register({
+    name: 'model-preferences.menu.options',
+    id: 'win-control-option',
+    order: 70,
+    locale: NAMESPACE,
+    inject: (sessionId?: string) => ({ sessionId }),
+  }, WinControlMenuOption)), 'win-control: model-preferences menu option')
 
   accessor.effect(() => slots.inject('web-ui.plugin.item', () => slots.register({
     name: 'web-ui.plugin.item',

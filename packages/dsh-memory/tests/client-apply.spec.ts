@@ -9,7 +9,8 @@ describe('memory client registration', () => {
       set: vi.fn(async () => {}),
       unset: vi.fn(async () => {}),
     }
-    const locale = { register: vi.fn() }
+    const commands: Array<{ name: string }> = []
+    const locale = { register: vi.fn(), bind: () => (key: string) => key }
     const registration: { contribution: any; component: unknown }[] = []
     const slots = {
       register: vi.fn((contribution: any, component: unknown) => {
@@ -23,19 +24,35 @@ describe('memory client registration', () => {
       settingsScope,
       get: vi.fn(() => ({ bind: vi.fn(() => settingsScope) })),
       effect: (effect: () => unknown) => effect(),
-      inject: (_dependencies: string[], callback: (scope: unknown) => unknown) => callback({ slots }),
+      inject: (deps: string[], callback: (scope: unknown) => unknown) => {
+        if (deps[0] === 'commandUi') {
+          return callback({
+            effect: (effect: () => unknown) => effect(),
+            get: () => ({ register: (cmd: { name: string }) => { commands.push(cmd); return () => {} } }),
+          })
+        }
+        return callback({ slots })
+      },
     }
 
     apply(ctx)
 
     expect(locale.register).toHaveBeenCalledWith('memory', expect.any(Object))
-    expect(registration).toHaveLength(1)
+    expect(registration).toHaveLength(5)
     expect(registration.some(item => item.contribution.name === 'conversation.session.header.actions')).toBe(false)
+    expect(registration.map(item => item.contribution.name)).toEqual([
+      'web-ui.plugin.item',
+      'sidebar.footer.action',
+      'conversation.session.panel.section',
+      'conversation.session.panel.section.actions',
+      'sidebar.right.tab.files.actions',
+    ])
     expect(registration[0]?.contribution).toMatchObject({
       name: 'web-ui.plugin.item',
       id: 'memory',
       order: 118,
     })
+    expect(commands.map(cmd => cmd.name)).toEqual(['search'])
     expect(registration[0]?.component).toBeTypeOf('function')
   })
 })

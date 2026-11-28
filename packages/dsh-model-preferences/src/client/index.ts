@@ -45,6 +45,25 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
       scope: 'root'
       owner: ModelPreferencesOnboardingOwnerProps
     }
+    'model-preferences.menu.options': {
+      kind: 'list'
+      scope: 'session'
+      owner: {
+        locked: boolean
+        dismiss: () => void
+        reportFailure: (message: string) => void
+        openPane: (pane: { key: string; title: string }) => void
+      }
+    }
+    'model-preferences.menu.pane': {
+      kind: 'keyed'
+      scope: 'session'
+      owner: {
+        locked: boolean
+        dismiss: () => void
+        reportFailure: (message: string) => void
+      }
+    }
   }
 
 }
@@ -185,6 +204,10 @@ export function apply(ctx: ClientContext): void {
       name: 'conversation.input.model',
       priority: -10,
       locale: 'model-preferences',
+      children: {
+        'model-preferences.menu.options': { kind: 'list', scope: 'session' },
+        'model-preferences.menu.pane': { kind: 'keyed', scope: 'session' },
+      },
       inject: (sessionId) => {
         const directory = models.directoryFor(sessionId)
         const available = sessions.subagentAddress(sessionId) === undefined

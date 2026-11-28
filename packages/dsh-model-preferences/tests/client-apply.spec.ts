@@ -121,8 +121,13 @@ describe('model preference client registration', () => {
     notify('llm-pi-ai/openai-codex')
     expect(onCatalogChanged).toHaveBeenCalledOnce()
     expect(slotRegistrations.map(entry => entry.contribution.name)).toContain('conversation.input.model')
-    expect(slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.priority).toBe(-10)
-    const composer = slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution.inject('session-a')
+    const modelContribution = slotRegistrations.find(entry => entry.contribution.name === 'conversation.input.model')?.contribution
+    expect(modelContribution?.priority).toBe(-10)
+    expect(modelContribution?.children).toEqual({
+      'model-preferences.menu.options': { kind: 'list', scope: 'session' },
+      'model-preferences.menu.pane': { kind: 'keyed', scope: 'session' },
+    })
+    const composer = modelContribution?.inject('session-a')
     expect(composer.directory).toBe(directory.store)
     expect(composer.getSessionCwd?.()).toBe('D:/fixture/worktree')
     workingDirectory = 'D:/fixture/other-worktree'

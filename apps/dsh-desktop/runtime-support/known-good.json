@@ -113,8 +113,14 @@
       "conversation.input.dock",
       "conversation.input.left",
       "conversation.input.model",
+      "conversation.input.model.options",
+      "conversation.input.model.pane",
       "conversation.input.right",
       "conversation.session.header.actions",
+      "conversation.session.panel.section",
+      "conversation.session.panel.section.actions",
+      "model-preferences.menu.options",
+      "model-preferences.menu.pane",
       "plugins.row.config",
       "root",
       "settings.models.footer",
@@ -122,6 +128,7 @@
       "sidebar.footer.action",
       "sidebar.remote",
       "sidebar.right.pane.tab",
+      "sidebar.right.tab.files.actions",
       "tool.call.toolview",
       "web-ui.plugin.item"
     ]

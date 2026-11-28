@@ -33,11 +33,28 @@ export type BranchChipProps = BranchSlotProps & GitGraphInjected
 /** Minimum gap between window-focus git refetches (ms). */
 export const FOCUS_REFRESH_MIN_MS = 5_000
 
+function useIsOfficeMode(): boolean {
+  const [office, setOffice] = useState(() =>
+    typeof document !== 'undefined' && document.documentElement.dataset.dshExperienceMode === 'office',
+  )
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof MutationObserver !== 'function') return
+    const root = document.documentElement
+    const sync = () => setOffice(root.dataset.dshExperienceMode === 'office')
+    sync()
+    const observer = new MutationObserver(sync)
+    observer.observe(root, { attributes: true, attributeFilter: ['data-dsh-experience-mode'] })
+    return () => observer.disconnect()
+  }, [])
+  return office
+}
+
 export function BranchChip(props: BranchChipProps) {
+  const officeMode = useIsOfficeMode()
   const sessionId = props.sessionId
   const workspaceCwd = props.useSessions(state =>
     sessionId === undefined ? undefined : state.byId[sessionId]?.cwd)
-  if (sessionId === undefined || !workspaceCwd) return null
+  if (officeMode || sessionId === undefined || !workspaceCwd) return null
   return <WorkspaceBranchChip key={JSON.stringify([sessionId, workspaceCwd])}
     {...props} sessionId={sessionId} workspaceCwd={workspaceCwd} />
 }

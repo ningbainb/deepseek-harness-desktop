@@ -11,7 +11,7 @@ const definitions = [
   { id: PERSONAL_SECTION, zh: '个人偏好', en: 'Personal preferences', pages: [PERSONAL_SECTION] },
   { id: 'agent-presets', zh: '会话与 Agent', en: 'Sessions and agents', pages: ['agent-presets', 'prompt-pilot', 'agent-inbox', 'archived-sessions'] },
   { id: 'skin-center', zh: '外观', en: 'Appearance', pages: ['skin-center', 'better-sidebar'] },
-  { id: 'plugins', zh: '工具与权限', en: 'Tools and permissions', pages: ['dsh-builtin-browser', 'win-control', 'fast-ops', 'im-hub', 'plugins', 'release-plugin-adapter'] },
+  { id: 'plugins', zh: '工具与权限', en: 'Tools and permissions', pages: ['plugins', 'dsh-builtin-browser', 'im-hub', 'win-control', 'fast-ops', 'release-plugin-adapter'] },
 ] as const
 
 export function groupDesktopSettings(rows: readonly SettingsSection[], language: string): readonly Group[] {

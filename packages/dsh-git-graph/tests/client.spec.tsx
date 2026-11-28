@@ -126,6 +126,24 @@ describe('BranchChip', () => {
     expect(trigger.tabIndex).toBe(0)
   })
 
+  it('hides the branch chip in office mode and restores it in pro mode', async () => {
+    document.documentElement.dataset.dshExperienceMode = 'office'
+    try {
+      bench()
+      expect(screen.queryByRole('button')).toBeNull()
+      await act(async () => {
+        document.documentElement.dataset.dshExperienceMode = 'dev'
+      })
+      await screen.findByRole('button', { name: '分支：main' })
+      await act(async () => {
+        document.documentElement.dataset.dshExperienceMode = 'office'
+      })
+      expect(screen.queryByRole('button')).toBeNull()
+    } finally {
+      delete document.documentElement.dataset.dshExperienceMode
+    }
+  })
+
   it('restores the active worktree control when the sessions baseline arrives after mount', async () => {
     const { view, props, sessionsState, calls } = bench({ cwd: undefined })
     expect(screen.queryByRole('button')).toBeNull()

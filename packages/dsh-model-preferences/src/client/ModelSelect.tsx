@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { PRIMARY_PROVIDER_ID } from '../core/config.ts'
 import {
   catalogFromDirectory,
@@ -17,6 +17,7 @@ import { installModelRefreshBridge } from './model-refresh.ts'
 export type ModelSelectProps = PropsRuntime<'conversation.input.model'>
   & PropsLocale<'model-preferences'>
   & ModelSelectInjected
+  & Partial<PropsRenderSlots<'model-preferences.menu.options' | 'model-preferences.menu.pane'>>
   & {
     modelSessionId: string
     sessionCwd?: string
@@ -40,7 +41,7 @@ function sortAcpModels(models: AcpCatalogModel[]): AcpCatalogModel[] {
   return [...models].sort((a, b) => Number(isGemini(b)) - Number(isGemini(a)))
 }
 
-type Pane = 'root' | 'model' | 'effort'
+type Pane = 'root' | 'model' | 'effort' | 'detail'
 
 interface EffortChoice {
   key: string
@@ -62,6 +63,7 @@ export function ModelSelect(props: ModelSelectProps) {
   const { locked, available, directory, load, modelSessionId, sessionCwd, getSessionCwd, select, settingsScope, t } = props
   const [open, setOpen] = useState(false)
   const [pane, setPane] = useState<Pane>('root')
+  const [detailPane, setDetailPane] = useState<{ key: string; title: string } | null>(null)
   const [selecting, setSelecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [acpModels, setAcpModels] = useState<AcpCatalogModel[]>([])
@@ -227,8 +229,10 @@ export function ModelSelect(props: ModelSelectProps) {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape') return
       event.preventDefault()
-      if (pane !== 'root') setPane('root')
-      else {
+      if (pane !== 'root') {
+        setPane('root')
+        setDetailPane(null)
+      } else {
         setOpen(false)
         triggerRef.current?.focus()
       }
@@ -246,7 +250,17 @@ export function ModelSelect(props: ModelSelectProps) {
   const close = (): void => {
     setOpen(false)
     setPane('root')
+    setDetailPane(null)
     setError(null)
+  }
+
+  const menuControls = {
+    locked: locked || busy,
+    dismiss: () => {
+      close()
+      triggerRef.current?.focus()
+    },
+    reportFailure: (message: string) => setError(message),
   }
 
   const chooseSelection = async (selection: ModelSelection): Promise<void> => {
@@ -322,8 +336,10 @@ export function ModelSelect(props: ModelSelectProps) {
     <div className={styles.root} ref={rootRef} onKeyDown={event => {
       if (event.key !== 'Escape' || !open) return
       event.preventDefault()
-      if (pane !== 'root') setPane('root')
-      else close()
+      if (pane !== 'root') {
+        setPane('root')
+        setDetailPane(null)
+      } else close()
     }}>
       <button
         ref={triggerRef}
@@ -377,6 +393,14 @@ export function ModelSelect(props: ModelSelectProps) {
                   <span aria-hidden="true" className={styles.cellChevron} />
                 </button>
               )}
+              {props.renderSlot?.('model-preferences.menu.options', {
+                ...menuControls,
+                openPane: (next: { key: string; title: string }) => {
+                  setError(null)
+                  setDetailPane(next)
+                  setPane('detail')
+                },
+              })}
             </>
           )}
 
@@ -489,6 +513,28 @@ export function ModelSelect(props: ModelSelectProps) {
                   <span className={styles.check} aria-hidden="true">{effectiveEffort === choice.effort && <span className={styles.checkmark} />}</span>
                 </button>
               ))}
+            </>
+          )}
+          {pane === 'detail' && detailPane !== null && (
+            <>
+              <div className={styles.detailHeader}>
+                <button
+                  type="button"
+                  className={styles.detailBack}
+                  aria-label={t('action.back')}
+                  onClick={() => {
+                    setPane('root')
+                    setDetailPane(null)
+                  }}
+                >
+                  {t('action.back')}
+                </button>
+                <span className={styles.detailTitle}>{detailPane.title}</span>
+              </div>
+              {error !== null && <div className={styles.error} role="alert"><span>{error}</span></div>}
+              <div className={`${styles.groups} scrollable`}>
+                {props.renderSlot?.('model-preferences.menu.pane', menuControls, { entryKey: detailPane.key })}
+              </div>
             </>
           )}
         </div>

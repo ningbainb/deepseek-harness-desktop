@@ -1,36 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import type { MemoryMatchReason } from '../core/activity.ts'
+import { postLocalSearch, type IndexStatus, type SessionMatch } from './local-search-api.ts'
 import type { MemoryLocaleKey } from './locales.ts'
 import styles from './memory.module.css'
 
-interface IndexStatus {
-  status: { counts: { memory: number; sessions: number; knowledge: number }; engine: 'fts5' | 'typescript'; vectorCount: number }
-  workspaces: Array<{ id: string; title: string }>
-  sources: Array<{ path: string; kind: 'path' | 'document' }>
-  indexing: boolean
-}
-
-interface SessionMatch {
-  sessionId: string
-  seq: number
-  turn: number
-  title: string
-  excerpt: string
-  timestamp: number
-  reasons: readonly MemoryMatchReason[]
-}
-
 type Translate = (key: MemoryLocaleKey) => string
-
-async function post<T>(operation: string, body: object, signal?: AbortSignal): Promise<T> {
-  const response = await fetch('/api/dsh-local-search/' + operation, {
-    method: 'POST', cache: 'no-store', signal,
-    headers: { 'content-type': 'application/json', 'x-dsh-local-search': '1' },
-    body: JSON.stringify(body),
-  })
-  if (!response.ok) throw new Error('Local search is unavailable')
-  return await response.json() as T
-}
 
 export function LocalSearchPanel({ t, onSuggest, onOpenSession }: {
   t: Translate
@@ -57,7 +30,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }: {
     let timer: ReturnType<typeof setTimeout> | undefined
     const refresh = async () => {
       try {
-        const snapshot = await post<IndexStatus>('status', { workspaceId: workspaceId || undefined }, abort.signal)
+        const snapshot = await postLocalSearch<IndexStatus>('status', { workspaceId: workspaceId || undefined }, abort.signal)
         if (!abort.signal.aborted) {
           setStatus(snapshot)
           if (snapshot.indexing) timer = setTimeout(() => { void refresh() }, 2500)
@@ -88,7 +61,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }: {
     event.preventDefault()
     if (!query.trim()) return
     void perform(async signal => {
-      const result = await post<{ hits: SessionMatch[]; indexing: boolean }>('sessions', {
+      const result = await postLocalSearch<{ hits: SessionMatch[]; indexing: boolean }>('sessions', {
         query: query.trim(), workspaceId: workspaceId || undefined,
         after: after ? new Date(after + 'T00:00:00').getTime() : undefined,
         before: before ? new Date(before + 'T23:59:59.999').getTime() : undefined,
@@ -104,7 +77,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }: {
   const change = (operation: 'add' | 'remove', path: string): void => {
     if (!workspaceId || !path.trim()) return
     void perform(async signal => {
-      await post('sources', { workspaceId, path: path.trim(), operation }, signal)
+      await postLocalSearch('sources', { workspaceId, path: path.trim(), operation }, signal)
       if (!signal.aborted) {
         if (operation === 'add') setSourcePath('')
         setRevision(value => value + 1)
@@ -125,7 +98,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }: {
       {error && <p className={styles.error} role="alert">{t('search.unavailable')}</p>}
       {status && <div className={styles.actions}>
         <button type="button" className={styles.button} disabled={busy || status.indexing} onClick={() => void perform(async signal => {
-          await post('rebuild', {}, signal)
+          await postLocalSearch('rebuild', {}, signal)
           if (!signal.aborted) setRevision(value => value + 1)
         })}>{t('search.rebuild')}</button>
       </div>}

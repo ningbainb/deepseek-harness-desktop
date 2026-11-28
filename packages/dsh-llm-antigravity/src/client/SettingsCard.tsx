@@ -9,12 +9,73 @@ import { authModes, defaults, efforts, namespace, statusPath, type AuthMode, typ
 import { STATUS_UPDATED_EVENT } from './acpStore.ts'
 import { AcpChatFrameHoc } from './AcpChatView.tsx'
 import { AcpComposerControl } from './AcpComposerControl.tsx'
+import { ACP_MODEL_PANE_KEY, AcpModelMenuOption, AcpModelMenuPane, AcpNativeSidebarPane } from './AcpEnginePicker.tsx'
 import { acpEn, acpZh } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap { 'llm-antigravity': keyof typeof zh }
   interface SlotMap {
     'web-ui.plugin.item': { kind: 'list'; scope: 'root'; owner: { children?: never } }
+    'conversation.input.model.options': {
+      kind: 'list'
+      scope: 'session'
+      owner: {
+        locked: boolean
+        dismiss: () => void
+        reportFailure: (message: string) => void
+        openPane: (pane: { key: string; title: string }) => void
+      }
+    }
+    'conversation.input.model.pane': {
+      kind: 'keyed'
+      scope: 'session'
+      owner: {
+        locked: boolean
+        dismiss: () => void
+        reportFailure: (message: string) => void
+      }
+    }
+    'model-preferences.menu.options': {
+      kind: 'list'
+      scope: 'session'
+      owner: {
+        locked: boolean
+        dismiss: () => void
+        reportFailure: (message: string) => void
+        openPane: (pane: { key: string; title: string }) => void
+      }
+    }
+    'model-preferences.menu.pane': {
+      kind: 'keyed'
+      scope: 'session'
+      owner: {
+        locked: boolean
+        dismiss: () => void
+        reportFailure: (message: string) => void
+      }
+    }
+    'sidebar.right.pane.tab': {
+      kind: 'keyed'
+      scope: 'session'
+      hookContext: () => {
+        tab: {
+          visible: boolean
+          signal: AbortSignal
+          actions: { close(): void }
+        }
+      }
+      inject: {
+        hooks: {
+          tabInfo: () => () => {
+            tab: {
+              visible: boolean
+              signal: AbortSignal
+              actions: { close(): void }
+            }
+          }
+        }
+      }
+    }
   }
 }
 
@@ -360,10 +421,36 @@ interface AcpCommandMenu {
   }): () => void
 }
 
+const ACP_RIGHT_TAB_ID = '@ningbainb/dsh-llm-antigravity/acp-pane'
+const ACP_RIGHT_TAB_KIND = 'dsh-acp-pane'
+
 export const inject = ['slots', 'configForms', 'locale']
 
 export function apply(ctx: Context) {
   const workbenches = new Map<string, () => void>()
+  const getCwdFor = (sessionId: string): string | undefined => {
+    const sessions = (ctx as { get?: (key: string) => unknown }).get?.('sessions') as {
+      binding?(sessionId: string): { session: { projections: { faceOf(name: string): { getSnapshot(): unknown } } } } | undefined
+      list?: { getSnapshot(): { byId: Record<string, { cwd?: string } | undefined> } }
+    } | undefined
+    const cwd = sessions?.binding?.(sessionId)?.session.projections.faceOf('workingDirectory').getSnapshot()
+    return typeof cwd === 'string' && cwd.trim()
+      ? cwd
+      : sessions?.list?.getSnapshot().byId[sessionId]?.cwd
+  }
+  const openNativeSidePane = (): boolean => {
+    const getter = (ctx as { get?: (key: string, throwIfMissing?: boolean) => unknown }).get
+    const sidebar = getter?.('sidebarRight', false) as { openTab?: (kind: string) => void } | undefined
+    const registry = getter?.('sidebarRightTabs', false) as { get?: (kind: string) => unknown } | undefined
+    if (!sidebar?.openTab || !registry?.get?.(ACP_RIGHT_TAB_KIND)) return false
+    try {
+      sidebar.openTab(ACP_RIGHT_TAB_KIND)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   ctx.inject(['commandUi'], scope => {
     const commands = scope.get('commandUi') as AcpCommandMenu
     const t = ctx.locale.bind(namespace)
@@ -375,6 +462,30 @@ export function apply(ctx: Context) {
     }))
   })
 
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['slots', 'sidebarRightTabs'], scope => {
+      const registry = (scope as { sidebarRightTabs?: { register(def: unknown): () => void } }).sidebarRightTabs
+        ?? (scope as { get?: (key: string) => unknown }).get?.('sidebarRightTabs') as { register(def: unknown): () => void } | undefined
+      if (!registry?.register) return
+      const t = ctx.locale.bind(namespace)
+      scope.effect(() => registry.register({
+        id: ACP_RIGHT_TAB_ID,
+        kind: ACP_RIGHT_TAB_KIND,
+        title: () => t('engines'),
+        guide: [{ id: 'acp-pane', order: 50, title: () => t('engines'), description: () => t('descriptionSidePane') }],
+      }))
+      scope.effect(() => scope.slots.inject('sidebar.right.pane.tab', () => scope.slots.register({
+        name: 'sidebar.right.pane.tab',
+        key: ACP_RIGHT_TAB_ID,
+        locale: namespace,
+      }, props => {
+        const info = props.useTabInfo()
+        if (!info.tab.visible || info.tab.signal.aborted) return null
+        return <AcpNativeSidebarPane t={props.t} onEmptyClose={() => info.tab.actions.close()} />
+      })))
+    })
+  }
+
   ctx.effect(() => ctx.locale.register(namespace, { zh, en }))
   ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
     name: 'web-ui.plugin.item', id: namespace, order: 120, locale: namespace,
@@ -383,6 +494,42 @@ export function apply(ctx: Context) {
   ctx.slots.inject('conversation.hero.frame', () => ctx.slots.register({
     name: 'conversation.hero.frame', id: `${namespace}-acp-frame`, order: 80, locale: namespace,
   }, AcpChatFrameHoc))
+  ctx.slots.inject('conversation.input.model.options', () => ctx.slots.register({
+    name: 'conversation.input.model.options',
+    id: `${namespace}-acp-engines`,
+    order: 40,
+    locale: namespace,
+    inject: () => ({
+      openFallbackWorkbench: (id: string) => workbenches.get(id)?.(),
+    }),
+  }, AcpModelMenuOption))
+  ctx.slots.inject('conversation.input.model.pane', () => ctx.slots.register({
+    name: 'conversation.input.model.pane',
+    key: ACP_MODEL_PANE_KEY,
+    locale: namespace,
+    inject: sessionId => ({
+      getCwd: () => getCwdFor(String(sessionId)),
+      openNativeSidePane,
+    }),
+  }, AcpModelMenuPane))
+  ctx.slots.inject('model-preferences.menu.options', () => ctx.slots.register({
+    name: 'model-preferences.menu.options',
+    id: `${namespace}-acp-engines`,
+    order: 40,
+    locale: namespace,
+    inject: () => ({
+      openFallbackWorkbench: (id: string) => workbenches.get(id)?.(),
+    }),
+  }, AcpModelMenuOption))
+  ctx.slots.inject('model-preferences.menu.pane', () => ctx.slots.register({
+    name: 'model-preferences.menu.pane',
+    key: ACP_MODEL_PANE_KEY,
+    locale: namespace,
+    inject: sessionId => ({
+      getCwd: () => getCwdFor(String(sessionId)),
+      openNativeSidePane,
+    }),
+  }, AcpModelMenuPane))
   ctx.slots.inject('conversation.input.right', () => ctx.slots.register({
     name: 'conversation.input.right', id: `${namespace}-acp-composer`, locale: namespace,
     inject: sessionId => ({
@@ -391,16 +538,8 @@ export function apply(ctx: Context) {
         workbenches.set(id, open)
         return () => { if (workbenches.get(id) === open) workbenches.delete(id) }
       },
-      getCwd: () => {
-        const sessions = (ctx as { get?: (key: string) => unknown }).get?.('sessions') as {
-          binding?(sessionId: string): { session: { projections: { faceOf(name: string): { getSnapshot(): unknown } } } } | undefined
-          list?: { getSnapshot(): { byId: Record<string, { cwd?: string } | undefined> } }
-        } | undefined
-        const cwd = sessions?.binding?.(String(sessionId))?.session.projections.faceOf('workingDirectory').getSnapshot()
-        return typeof cwd === 'string' && cwd.trim()
-          ? cwd
-          : sessions?.list?.getSnapshot().byId[String(sessionId)]?.cwd
-      },
+      getCwd: () => getCwdFor(String(sessionId)),
+      openNativeSidePane,
     }),
   }, AcpComposerControl))
 }

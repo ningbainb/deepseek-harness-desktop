@@ -60,16 +60,25 @@ function createTimeline(sessionId: string) {
   }
 }
 
+function getOrCreateTimeline(sessionId: string) {
+  const existing = timelines.get(sessionId)
+  if (existing) return existing
+  const created = createTimeline(sessionId)
+  timelines.set(sessionId, created)
+  return created
+}
+
 export function useCheckpointTimeline(sessionId: string, turn: number, seq: number) {
-  const timeline = useMemo(() => {
-    const existing = timelines.get(sessionId)
-    if (existing) return existing
-    const created = createTimeline(sessionId)
-    timelines.set(sessionId, created)
-    return created
-  }, [sessionId])
+  const timeline = useMemo(() => getOrCreateTimeline(sessionId), [sessionId])
   const getTurn = useCallback(() => timeline.at(String(turn)), [timeline, turn])
   const checkpoint = useSyncExternalStore(timeline.subscribe, getTurn, getTurn)
   useEffect(() => { timeline.observe(seq) }, [timeline, seq])
   return { checkpoint, timeline }
+}
+
+export function useSessionCheckpoints(sessionId: string) {
+  const timeline = useMemo(() => getOrCreateTimeline(sessionId), [sessionId])
+  const checkpoints = useSyncExternalStore(timeline.subscribe, timeline.list, timeline.list)
+  useEffect(() => { timeline.refresh() }, [timeline])
+  return { checkpoints, timeline }
 }

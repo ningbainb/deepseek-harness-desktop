@@ -3264,7 +3264,7 @@
       "path": "packages/dsh-model-preferences/src/client/ModelSelect.tsx",
       "kind": "dynamic-import",
       "specifier": "@deepseek-ai/dsh-client-ui-settings/client",
-      "line": 24,
+      "line": 25,
       "typeOnly": false,
       "classification": "public-experimental",
       "controlled": false
@@ -6484,7 +6484,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-checkpoints/src/client/index.ts",
-      "line": 16,
+      "line": 31,
       "operation": "locale"
     },
     {
@@ -6574,7 +6574,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 363,
+      "line": 427,
       "operation": "locale"
     },
     {
@@ -6586,7 +6586,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-memory/src/client/index.ts",
-      "line": 34,
+      "line": 55,
       "operation": "locale"
     },
     {
@@ -6604,7 +6604,7 @@
     {
       "category": "host-service",
       "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "line": 65,
+      "line": 84,
       "operation": "sessions"
     },
     {
@@ -17464,8 +17464,20 @@
     {
       "category": "slot",
       "path": "packages/dsh-checkpoints/src/client/index.ts",
-      "line": 20,
+      "line": 35,
       "operation": "conversation.chat.turnTail"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-checkpoints/src/client/index.ts",
+      "line": 38,
+      "operation": "conversation.session.panel.section"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-checkpoints/src/client/index.ts",
+      "line": 45,
+      "operation": "conversation.session.panel.section.actions"
     },
     {
       "category": "slot",
@@ -17506,26 +17518,80 @@
     {
       "category": "slot",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 379,
+      "line": 477,
+      "operation": "sidebar.right.pane.tab"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
+      "line": 490,
       "operation": "web-ui.plugin.item"
     },
     {
       "category": "slot",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 383,
+      "line": 494,
       "operation": "conversation.hero.frame"
     },
     {
       "category": "slot",
       "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
-      "line": 386,
+      "line": 497,
+      "operation": "conversation.input.model.options"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
+      "line": 506,
+      "operation": "conversation.input.model.pane"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
+      "line": 515,
+      "operation": "model-preferences.menu.options"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
+      "line": 524,
+      "operation": "model-preferences.menu.pane"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-llm-antigravity/src/client/SettingsCard.tsx",
+      "line": 533,
       "operation": "conversation.input.right"
     },
     {
       "category": "slot",
       "path": "packages/dsh-memory/src/client/index.ts",
-      "line": 57,
+      "line": 78,
       "operation": "web-ui.plugin.item"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-memory/src/client/index.ts",
+      "line": 89,
+      "operation": "sidebar.footer.action"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-memory/src/client/index.ts",
+      "line": 98,
+      "operation": "conversation.session.panel.section"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-memory/src/client/index.ts",
+      "line": 105,
+      "operation": "conversation.session.panel.section.actions"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-memory/src/client/index.ts",
+      "line": 110,
+      "operation": "sidebar.right.tab.files.actions"
     },
     {
       "category": "slot",
@@ -17536,13 +17602,13 @@
     {
       "category": "slot",
       "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "line": 124,
+      "line": 143,
       "operation": "settings.models.footer"
     },
     {
       "category": "slot",
       "path": "packages/dsh-model-preferences/src/client/index.ts",
-      "line": 184,
+      "line": 203,
       "operation": "conversation.input.model"
     },
     {
@@ -17711,6 +17777,18 @@
       "category": "slot",
       "path": "packages/dsh-win-control/src/client/index.ts",
       "line": 35,
+      "operation": "conversation.input.model.options"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-win-control/src/client/index.ts",
+      "line": 43,
+      "operation": "model-preferences.menu.options"
+    },
+    {
+      "category": "slot",
+      "path": "packages/dsh-win-control/src/client/index.ts",
+      "line": 51,
       "operation": "web-ui.plugin.item"
     },
     {

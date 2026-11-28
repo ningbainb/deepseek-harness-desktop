@@ -10,10 +10,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { normalizeMemoryConfig, type MemoryConfig } from '../core/config.ts'
 import { MEMORY_SETTINGS_NAMESPACE } from '../core/schema.ts'
 import { MemorySettingsCard } from './MemorySettingsCard.tsx'
+import { QuickSearchSidebarEntry, openQuickSearch, toggleQuickSearch } from './QuickSearchDialog.tsx'
+import { FilesTreeKnowledgeButton, WorkspaceKnowledgeCount, WorkspaceKnowledgeSection } from './WorkspaceKnowledgeSection.tsx'
 import { en, zh, type MemoryLocaleKey } from './locales.ts'
 
 export * from './locales.ts'
 export { MemorySettingsCard } from './MemorySettingsCard.tsx'
+export { QuickSearchDialog, QuickSearchSidebarEntry, openQuickSearch, toggleQuickSearch } from './QuickSearchDialog.tsx'
+export { FilesTreeKnowledgeButton, WorkspaceKnowledgeCount, WorkspaceKnowledgeSection } from './WorkspaceKnowledgeSection.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -22,7 +26,24 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
   interface SlotMap {
     'web-ui.plugin.item': { kind: 'list'; scope: 'root'; owner: { children?: never } }
+    'sidebar.footer.action': { kind: 'list'; scope: 'root'; owner: { wide: boolean } }
+    'conversation.session.panel.section': {
+      kind: 'list'
+      scope: 'session'
+      owner: { readonly presentation: 'docked' | 'overlay'; readonly dismissOverlay: () => void }
+    }
+    'conversation.session.panel.section.actions': { kind: 'keyed'; scope: 'session' }
+    'sidebar.right.tab.files.actions': { kind: 'list'; scope: 'session'; owner: { readonly absolutePath: string } }
   }
+}
+
+interface SearchCommandMenu {
+  register(action: {
+    name: string
+    label(): string
+    available(): boolean
+    ui: { kind: 'action'; run(): void }
+  }): () => void
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -65,8 +86,59 @@ export function apply(ctx: ClientContext): void {
         onOpenSession: ctx.get('uiWorkspace' as never, false) ? openSession : undefined,
       }),
     }, MemorySettingsCard))
+    scope.slots.inject('sidebar.footer.action', () => scope.slots.register({
+      name: 'sidebar.footer.action',
+      id: 'local-search-quick',
+      order: 15,
+      locale: 'memory',
+      inject: () => ({
+        onOpenSession: ctx.get('uiWorkspace' as never, false) ? openSession : undefined,
+      }),
+    }, QuickSearchSidebarEntry))
+    scope.slots.inject('conversation.session.panel.section', () => scope.slots.register({
+      name: 'conversation.session.panel.section',
+      id: 'workspace-knowledge',
+      order: 40,
+      locale: 'memory',
+      label: () => ctx.locale.bind('memory')('search.kbSectionTitle'),
+    }, WorkspaceKnowledgeSection as never))
+    scope.slots.inject('conversation.session.panel.section.actions', () => scope.slots.register({
+      name: 'conversation.session.panel.section.actions',
+      key: 'workspace-knowledge',
+      locale: 'memory',
+    }, WorkspaceKnowledgeCount as never))
+    scope.slots.inject('sidebar.right.tab.files.actions', () => scope.slots.register({
+      name: 'sidebar.right.tab.files.actions',
+      id: 'memory-add-kb-source',
+      order: 30,
+      locale: 'memory',
+    }, FilesTreeKnowledgeButton as never))
     // Memory management and activity stay in settings, not the conversation header.
   })
+  ctx.inject(['commandUi' as never], scope => {
+    const commands = (scope as { get?: (key: string) => unknown }).get?.('commandUi') as SearchCommandMenu | undefined
+    if (!commands?.register) return
+    const t = ctx.locale.bind('memory')
+    scope.effect(() => commands.register({
+      name: 'search',
+      label: () => t('search.quickOpen'),
+      available: () => true,
+      ui: { kind: 'action', run: () => openQuickSearch() },
+    }))
+  })
+  if (typeof window !== 'undefined') {
+    ctx.effect(() => {
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.defaultPrevented || event.altKey || event.shiftKey) return
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+          event.preventDefault()
+          toggleQuickSearch()
+        }
+      }
+      window.addEventListener('keydown', onKeyDown)
+      return () => window.removeEventListener('keydown', onKeyDown)
+    }, 'memory: quick search shortcut')
+  }
 }
 
 export type { PropsLocale, PropsRuntime }

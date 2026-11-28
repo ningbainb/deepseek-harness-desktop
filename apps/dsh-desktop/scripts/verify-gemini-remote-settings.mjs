@@ -158,15 +158,17 @@ try {
   const officeApps = nativeComposer.locator('[data-dsh-office-apps-trigger]')
   const send = nativeComposer.locator('button[aria-busy]')
   async function verifyToolbar(mode, state = 'empty', { allowWrapping = false } = {}) {
-    await branch.waitFor({ timeout })
+    if (mode === 'dev') await branch.waitFor({ timeout })
+    else assert.equal(await branch.count(), 0, 'office mode hides the Git branch icon')
     assert.equal(await nativeComposer.locator('[data-dsh-acp-engines]').count(), 0)
     assert.equal(await nativeComposer.getByText(/^ACP 引擎$/u).count(), 0)
     await modelTrigger.getByText('供应商默认', { exact: true }).waitFor({ timeout })
     const controls = {
-      commands, branch, model: modelTrigger, send,
+      commands, model: modelTrigger, send,
       skills: nativeComposer.getByRole('button', { name: '技能库' }),
       permissions: nativeComposer.getByRole('button', { name: /^访问模式/u }),
     }
+    if (mode === 'dev') controls.branch = branch
     if (mode === 'office') controls.office = officeApps
     const buttons = Object.fromEntries(await Promise.all(Object.entries(controls).map(async ([id, locator]) => {
       const metrics = await locator.evaluate(element => {
@@ -295,6 +297,16 @@ try {
   await openEngines()
   await page.getByRole('button', { name: /使用 DeepSeek 对话|Use DeepSeek chat/u }).click({ timeout })
   console.log('PASS native ACP workbench selects a second engine with the same composer')
+
+  await modelTrigger.click({ timeout })
+  const acpMenuEntry = page.locator('[data-dsh-acp-menu-entry="true"]')
+  await acpMenuEntry.waitFor({ timeout })
+  await acpMenuEntry.click({ timeout })
+  await page.locator('[data-dsh-acp-model-pane="true"]').waitFor({ timeout })
+  await page.keyboard.press('Escape')
+  await acpMenuEntry.waitFor({ timeout })
+  await page.keyboard.press('Escape')
+  console.log('PASS native model menu integrates local ACP engines pane')
 
   await page.locator('[data-mode-tab="office"]').click()
   const officeChips = conversation.locator('[data-dsh-office-starter-dock]')

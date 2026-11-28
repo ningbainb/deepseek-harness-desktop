@@ -382,7 +382,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | packages/dsh-model-preferences/src/client/ModelSelect.tsx | 1 | static-import | @deepseek-ai/dsh-api-remotes/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/ModelSelect.tsx | 3 | static-import | @deepseek-ai/dsh-client-ui-model-selection/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/ModelSelect.tsx | 4 | static-import | @deepseek-ai/dsh-client-ui-slots | yes | public-stable | no |
-| packages/dsh-model-preferences/src/client/ModelSelect.tsx | 24 | dynamic-import | @deepseek-ai/dsh-client-ui-settings/client | no | public-experimental | no |
+| packages/dsh-model-preferences/src/client/ModelSelect.tsx | 25 | dynamic-import | @deepseek-ai/dsh-client-ui-settings/client | no | public-experimental | no |
 | packages/dsh-model-preferences/src/client/index.ts | 7 | static-import | @deepseek-ai/dsh-client-ui-settings/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/index.ts | 10 | static-import | @deepseek-ai/dsh-client-ui-commands/client | yes | public-experimental | no |
 | packages/dsh-model-preferences/src/client/index.ts | 11 | static-import | @deepseek-ai/dsh-client-ui-model-selection/client | yes | public-experimental | no |
@@ -750,7 +750,7 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-aionui-panel/src/index.ts | 29 | subprocess |
 | host-service | packages/dsh-chat-artifacts/src/client/index.ts | 32 | locale |
 | host-service | packages/dsh-chat-artifacts/src/index.ts | 65 | object |
-| host-service | packages/dsh-checkpoints/src/client/index.ts | 16 | locale |
+| host-service | packages/dsh-checkpoints/src/client/index.ts | 31 | locale |
 | host-service | packages/dsh-checkpoints/src/index.ts | 15 | sessions |
 | host-service | packages/dsh-data-location/src/client/Panel.tsx | 240 | data-location |
 | host-service | packages/dsh-desktop-client-hmr/src/client/index.ts | 6 | modules |
@@ -765,12 +765,12 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | host-service | packages/dsh-live-stats/src/client/index.ts | 69 | remote |
 | host-service | packages/dsh-live-stats/src/index.ts | 17 | live-stats |
 | host-service | packages/dsh-live-stats/src/invariant.ts | 14 | invariants |
-| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 363 | locale |
+| host-service | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 427 | locale |
 | host-service | packages/dsh-llm-antigravity/src/index.ts | 33 | stream-json |
-| host-service | packages/dsh-memory/src/client/index.ts | 34 | locale |
+| host-service | packages/dsh-memory/src/client/index.ts | 55 | locale |
 | host-service | packages/dsh-memory/src/index.ts | 32 | tools |
 | host-service | packages/dsh-mode-switcher/src/client/index.ts | 11 | conversation |
-| host-service | packages/dsh-model-preferences/src/client/index.ts | 65 | sessions |
+| host-service | packages/dsh-model-preferences/src/client/index.ts | 84 | sessions |
 | host-service | packages/dsh-model-preferences/src/index.ts | 7 | settings |
 | host-service | packages/dsh-particle-theme/src/client/index.ts | 33 | object |
 | host-service | packages/dsh-personal-prompt/src/client/index.ts | 36 | locale |
@@ -2580,20 +2580,31 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-chat-artifacts/src/client/index.ts | 41 | tool.call.toolview |
 | slot | packages/dsh-chat-artifacts/src/client/index.ts | 46 | conversation.chat.turnTail |
 | slot | packages/dsh-chat-artifacts/src/client/index.ts | 49 | conversation.chat.markdown.fence |
-| slot | packages/dsh-checkpoints/src/client/index.ts | 20 | conversation.chat.turnTail |
+| slot | packages/dsh-checkpoints/src/client/index.ts | 35 | conversation.chat.turnTail |
+| slot | packages/dsh-checkpoints/src/client/index.ts | 38 | conversation.session.panel.section |
+| slot | packages/dsh-checkpoints/src/client/index.ts | 45 | conversation.session.panel.section.actions |
 | slot | packages/dsh-data-location/src/client/Panel.tsx | 243 | web-ui.plugin.item |
 | slot | packages/dsh-fast-ops/src/client/index.ts | 25 | web-ui.plugin.item |
 | slot | packages/dsh-git-graph/src/client/index.ts | 87 | conversation.input.left |
 | slot | packages/dsh-im-hub/src/client/index.ts | 25 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 85 | web-ui.plugin.item |
 | slot | packages/dsh-live-stats/src/client/index.ts | 95 | conversation.composer.dock |
-| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 379 | web-ui.plugin.item |
-| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 383 | conversation.hero.frame |
-| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 386 | conversation.input.right |
-| slot | packages/dsh-memory/src/client/index.ts | 57 | web-ui.plugin.item |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 477 | sidebar.right.pane.tab |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 490 | web-ui.plugin.item |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 494 | conversation.hero.frame |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 497 | conversation.input.model.options |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 506 | conversation.input.model.pane |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 515 | model-preferences.menu.options |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 524 | model-preferences.menu.pane |
+| slot | packages/dsh-llm-antigravity/src/client/SettingsCard.tsx | 533 | conversation.input.right |
+| slot | packages/dsh-memory/src/client/index.ts | 78 | web-ui.plugin.item |
+| slot | packages/dsh-memory/src/client/index.ts | 89 | sidebar.footer.action |
+| slot | packages/dsh-memory/src/client/index.ts | 98 | conversation.session.panel.section |
+| slot | packages/dsh-memory/src/client/index.ts | 105 | conversation.session.panel.section.actions |
+| slot | packages/dsh-memory/src/client/index.ts | 110 | sidebar.right.tab.files.actions |
 | slot | packages/dsh-mode-switcher/src/client/index.ts | 34 | conversation.session.header.actions |
-| slot | packages/dsh-model-preferences/src/client/index.ts | 124 | settings.models.footer |
-| slot | packages/dsh-model-preferences/src/client/index.ts | 184 | conversation.input.model |
+| slot | packages/dsh-model-preferences/src/client/index.ts | 143 | settings.models.footer |
+| slot | packages/dsh-model-preferences/src/client/index.ts | 203 | conversation.input.model |
 | slot | packages/dsh-particle-theme/src/client/index.ts | 81 | web-ui.plugin.item |
 | slot | packages/dsh-personal-prompt/src/client/index.ts | 53 | web-ui.plugin.item |
 | slot | packages/dsh-pet/src/client/index.ts | 134 | web-ui.plugin.item |
@@ -2621,7 +2632,9 @@ Capability discovery is compatibility evidence only. Renderer surface identity, 
 | slot | packages/dsh-web-ui-settings/src/client/index.ts | 312 | root |
 | slot | packages/dsh-web-ui-settings/src/client/settings-sdk-adapter.ts | 100 | conversation.input.left |
 | slot | packages/dsh-win-control/src/client/index.ts | 27 | conversation.input.left |
-| slot | packages/dsh-win-control/src/client/index.ts | 35 | web-ui.plugin.item |
+| slot | packages/dsh-win-control/src/client/index.ts | 35 | conversation.input.model.options |
+| slot | packages/dsh-win-control/src/client/index.ts | 43 | model-preferences.menu.options |
+| slot | packages/dsh-win-control/src/client/index.ts | 51 | web-ui.plugin.item |
 | slot | packages/skins/skin-center/src/client/index.ts | 104 | web-ui.plugin.item |
 | slot | packages/skins/skin-center/src/client/index.ts | 112 | settings.section |
 | workspace | apps/dsh-desktop/src/conversation-import/session-bridge.mjs | 207 | list |

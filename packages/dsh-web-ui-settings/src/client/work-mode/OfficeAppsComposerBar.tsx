@@ -120,31 +120,40 @@ export function OfficeStarterDock({
 
   if (!isBlankSession || store.experienceMode !== 'office') return null
 
-  const items = (store.snapshot?.items ?? []).filter(i => i.entry.examples.length > 0).slice(0, 4)
+  const connectedItems = (store.snapshot?.items ?? [])
+    .filter(i => i.config.enabled && i.status === 'connected' && i.entry.examples.length > 0)
+    .slice(0, 3)
 
   return <div className={css.starterDock} data-dsh-office-starter-dock>
-    {items.map((item) => {
+    {connectedItems.map((item) => {
       const example = item.entry.examples[0]
-      const ready = item.config.enabled && item.status === 'connected'
       return <button
         key={item.entry.id}
         type="button"
         className={css.starterPill}
         data-starter-connector={item.entry.id}
-        onClick={() => ready ? onRunPrompt(example.prompt[locale]) : officeAppsStore.openWizard(item.entry.id)}
+        onClick={() => onRunPrompt(example.prompt[locale])}
       >
-        <span className={css.statusDot} data-state={ready ? 'connected' : 'not_installed'} aria-hidden="true" />
+        <span className={css.statusDot} data-state="connected" aria-hidden="true" />
         <span>{example.title[locale]}</span>
-        {!ready && <span className={css.starterMeta}>({item.entry.name[locale]})</span>}
       </button>
     })}
     <button
       type="button"
       className={css.starterPill}
+      data-starter-local-doc="true"
+      onClick={() => onRunPrompt(t('localDocStarterPrompt'))}
+    >
+      <span>{t('localDocStarterChip')}</span>
+    </button>
+    <button
+      type="button"
+      className={css.starterPill}
+      data-starter-manage-office="true"
       onClick={() => officeAppsStore.openCatalog()}
     >
       <BriefcaseIcon size={13} />
-      <span>{t('manageOfficeAppsChip')}</span>
+      <span>{connectedItems.length > 0 ? t('manageOfficeAppsChip') : t('connectOfficeAppsChip')}</span>
     </button>
   </div>
 }

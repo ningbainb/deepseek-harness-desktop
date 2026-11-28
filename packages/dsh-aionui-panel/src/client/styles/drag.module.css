@@ -29,30 +29,40 @@
   line-height: 18px;
 }
 
-.attachments { position: relative; z-index: 4; max-width: var(--dsh-composer-card-max-width, 720px); margin: 0 auto; color: var(--aion-text-primary); background: var(--aion-bg-base, var(--dsw-alias-bg-layer-1)); font-size: 12px; }
+.attachments { position: relative; z-index: 4; max-width: var(--dsh-composer-card-max-width, 720px); margin: 0 auto 6px; color: var(--dsw-alias-label-primary, var(--aion-text-primary)); background: transparent; font-size: 12px; }
 .fileList { display: flex; flex-wrap: wrap; gap: 8px; max-height: 168px; overflow: auto; }
-.fileCard { position: relative; display: flex; flex-direction: column; gap: 4px; max-width: 240px; min-width: 140px; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid var(--aion-border-base); background: var(--aion-bg-2); }
-.fileCard strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fileCard small { color: var(--aion-text-secondary); }
+.fileCard { position: relative; display: flex; flex-direction: column; gap: 4px; max-width: 248px; min-width: 148px; padding: 9px 30px 9px 11px; border-radius: 10px; border: 1px solid var(--dsw-alias-border-l2, var(--aion-border-base)); background: var(--dsw-alias-bg-layer-2, var(--aion-bg-2)); transition: border-color 0.14s ease, background-color 0.14s ease; }
+.fileCard:hover { border-color: var(--dsw-alias-border-l3, var(--aion-border-base)); }
+.fileCard strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.fileCard small { color: var(--dsw-alias-label-tertiary, var(--aion-text-secondary)); font-size: 11px; }
 .fileCard button { color: inherit; background: transparent; border: 0; cursor: pointer; }
-.fileCard button:last-child { position: absolute; right: 4px; top: 4px; width: 26px; height: 26px; font-size: 18px; }
-.fileCard[data-state="failed"] { border-color: var(--aion-danger, #bc4141); }
-.addFile { color: var(--aion-text-secondary); background: transparent; border: 0; border-radius: 6px; padding: 5px 8px; margin: 4px 0; cursor: pointer; font: inherit; }
-.addFile:hover { background: var(--aion-bg-3); }
-.attachments button:focus-visible { outline: 2px solid var(--aion-primary); outline-offset: 2px; }
+.fileCard button:last-child { position: absolute; right: 5px; top: 5px; width: 22px; height: 22px; border-radius: 6px; font-size: 16px; line-height: 1; color: var(--dsw-alias-label-tertiary); }
+.fileCard button:last-child:hover { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
+.fileCard[data-state="failed"] { border-color: var(--dsw-alias-state-error-primary, var(--aion-danger, #bc4141)); }
+.addFile { color: var(--dsw-alias-label-secondary, var(--aion-text-secondary)); background: transparent; border: 0; border-radius: 6px; padding: 5px 8px; margin: 4px 0; cursor: pointer; font: inherit; }
+.addFile:hover { background: var(--dsw-alias-interactive-bg-hover, var(--aion-bg-3)); }
+.attachments button:focus-visible { outline: 2px solid var(--dsw-alias-brand-primary, var(--aion-primary)); outline-offset: 2px; }
 
-.documentMode { display: flex; flex-wrap: wrap; gap: 4px; }
+.documentMode { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .fileCard .documentMode button {
   position: static;
   width: auto;
   height: auto;
-  border-radius: 5px;
-  padding: 3px 5px;
+  border-radius: 6px;
+  border: 1px solid var(--dsw-alias-border-l2, transparent);
+  padding: 2px 7px;
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-bg-module-platform);
   font: inherit;
+  font-size: 11px;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.fileCard .documentMode button:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
 }
 .fileCard .documentMode button[aria-pressed='true'] {
   color: var(--dsw-alias-label-primary);
-  background: color-mix(in srgb, var(--dsw-alias-label-primary) 12%, var(--dsw-alias-bg-module-platform));
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary, var(--dsw-alias-label-primary)) 35%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary, var(--dsw-alias-label-primary)) 12%, var(--dsw-alias-bg-module-platform));
 }
