@@ -83,3 +83,8 @@
 不同轮次应按同一列对照。前轮的 88 组统计的是所有物理重复。本轮逐项分诊始于另一份快照，当时有 86 组物理重复和 63 组独立实现。沿这 63 个分组追踪到本次复扫，24 组已关闭，38 组按业务或发布边界保留，1 组等待 macOS 与 Linux 原生打包环境。保留项中，第 60 组已通过 `1df4efba` 合并 Remote 包内配对和更新路由的 JSON 输出。该组仍包含 Remote、SSH 和设置桥三个独立发布者。
 
 这一轮的 `dependency-map.json` 与 `duplicate-triage-latest.json` 保存同一份扫描结果。`duplicate-triage.json` 中的 `closedSinceDiscovery` 对照每个原始编号、具体所有者和关闭提交。当前台账的结论来自架构扫描、组件测试及独立复审。对应源码 E2E、打包和桌面部署分别以本机验收目录的当次回执为准。
+
+### 预设、输入框与收尾复验回执（`d6368a65`）
+
+- 22 项工程门禁全部通过（06:30:44），含 `architecture:check`、`sync-shared:check`、`runtime-graph:check`、`test:scripts`、`emoji` 与 `diff-check`，汇总见 `D:/dshshequ/.desktop-build/artifacts/architecture-5.7-presets-composer/final-gates.json`。
+- 补充源码 Electron E2E 全部通过（06:31:09），含 `verify-packaged-model-preferences.mjs`、`verify-packaged-image-drop.mjs`、`verify-packaged-personalization.mjs`、`verify-packaged-local-lan-gateway.mjs`、修复后的 `verify-skin-center.mjs`（`0393d329`）以及 `verify-workspace-relocation.mjs`（`f4f3805d`），记录见 `additional-source.json`；`integrated-source.json` 确认与目标工作区 `dsh-release-550` 一致。
