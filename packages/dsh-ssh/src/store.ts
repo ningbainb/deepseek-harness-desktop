@@ -364,6 +364,7 @@ function unwrapQuotes(raw: string): string {
 export function expandHome(path: string): string {
   const unwrapped = unwrapQuotes(path)
   if (unwrapped === '~') return homedir()
-  if (unwrapped.startsWith('~/') || unwrapped.startsWith('~\\')) return join(homedir(), unwrapped.slice(2))
+  if (unwrapped.startsWith('~/')) return join(homedir(), unwrapped.slice(2))
+  if (unwrapped.startsWith('~\\')) return join(homedir(), ...unwrapped.slice(2).split(/[\\/]+/))
   return unwrapped
 }

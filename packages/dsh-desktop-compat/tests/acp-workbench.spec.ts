@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -31,7 +31,7 @@ it('registers four built-ins alongside custom agents and verifies installed agen
 })
 
 it('resolves a Windows npm command to its JavaScript entry point without executing its shell shim', async () => {
-  const home = await mkdtemp(join(tmpdir(), 'dsh-acp-shim-'))
+  const home = await realpath(await mkdtemp(join(tmpdir(), 'dsh-acp-shim-')))
   try {
     const preset = BUILTIN_ACP_PRESETS.find(agent => agent.id === 'codex')!
     const folder = join(home, 'node_modules', '@agentclientprotocol', 'codex-acp')
