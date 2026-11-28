@@ -53,18 +53,11 @@ export function summarizeFastOpsBadge(
     + Math.max(0, Number(counters?.astCalls ?? 0))
     + Math.max(0, Number(counters?.cacheSpills ?? 0))
 
-  if (totalSaved > 0 && files > 0) {
-    return {
-      active: true,
-      totalSaved,
-      label: `${t('dockSavedPrefix')} ~${formatCompactTokens(totalSaved)} · ${t('dockBatchSuffix')} ${files} ${t('dockFilesUnit')}`,
-    }
-  }
   if (totalSaved > 0) {
     return {
       active: true,
       totalSaved,
-      label: `${t('dockSavedPrefix')} ~${formatCompactTokens(totalSaved)} tok`,
+      label: `${t('dockSavedPrefix')} ~${formatCompactTokens(totalSaved)}`,
     }
   }
   if (files > 0) {

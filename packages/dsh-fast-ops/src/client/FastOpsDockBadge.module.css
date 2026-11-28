@@ -14,41 +14,44 @@
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   max-width: 100%;
   margin: 0;
-  padding: 1px 9px;
+  padding: 1px 7px;
+  border: none;
   border-radius: 12px;
   font: inherit;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 20px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+  transition: background 140ms ease, color 140ms ease;
 }
 
 .root[data-saved='false'] .pill {
-  background: var(--dsw-alias-interactive-bg-hover, rgba(128, 128, 128, 0.08));
-  border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.18));
-  color: var(--dsw-alias-label-secondary, #4e5969);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary, #647084);
+}
+
+.root[data-saved='false'] .icon {
+  color: color-mix(in srgb, #10b981 78%, var(--dsw-alias-label-tertiary, #647084));
 }
 
 .root[data-saved='false'] .pill:hover,
 .root[data-saved='false'][data-open='true'] .pill {
-  color: var(--dsw-alias-label-primary, #1d2129);
-  border-color: var(--dsw-alias-border-l1, rgba(128, 128, 128, 0.3));
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
 }
 
 .root[data-saved='true'] .pill {
-  background: color-mix(in srgb, #12b76a 12%, transparent);
-  border: 1px solid color-mix(in srgb, #12b76a 32%, transparent);
-  color: #0e9f6e;
+  background: color-mix(in srgb, #10b981 8%, transparent);
+  color: var(--dsw-alias-state-success-primary, #0f8a5f);
+  font-weight: 500;
 }
 
 .root[data-saved='true'] .pill:hover,
 .root[data-saved='true'][data-open='true'] .pill {
-  background: color-mix(in srgb, #12b76a 18%, transparent);
-  border-color: color-mix(in srgb, #12b76a 46%, transparent);
+  background: color-mix(in srgb, #10b981 14%, transparent);
 }
 
 .pill:focus-visible {
@@ -68,13 +71,14 @@
 
 .popover {
   position: absolute;
-  left: 50%;
+  right: 0;
+  left: auto;
   bottom: calc(100% + 8px);
-  transform: translateX(-50%);
-  z-index: 40;
+  transform: none;
+  z-index: 60;
   width: max-content;
-  min-width: 268px;
-  max-width: 320px;
+  min-width: 256px;
+  max-width: 288px;
   box-sizing: border-box;
   padding: 12px 14px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(128, 128, 128, 0.22));
@@ -87,11 +91,8 @@
 
 @media (max-width: 900px) {
   .popover {
-    left: auto;
-    right: 0;
-    transform: none;
-    min-width: min(268px, 78vw);
-    max-width: min(320px, 88vw);
+    min-width: min(256px, 78vw);
+    max-width: min(288px, 88vw);
   }
 }
 

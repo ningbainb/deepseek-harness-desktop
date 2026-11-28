@@ -20,7 +20,7 @@ describe('FastOpsDockBadge & client registration', () => {
     expect(summarizeFastOpsBadge({}, tZh)).toEqual({
       active: false,
       totalSaved: 0,
-      label: 'nbfast 省流已就绪',
+      label: 'nbfast 就绪',
     })
     expect(summarizeFastOpsBadge({}, tEn)).toEqual({
       active: false,
@@ -31,15 +31,15 @@ describe('FastOpsDockBadge & client registration', () => {
     expect(summarizeFastOpsBadge({ denoiseTokensSaved: 8420, spillTokensSaved: 6380, filesReadInBatches: 18 }, tZh)).toEqual({
       active: true,
       totalSaved: 14800,
-      label: 'nbfast 省 ~14.8K · 批读 18 文件',
+      label: 'nbfast 省 ~14.8K',
     })
     expect(summarizeFastOpsBadge({ denoiseTokensSaved: 8420, spillTokensSaved: 6380, filesReadInBatches: 18 }, tEn)).toEqual({
       active: true,
       totalSaved: 14800,
-      label: 'nbfast saved ~14.8K · read 18 files',
+      label: 'nbfast saved ~14.8K',
     })
 
-    expect(summarizeFastOpsBadge({ spillTokensSaved: 3200 }, tZh).label).toBe('nbfast 省 ~3.2K tok')
+    expect(summarizeFastOpsBadge({ spillTokensSaved: 3200 }, tZh).label).toBe('nbfast 省 ~3.2K')
     expect(summarizeFastOpsBadge({ filesReadInBatches: 6 }, tZh).label).toBe('nbfast 批读 6 文件')
     expect(summarizeFastOpsBadge({ astCalls: 3, cacheSpills: 2 }, tZh).label).toBe('nbfast 加速 5 次')
     expect(summarizeFastOpsBadge({ astCalls: 3, cacheSpills: 2 }, tEn).label).toBe('nbfast 5 ops')

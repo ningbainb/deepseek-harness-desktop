@@ -29,7 +29,7 @@ export const zh = {
   statsDenoiseTokens: '累计省流 Token（估算）',
   statsTotalSavedSubDenoise: '降噪',
   statsTotalSavedSubSpill: '缓存',
-  dockReady: 'nbfast 省流已就绪',
+  dockReady: 'nbfast 就绪',
   dockSavedPrefix: 'nbfast 省',
   dockBatchSuffix: '批读',
   dockFilesUnit: '文件',
