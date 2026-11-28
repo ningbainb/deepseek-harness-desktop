@@ -2,14 +2,17 @@
 
 ## 中文
 
-5.6.0 为维护修复版本，重点修复拓展坞与对话界面中的 SSH 远程开发、性价比模式预设切换与智能操控完全权限兼容、Windows 自动升级异常，以及异常断电后的本地配置自愈与令牌悬停预览体验。
+DeepSeek Harness Desktop 5.6.0 是集成官方 DSH `0.2.3-alpha.2` 与原生 UI 插槽体系的重要特性与稳定版，带来多引擎 ACP 协同、nbfast 代码省流工具箱、全局中英代码混合检索、工作区检查点回滚、离线文档与 Mermaid 图表导出、国内 4 通道 IM 通知、Windows 原生操控，以及默认内置的 CDN 加速更新线路。
 
 ### 本次亮点
 
-- **恢复 SSH 远程开发入口与挂载可靠性。** 兼容拓展坞「更多工具 → SSH 远程开发」在不同原生布局容器中的懒加载挂载，并在打开前自动收起可能遮挡对话区的全局面板或快捷键设置弹窗；增加重复挂载保护；调整原生设置视图显示时的 Toast 提示位置，避免错误反馈被原生视图遮挡。
-- **增强 SSH 连接与配置导入兼容性。** 为密码主机补充 PAM `keyboard-interactive` 认证兜底；兼容 Windows 下带引号路径与 `~\` 路径展开；支持 `~/.ssh/config` 中的 `Key=Value` 语法、带引号 `IdentityFile`、自动探测同目录默认私钥（`id_ed25519` / `id_rsa` / `id_ecdsa`）及 `USERNAME` 用户兜底。
-- **修复 Windows 自动更新检查失败。** 修复当安装目录旁存在 `.dsh-desktop-updates` 缓存目录时 `NsisUpdater` 未初始化 `ElectronHttpExecutor` 导致的空指针报错（`Cannot read properties of null (reading 'request')`），恢复新版本检测与自动下载安装流程。
-- **修复性价比模式与智能操控兼容性，新增断电自愈与令牌悬停预览。** 修复性价比模式（`dsh-value-mode`）仅读取创建时冻结 `agentPreset` 导致空白会话切进/切出预设路由不同步的问题；修复「完全权限 + 不询问」模式下 Playwright/浏览器与电脑操控工具被静默拒绝的问题；为桌面端持久化配置与迁移日志增加意外断电/全零损坏文件的无感备份恢复与隔离重建；为对话底部实时令牌行补充悬停直出预览卡片及缓存命中/写入明细。
+- **多引擎 ACP 协同与 Gemini CLI 交互支持。** 在原生模型菜单与右侧工作栏即可按会话切换本地 Antigravity CLI（Gemini）、Codex、OpenCode 等引擎（`/acp` 同步可用），支持主对话或并排右侧栏协同、交互式登录检测、思考档位与工具权限确认。
+- **nbfast 省流工具箱（`dsh-fast-ops`）。** 提供 AST 语法大纲提取、结构化符号搜索、带修订号校验与 Diff 预览的多段批量改写及终端全量输出按需读取，并在底部实时令牌明细中展示累计节省令牌数。
+- **全局混合检索（`Ctrl+K` / `/search`）与工作区知识库。** 支持基于 BM25 的中文、英文与代码标识符混合检索历史会话、记忆与项目知识库，并在右侧栏与文件树提供一键加入检索源入口。
+- **办公文档解析、工作区检查点与离线图表。** 原生解析拖入的 Word/Excel/PowerPoint/PDF 与授权网页并支持一键切换路径引用或摘要；每轮写入自动保存独立影子检查点，支持分栏差异审阅、单文件或整轮恢复及撤销恢复；支持会话内交互式 MCP Apps 与 Mermaid 图表离线导出 SVG/PNG。
+- **内置国内 4 通道 IM 通知与 Windows 原生操控。** 新增飞书、钉钉、企业微信与 Webhook 四通道轻量级消息推送与指令桥接（`dsh-im-hub`），以及受控的 Windows 桌面 UI 自动化与截图控制工具（`dsh-win-control`），默认仅在当前会话主动授权时呈现状态胶囊。
+- **默认内置 CDN 加速更新与原生界面重塑。** 桌面端自动更新默认预置 `https://download.1521003.xyz/releases/`（国内线路自动探测并优先选用更快的健康源，海外及异常/`429` 自动回退 GitHub）；全面采用官方 DSH 原生插槽重构输入栏与设置导航，精简权限（「询问」）与推理强度（「默认」）文案，按模式隐藏冗余图标。
+- **重点稳定性修复。** 修复 SSH 远程开发挂载与 PAM/Windows 密钥导入兼容、`.dsh-desktop-updates` 更新缓存目录下 `NsisUpdater` 空网络执行器报错、性价比模式预设热切换、完全权限下浏览器/电脑操控执行，以及意外断电损坏配置文件的启动自愈。
 
 ### 验证
 
@@ -17,7 +20,7 @@
 
 ### 下载与校验
 
-本发行页提供 Windows x64 安装程序、macOS arm64 DMG 和 ZIP，以及 Linux x64 DEB。安装前可通过同页的 `SHA256SUMS.txt` 校验下载文件。
+本发行页提供 Windows x64 安装程序、macOS arm64 DMG 和 ZIP，以及 Linux x64 DEB。安装前可通过同页的 `SHA256SUMS.txt` 校验下载文件；已安装桌面版的用户可在应用内自动检查并选择加速线路或 GitHub 完成升级。
 
 ### 说明
 
@@ -27,14 +30,17 @@
 
 ## English
 
-Desktop 5.6.0 is a maintenance release that restores SSH remote access, fixes Windows auto-update checks, resolves Value Mode preset switching and full-access Smart Control execution, and adds power-loss startup self-healing with hover token cache previews.
+DeepSeek Harness Desktop 5.6.0 brings official DSH `0.2.3-alpha.2` and native slot integration together with major capabilities: multi-engine ACP collaboration, the nbfast token-efficient AST toolkit, global `Ctrl+K` hybrid search, workspace checkpoints, offline Office/PDF parsing and Mermaid export, a 4-channel IM hub, Windows native desktop control, and built-in CDN update acceleration.
 
 ### Highlights
 
-- **Restored SSH entry & conversation mounting.** Supports lazy mounting across both `[data-pane="conversation"]` and `[class*="centerCol"]`, dismisses blocking global panels or settings modals when launched from Extension Dock, guards against duplicate `apply` registration, and keeps Dock toast notifications visible in the sidebar while native `WebContentsView` tabs are open.
-- **Improved SSH authentication & config import.** Adds bounded `keyboard-interactive` fallback for PAM password hosts, handles quoted and Windows `~\` key paths, parses `Key=Value` entries in `~/.ssh/config`, detects default keys (`id_ed25519` / `id_rsa` / `id_ecdsa`) when `IdentityFile` is omitted, and falls back to `USERNAME` on Windows.
-- **Fixed Windows auto-update check failures.** Initializes `ElectronHttpExecutor` on the custom `NsisUpdater` instance used when the sibling `.dsh-desktop-updates` cache directory exists, resolving `Cannot read properties of null (reading 'request')` and restoring update checks and downloads.
-- **Value Mode preset sync, full-access Smart Control, crash self-healing & token hover preview.** Tracks live `agentPreset` projections/events in `dsh-value-mode`, stops silently rejecting Browser/Computer Use tools under `danger-full-access` (`approval: never`), auto-recovers or quarantines power-loss-corrupted startup state files, and shows cache hit/write breakdowns on token-bar hover.
+- **Multi-Engine ACP Workbench & Interactive Gemini CLI.** Switch between local Antigravity CLI (Gemini), Codex, OpenCode, and companion engines directly inside the native model menu, right workspace pane, or `/acp` command, with per-session state, thinking level controls, and tool approval prompts.
+- **nbfast Code Toolkit (`dsh-fast-ops`).** Delivers AST code outlines, structure-aware search, revision-checked batch edits with previews, and on-demand terminal output expansion, reporting cumulative token savings directly inside the live stats details panel.
+- **Global Hybrid Search (`Ctrl+K` / `/search`) & Workspace Knowledge Base.** Uses BM25 ranking over mixed Chinese, English, and code identifiers across session transcripts, memories, and explicitly indexed Markdown/project knowledge sources from the sidebar and files tab.
+- **Document Parsing, Workspace Checkpoints & Offline Diagrams.** Parses dropped Office/PDF documents and approved web pages with instant switching between path references and extracted excerpts; captures per-turn shadow Git checkpoints with split diff inspection, single-file or full-turn restore, and one-click undo; supports interactive in-chat MCP Apps and offline Mermaid SVG/PNG export.
+- **4-Channel IM Hub & On-Demand Windows Control.** Adds lightweight Feishu, DingTalk, WeCom, and Webhook notification routing (`dsh-im-hub`) plus scoped Windows desktop UI automation (`dsh-win-control`) surfaced cleanly from the model menu and active-session composer pill.
+- **Default CDN Update Acceleration & Native UI Refinement.** Preconfigures `https://download.1521003.xyz/releases/` as the default mirror in `UpdateDownloadRouter` (probing and preferring the faster healthy mirror in mainland China while automatically falling back to GitHub globally or on `429`/errors); aligns composer toolbars, two-character concise labels, and sidebar actions with official DSH UI slots.
+- **Reliability & Bug Fixes.** Restores Extension Dock SSH mounting and PAM/Windows key import, initializes `ElectronHttpExecutor` when sibling update cache directories exist on Windows, syncs Value Mode presets dynamically, enables full-access Smart Control tools, and adds power-loss startup self-healing.
 
 ### Verification
 
@@ -42,7 +48,7 @@ Native build and acceptance records for all three platforms are available in Git
 
 ### Download and verification
 
-This release includes a Windows x64 installer, macOS arm64 DMG and ZIP files, and a Linux x64 DEB package. Verify your download against the attached `SHA256SUMS.txt` before installing.
+This release includes a Windows x64 installer, macOS arm64 DMG and ZIP files, and a Linux x64 DEB package. Verify your download against the attached `SHA256SUMS.txt` before installing, or upgrade seamlessly through the built-in desktop updater.
 
 ### Notice
 

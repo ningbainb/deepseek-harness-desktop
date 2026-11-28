@@ -17,12 +17,25 @@ import {
 
 const OFFICIAL_ASSET = 'https://github.com/ningbainb/deepseek-harness-desktop/releases/download/v2.1.0/DeepSeek-Harness-Desktop-Setup-2.1.0-x64.exe'
 
-test('mirror configuration is HTTPS-only and can be disabled', () => {
-  assert.deepEqual(DEFAULT_UPDATE_MIRRORS, [])
-  assert.deepEqual(parseUpdateMirrors(undefined), [])
-  assert.deepEqual(parseUpdateMirrors(''), [])
+test('mirror configuration includes default CDN route, stays HTTPS-only, and can be disabled', () => {
+  assert.deepEqual(DEFAULT_UPDATE_MIRRORS, [{
+    id: 'download.1521003.xyz',
+    label: 'CDN 加速 download.1521003.xyz',
+    prefix: 'https://download.1521003.xyz/releases/',
+    mode: 'release-path',
+  }])
+  assert.deepEqual(parseUpdateMirrors(undefined), DEFAULT_UPDATE_MIRRORS)
+  assert.deepEqual(parseUpdateMirrors(''), DEFAULT_UPDATE_MIRRORS)
   assert.deepEqual(parseUpdateMirrors('official'), [])
   assert.deepEqual(parseUpdateMirrors('off'), [])
+  assert.deepEqual(parseUpdateMirrors('none'), [])
+  assert.equal(
+    rewriteGitHubReleaseUrl(
+      'https://github.com/ningbainb/deepseek-harness-desktop/releases/download/desktop-v5.6.0/DeepSeek-Harness-Desktop-Setup-5.6.0-x64.exe',
+      DEFAULT_UPDATE_MIRRORS[0],
+    ).href,
+    'https://download.1521003.xyz/releases/desktop-v5.6.0/DeepSeek-Harness-Desktop-Setup-5.6.0-x64.exe',
+  )
   assert.deepEqual(
     parseUpdateMirrors('https://mirror.example/;http://unsafe.example/;https://user:secret@private.example/'),
     [{ id: 'mirror.example', label: '备用线路 mirror.example', prefix: 'https://mirror.example/' }],

@@ -2,10 +2,19 @@ import { performance } from 'node:perf_hooks'
 
 const PROBE_BYTES = 64 * 1024
 
-// GitHub is the only built-in transport. Administrators may opt into an
-// HTTPS proxy through DSH_DESKTOP_UPDATE_MIRRORS, but Desktop never promotes
-// an unowned third-party mirror as the default path.
-export const DEFAULT_UPDATE_MIRRORS = Object.freeze([])
+// Built-in first-party Cloudflare R2/Workers release mirror. In mainland China
+// `auto` probes both sources and prefers this mirror when healthy and faster,
+// keeping GitHub official first elsewhere and as the automatic fallback on
+// 429, unavailability, or transfer errors. Administrators may override or
+// disable mirrors via DSH_DESKTOP_UPDATE_MIRRORS=off.
+export const DEFAULT_UPDATE_MIRRORS = Object.freeze([
+  Object.freeze({
+    id: 'download.1521003.xyz',
+    label: 'CDN 加速 download.1521003.xyz',
+    prefix: 'https://download.1521003.xyz/releases/',
+    mode: 'release-path',
+  }),
+])
 
 export const OFFICIAL_UPDATE_SOURCE = Object.freeze({
   id: 'github',
