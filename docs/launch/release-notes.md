@@ -2,17 +2,17 @@
 
 ## 中文
 
-DeepSeek Harness Desktop 5.6.0 是集成官方 DSH `0.2.3-alpha.2` 与原生 UI 插槽体系的重要特性与稳定版，带来多引擎 ACP 协同、nbfast 代码省流工具箱、全局中英代码混合检索、工作区检查点回滚、离线文档与 Mermaid 图表导出、国内 4 通道 IM 通知、Windows 原生操控，以及默认内置的 CDN 加速更新线路。
+DeepSeek Harness Desktop 5.6.0 是一次体验与能力全面升级的正式版本：在一个桌面工作台里汇集多款本机 AI 助手、更省额度的代码读写、全局 `Ctrl+K` 对话搜索、办公文档直读、改文件自动留档回滚、飞书/钉钉/企业微信进度提醒，以及开箱即用的国内加速更新。
 
 ### 本次亮点
 
-- **多引擎 ACP 协同与 Gemini CLI 交互支持。** 在原生模型菜单与右侧工作栏即可按会话切换本地 Antigravity CLI（Gemini）、Codex、OpenCode 等引擎（`/acp` 同步可用），支持主对话或并排右侧栏协同、交互式登录检测、思考档位与工具权限确认。
-- **nbfast 省流工具箱（`dsh-fast-ops`）。** 提供 AST 语法大纲提取、结构化符号搜索、带修订号校验与 Diff 预览的多段批量改写及终端全量输出按需读取，并在底部实时令牌明细中展示累计节省令牌数。
-- **全局混合检索（`Ctrl+K` / `/search`）与工作区知识库。** 支持基于 BM25 的中文、英文与代码标识符混合检索历史会话、记忆与项目知识库，并在右侧栏与文件树提供一键加入检索源入口。
-- **办公文档解析、工作区检查点与离线图表。** 原生解析拖入的 Word/Excel/PowerPoint/PDF 与授权网页并支持一键切换路径引用或摘要；每轮写入自动保存独立影子检查点，支持分栏差异审阅、单文件或整轮恢复及撤销恢复；支持会话内交互式 MCP Apps 与 Mermaid 图表离线导出 SVG/PNG。
-- **内置国内 4 通道 IM 通知与 Windows 原生操控。** 新增飞书、钉钉、企业微信与 Webhook 四通道轻量级消息推送与指令桥接（`dsh-im-hub`），以及受控的 Windows 桌面 UI 自动化与截图控制工具（`dsh-win-control`），默认仅在当前会话主动授权时呈现状态胶囊。
-- **默认内置 CDN 加速更新与原生界面重塑。** 桌面端自动更新默认预置 `https://download.1521003.xyz/releases/`（国内线路自动探测并优先选用更快的健康源，海外及异常/`429` 自动回退 GitHub）；全面采用官方 DSH 原生插槽重构输入栏与设置导航，精简权限（「询问」）与推理强度（「默认」）文案，按模式隐藏冗余图标。
-- **重点稳定性修复。** 修复 SSH 远程开发挂载与 PAM/Windows 密钥导入兼容、`.dsh-desktop-updates` 更新缓存目录下 `NsisUpdater` 空网络执行器报错、性价比模式预设热切换、完全权限下浏览器/电脑操控执行，以及意外断电损坏配置文件的启动自愈。
+- **一个窗口用遍多款本机 AI 助手。** 不用来回切换软件或命令行，在模型菜单里就能按对话选用本机 Gemini（Antigravity CLI）、Codex、OpenCode 等助手，还能在右侧栏并排开启多个助手协作，继续支持 `/acp` 快捷呼出。
+- **读大项目更快、更省额度（nbfast）。** 批量读取文件、先预览再精准修改代码，大幅减少反复读取大文件带来的额度消耗；对话底部的用量明细会实时告诉你一共省下了多少额度。
+- **按 `Ctrl+K` 一秒搜遍历史对话与项目文档。** 无论是中文、英文还是代码里的名称，都能直接搜出过去聊过的内容；在侧栏或文件列表里顺手把项目文档加入知识库，让 AI 边查资料边作答。
+- **办公文档直读、流程图离线存图与对话小工具。** 拖入 Word、Excel、PPT、PDF 或授权打开的网页即可直接解析，一键选择「只传路径」或「提取摘要」；流程图（Mermaid）支持离线直接出图，还能一键导出 SVG 或 PNG；常用外部工具界面也能直接在对话卡片里操作。
+- **AI 改文件自带「后悔药」。** 每轮文件修改完成后自动保存独立的恢复点，完全不打乱你自己的 Git 历史；支持左右分栏对比改了哪些行，按单个文件或整轮一键还原，还原错了还能撤销。
+- **飞书 / 钉钉 / 企业微信通知与按需桌面操控。** 支持把长任务完成通知和操作确认推送到飞书、钉钉、企业微信或常用 Webhook；电脑桌面操控放在模型菜单中按需开启，平时安静隐藏不占版面。
+- **国内更新默认提速 & 界面更顺手。** 默认内置国内加速更新线路，检查和下载新版本更快，遇到线路波动会自动切回 GitHub；输入栏按专业模式和办公模式自动精简，常用选项收短为「询问」「默认」，并修复了 SSH 远程连接、Windows 自动更新、性价比模式切换和意外断电配置恢复等问题。
 
 ### 验证
 
@@ -30,17 +30,17 @@ DeepSeek Harness Desktop 5.6.0 是集成官方 DSH `0.2.3-alpha.2` 与原生 UI 
 
 ## English
 
-DeepSeek Harness Desktop 5.6.0 brings official DSH `0.2.3-alpha.2` and native slot integration together with major capabilities: multi-engine ACP collaboration, the nbfast token-efficient AST toolkit, global `Ctrl+K` hybrid search, workspace checkpoints, offline Office/PDF parsing and Mermaid export, a 4-channel IM hub, Windows native desktop control, and built-in CDN update acceleration.
+DeepSeek Harness Desktop 5.6.0 is a major feature and polish release designed around everyday workflows: switch between local AI assistants in one window, save tokens on large projects, search any past conversation with `Ctrl+K`, read Office and PDF files directly, undo file edits safely, get notified on Feishu/DingTalk/WeCom, and enjoy faster built-in update downloads.
 
 ### Highlights
 
-- **Multi-Engine ACP Workbench & Interactive Gemini CLI.** Switch between local Antigravity CLI (Gemini), Codex, OpenCode, and companion engines directly inside the native model menu, right workspace pane, or `/acp` command, with per-session state, thinking level controls, and tool approval prompts.
-- **nbfast Code Toolkit (`dsh-fast-ops`).** Delivers AST code outlines, structure-aware search, revision-checked batch edits with previews, and on-demand terminal output expansion, reporting cumulative token savings directly inside the live stats details panel.
-- **Global Hybrid Search (`Ctrl+K` / `/search`) & Workspace Knowledge Base.** Uses BM25 ranking over mixed Chinese, English, and code identifiers across session transcripts, memories, and explicitly indexed Markdown/project knowledge sources from the sidebar and files tab.
-- **Document Parsing, Workspace Checkpoints & Offline Diagrams.** Parses dropped Office/PDF documents and approved web pages with instant switching between path references and extracted excerpts; captures per-turn shadow Git checkpoints with split diff inspection, single-file or full-turn restore, and one-click undo; supports interactive in-chat MCP Apps and offline Mermaid SVG/PNG export.
-- **4-Channel IM Hub & On-Demand Windows Control.** Adds lightweight Feishu, DingTalk, WeCom, and Webhook notification routing (`dsh-im-hub`) plus scoped Windows desktop UI automation (`dsh-win-control`) surfaced cleanly from the model menu and active-session composer pill.
-- **Default CDN Update Acceleration & Native UI Refinement.** Preconfigures `https://download.1521003.xyz/releases/` as the default mirror in `UpdateDownloadRouter` (probing and preferring the faster healthy mirror in mainland China while automatically falling back to GitHub globally or on `429`/errors); aligns composer toolbars, two-character concise labels, and sidebar actions with official DSH UI slots.
-- **Reliability & Bug Fixes.** Restores Extension Dock SSH mounting and PAM/Windows key import, initializes `ElectronHttpExecutor` when sibling update cache directories exist on Windows, syncs Value Mode presets dynamically, enables full-access Smart Control tools, and adds power-loss startup self-healing.
+- **Multiple Local AI Assistants in One Workspace.** Switch between local Gemini (Antigravity CLI), Codex, OpenCode, and companion agents right from the model menu or side by side in the right panel, with `/acp` shortcut support preserved.
+- **Faster Code Work with Fewer Tokens (nbfast).** Read project files in batches, preview code changes before applying them, and see live token savings directly in the bottom usage details bar.
+- **Instant `Ctrl+K` Search Across History and Docs.** Search past conversations and project knowledge bases across Chinese, English, and code terms in seconds, and add workspace files as reference sources with one click.
+- **Direct Office/PDF Reading, Offline Diagrams, and Interactive Tools.** Drop in Word, Excel, PowerPoint, or PDF files and switch between path references and extracted text; render Mermaid diagrams offline with one-click SVG/PNG export; interact with rich tool cards directly inside chat.
+- **Safe Recovery Points for File Edits.** Automatically saves a separate restore point after every AI edit turn without touching your Git history. Inspect side-by-side diffs, restore individual files or a full turn, and undo any restore.
+- **Feishu / DingTalk / WeCom Alerts & On-Demand Desktop Control.** Route task updates and approvals to Feishu, DingTalk, WeCom, or webhooks, and toggle Windows desktop control from the model menu only when you need it.
+- **Faster Default Update Mirror & Cleaner Interface.** Preconfigures `download.1521003.xyz` for faster regional downloads with automatic fallback to GitHub, streamlines the composer by work mode with concise options, and fixes SSH remote connections, Windows auto-updates, Value Mode preset sync, and crash recovery.
 
 ### Verification
 
