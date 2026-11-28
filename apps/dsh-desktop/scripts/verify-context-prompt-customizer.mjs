@@ -154,7 +154,7 @@ try {
   const originalP1 = await p1()
   ;({ settings } = await openDockSetting(app, main, 'value-mode'))
   const card = settings.locator('[data-prompt-customizer-card]')
-  const toggle = card.getByRole('switch', { name: 'Agent 高级提示词 (P2)', exact: true })
+  const toggle = card.getByRole('switch', { name: 'Agent 高级提示词', exact: true })
   await toggle.waitFor()
   assert.equal(await toggle.getAttribute('aria-checked'), 'false', 'P2 defaults off in the actual candidate')
   assert.equal(await settings.locator('[data-prompt-customizer-card]').count(), 1)
@@ -214,7 +214,7 @@ try {
 
   stage = 'p2-disable-preserves-database'
   ;({ settings } = await openDockSetting(app, main, 'value-mode'))
-  await settings.locator('[data-prompt-customizer-card]').getByRole('switch', { name: 'Agent 高级提示词 (P2)', exact: true }).click()
+  await settings.locator('[data-prompt-customizer-card]').getByRole('switch', { name: 'Agent 高级提示词', exact: true }).click()
   await settings.locator('[data-prompt-customizer-card]').getByRole('status').filter({ hasText: /^配置已关闭$/u }).waitFor({ timeout: 600_000 })
   assert.ok((await stat(join(home, 'prompt-customizer', 'prompt-customizer.db'))).size > 0)
   const manifest = JSON.parse(await readFile(join(home, 'profiles', 'desktop', 'package.json'), 'utf8'))

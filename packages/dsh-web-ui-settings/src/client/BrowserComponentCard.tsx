@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import css from './dock-settings.module.css'
 
 type Phase = 'idle' | 'checking' | 'waiting' | 'downloading' | 'verifying' | 'extracting' | 'activating' | 'ready' | 'error' | 'cancelled'
 type Status = { phase: Phase; receivedBytes: number; totalBytes: number; version: string; error?: string | null }
@@ -55,18 +56,26 @@ export function BrowserComponentCard({ active = true }: { active?: boolean }) {
     window.dispatchEvent(new CustomEvent('dsh:dock-plugin', { detail: 'dsh-builtin-browser' }))
     window.dispatchEvent(new CustomEvent('dsh:dock-setting', { detail: 'plugin-options' }))
   }
-  return <section data-browser-component-card>
-    <h1>共享浏览器</h1>
-    <p>使用时检查独立浏览器组件，缺失时再下载。浏览器数据和动作权限沿用原配置。</p>
-    <p role="status" aria-live="polite">{status ? phases[status.phase] : '正在读取状态'}{status?.version && ` (${status.version})`}</p>
-    {status && <p>组件大小：{status.totalBytes > 0 ? size(status.totalBytes) : '读取中'}；已接收 {size(status.receivedBytes)}</p>}
-    {status?.phase === 'downloading' && status.totalBytes > 0 && <progress aria-label="浏览器组件下载进度" value={status.receivedBytes} max={status.totalBytes} />}
-    {(error || status?.error) && <p role="alert">{error || status?.error}</p>}
-    {status?.phase === 'error' && <p>可稍后重试，聊天和项目仍可使用。</p>}
-    {pending(status)
-      ? <button type="button" disabled={acting} onClick={() => { void act('cancel') }}>取消下载</button>
-      : status?.phase !== 'ready' && <button type="button" disabled={acting} onClick={() => { void act('prepare') }}>{status?.phase === 'error' || status?.phase === 'cancelled' ? '重试下载' : '准备浏览器组件'}</button>}
-    {error && <button type="button" disabled={acting} onClick={() => setRefresh(value => value + 1)}>刷新状态</button>}
-    <button type="button" onClick={openSettings}>浏览器设置与动作权限</button>
+  return <section className={css.browserCard} data-browser-component-card>
+    <header className={css.browserHeader}>
+      <div>
+        <h1>共享浏览器</h1>
+        <p className={css.browserDesc}>使用时检查独立浏览器组件，缺失时再下载。浏览器数据和动作权限沿用原配置。</p>
+      </div>
+      <span className={css.browserStatusBadge} data-phase={status?.phase ?? 'loading'} role="status" aria-live="polite">
+        {status ? phases[status.phase] : '正在读取状态'}{status?.version && ` (${status.version})`}
+      </span>
+    </header>
+    {status && <p className={css.browserMeta}>组件大小：{status.totalBytes > 0 ? size(status.totalBytes) : '读取中'}；已接收 {size(status.receivedBytes)}</p>}
+    {status?.phase === 'downloading' && status.totalBytes > 0 && <progress className={css.browserProgress} aria-label="浏览器组件下载进度" value={status.receivedBytes} max={status.totalBytes} />}
+    {(error || status?.error) && <p role="alert" className={css.collaborationError}>{error || status?.error}</p>}
+    {status?.phase === 'error' && <p className={css.browserMeta}>可稍后重试，聊天和项目仍可使用。</p>}
+    <div className={css.browserActions}>
+      {pending(status)
+        ? <button type="button" className={css.browserSecondary} disabled={acting} onClick={() => { void act('cancel') }}>取消下载</button>
+        : status?.phase !== 'ready' && <button type="button" className={css.browserPrimary} disabled={acting} onClick={() => { void act('prepare') }}>{status?.phase === 'error' || status?.phase === 'cancelled' ? '重试下载' : '准备浏览器组件'}</button>}
+      {error && <button type="button" className={css.browserSecondary} disabled={acting} onClick={() => setRefresh(value => value + 1)}>刷新状态</button>}
+      <button type="button" className={css.browserSecondary} onClick={openSettings}>浏览器设置与动作权限</button>
+    </div>
   </section>
 }

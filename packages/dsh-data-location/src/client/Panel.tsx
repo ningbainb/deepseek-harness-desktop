@@ -161,7 +161,6 @@ export function DataLocationCard({ t }: PropsLocale<'data-location'>) {
       {copiedField === 'error' && <p className={css.notice} data-tone="error" role="status">{t('copyFailed')}</p>}
       {status.reason && <div className={css.notice} data-tone="info">
         <p>{status.source === 'environment' ? t('envReasonHint') : status.reason}</p>
-        {status.source === 'environment' && <code className={css.reasonCode}>{status.reason}</code>}
       </div>}
       {status.cleanupIncomplete && <p className={css.notice} data-tone="error" role="alert">{t('cleanup')}</p>}
       {phase === 'rolled-back' && <p className={css.notice} data-tone="error" role="status">{t('rolledBack')}</p>}

@@ -125,12 +125,15 @@
 .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
 :is(.card, .dialog) .toggle {
+  justify-self: start;
+  justify-content: flex-start;
   min-height: 28px;
   padding: 2px 0;
   border: 0;
   background: transparent;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 500;
 }
 :is(.card, .dialog) .toggle:hover:enabled {
   background: transparent;

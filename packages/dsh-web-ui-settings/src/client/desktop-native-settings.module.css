@@ -131,5 +131,147 @@
 .form { min-width: 0; }
 .form:not(:empty) { margin-top: 6px; }
 .button { justify-self: start; margin: 6px 0 0 12px; border-color: var(--dsw-alias-border-l2); }
+[data-dsh-native-settings='personal'] .button { margin: 4px 0 0; }
 .button:disabled { cursor: default; opacity: .6; }
 .error { margin: 4px 0 0 12px; color: var(--dsw-alias-state-error-primary); }
+
+[data-dsh-native-settings='personal'] :global([data-personal-prompt-card]),
+[data-dsh-native-settings='personal'] :global([data-memory-card]) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-desktop-settings-panel='skin-center'] :global([class*='cardHeaderStatic']) { box-sizing: border-box; }
+[data-desktop-settings-panel='skin-center'] :global([class*='enableRow']) { justify-content: space-between; }
+[data-desktop-settings-panel='skin-center'] :global([class*='head']) > :global([class*='intro']) { display: none; }
+[data-desktop-settings-panel='skin-center'] :global([class*='backgroundRow']) { gap: 8px; padding: 10px 0; }
+[data-desktop-settings-panel='skin-center'] :global([class*='backgroundHead']:not(:first-child)) { margin-top: 12px; }
+[data-desktop-settings-panel='skin-center'] :global([class*='toolbar']) > button {
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+[data-desktop-settings-panel='prompt-pilot'] section {
+  padding: 4px 0 !important;
+  gap: 12px !important;
+}
+[data-desktop-settings-panel='prompt-pilot'] section > h2 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+[data-desktop-settings-panel='prompt-pilot'] section > label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2);
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}
+[data-desktop-settings-panel='prompt-pilot'] section > label:first-of-type {
+  justify-content: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+[data-desktop-settings-panel='prompt-pilot'] section > label input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--dsw-alias-brand-primary);
+}
+[data-desktop-settings-panel='prompt-pilot'] section > label select {
+  min-width: 180px;
+  height: 32px;
+  padding: 0 10px !important;
+  border: 1px solid var(--dsw-alias-border-l2) !important;
+  border-radius: 8px !important;
+  background: var(--dsw-alias-bg-layer-1) !important;
+  font-size: 13px;
+}
+[data-desktop-settings-panel='prompt-pilot'] section > p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+[data-desktop-settings-panel='prompt-pilot'] section > details {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: var(--dsw-alias-bg-layer-2);
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+[data-desktop-settings-panel='prompt-pilot'] section > details > summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+[data-desktop-settings-panel='archived-sessions'] :is(input[type='text'], input[type='search'], input[type='number']) {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+}
+[data-desktop-settings-panel='archived-sessions'] :is(input[type='text'], input[type='search'], input[type='number']):focus {
+  border-color: var(--dsw-alias-brand-primary);
+}
+[data-desktop-settings-panel='archived-sessions'] input[type='checkbox'] {
+  accent-color: var(--dsw-alias-brand-primary);
+}
+[data-desktop-settings-panel='archived-sessions'] :global([class*='dangerButton']),
+[data-desktop-settings-panel='archived-sessions'] button:is([style*='red'], [style*='ff0000'], [style*='dc2626'], [style*='220, 38, 38'], [style*='255, 0, 0'], [style*='ef4444']) {
+  background: color-mix(in srgb, #dc2626 11%, transparent) !important;
+  color: var(--dsw-alias-state-error-primary, #c81e1e) !important;
+  border: 1px solid color-mix(in srgb, #dc2626 30%, transparent) !important;
+  border-radius: 8px !important;
+}
+[data-desktop-settings-panel='archived-sessions'] :global([class*='dangerButton']):hover:not(:disabled),
+[data-desktop-settings-panel='archived-sessions'] button:is([style*='red'], [style*='ff0000'], [style*='dc2626'], [style*='220, 38, 38'], [style*='255, 0, 0'], [style*='ef4444']):hover:not(:disabled) {
+  background: color-mix(in srgb, #dc2626 18%, transparent) !important;
+}
+[data-desktop-settings-panel='archived-sessions'] :global([class*='dangerButton']):disabled {
+  opacity: 0.45 !important;
+}
+
+[data-desktop-settings-panel='dsh-usage'] :global([class*='settingsGrid']) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px !important;
+  align-items: center;
+}
+[data-desktop-settings-panel='dsh-usage'] :global([class*='settingItem']) {
+  justify-content: space-between;
+  gap: 10px !important;
+  min-width: 0;
+}
+[data-desktop-settings-panel='dsh-usage'] :global([class*='settingItem']) :is(input, select) {
+  height: 30px;
+  min-width: 76px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+[data-desktop-settings-panel='dsh-usage'] :global([class*='settingItem']) input[type='checkbox'] {
+  width: 15px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0;
+  accent-color: var(--dsw-alias-brand-primary);
+}

@@ -49,14 +49,14 @@ const copy = {
     'data-location': '数据目录迁移', 'agent-inbox': '审批收件箱', 'llm-antigravity': 'Antigravity CLI (Gemini)',
     'win-control': 'Windows 桌面操控', 'fast-ops': 'nbfast', 'im-hub': 'IM 远程通道中心',
     personal: '个人偏好', responses: '回复偏好', memory: '记忆', advancedModels: '高级模型策略',
-    valueMode: '性价比模式', image: '图像理解', promptCustomizer: 'Agent 高级提示词 (P2)',
+    valueMode: '性价比模式', image: '图像理解', promptCustomizer: 'Agent 高级提示词',
     unavailable: '此设置暂时不可用。', promptCustomizerError: '无法打开高级提示词设置，请重试。',
   },
   en: {
     'data-location': 'Data directory migration', 'agent-inbox': 'Approval inbox', 'llm-antigravity': 'Antigravity CLI (Gemini)',
     'win-control': 'Windows Control', 'fast-ops': 'nbfast', 'im-hub': 'IM Hub',
     personal: 'Personal preferences', responses: 'Response preferences', memory: 'Memory', advancedModels: 'Advanced models',
-    valueMode: 'Value Mode', image: 'Image understanding', promptCustomizer: 'Advanced agent prompt (P2)',
+    valueMode: 'Value Mode', image: 'Image understanding', promptCustomizer: 'Advanced agent prompt',
     unavailable: 'This setting is temporarily unavailable.', promptCustomizerError: 'Could not open advanced prompt settings. Please try again.',
   },
 }
@@ -75,6 +75,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'desktop-native.settings.im-hub': BuiltinSlotEntry
     'desktop-native.settings.personal': { kind: 'list'; scope: 'root'; owner: {} }
     'desktop-native.settings.models': { kind: 'list'; scope: 'root'; owner: {} }
+    'settings.section.icon': { kind: 'list'; scope: 'root'; inline: true; owner: { children?: never } }
   }
 }
 
@@ -152,8 +153,7 @@ function PersonalPreferences({ t, renderSlot }: SettingsCopy & PropsRenderSlots<
   useLayoutEffect(() => { setVisited(previous => previous.includes(active) ? previous : [...previous, active]) }, [active])
   const changeTab = (id: PersonalTab) => select({ ...selection, personal: id })
   return <section className={css.section} data-dsh-native-settings="personal">
-    <h2 className={css.title}>{t('personal')}</h2>
-    <div role="tablist" aria-label={t('personal')} className={css.tabs}>
+    <div role="tablist" aria-label={t('personal')} className={`${css.tabs} ${css.groupTabs}`}>
       {personalTabs.map(id => <button key={id} id={`desktop-native-${id}-tab`} type="button" role="tab"
         aria-selected={active === id} aria-controls={`desktop-native-${id}`} tabIndex={active === id ? 0 : -1}
         onClick={() => changeTab(id)} onKeyDown={event => {
@@ -239,6 +239,22 @@ function BuiltinSettings({ id, t, renderSlot }: SettingsCopy & { id: BuiltinCard
   </div>
 }
 
+function PersonalNavIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 20a8 8 0 0 1 16 0" />
+  </svg>
+}
+
+function AppearanceNavIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 21a9 9 0 1 1 8.8-7 3.2 3.2 0 0 1-3.2 2.7H15a2 2 0 0 0-1.9 2.6c.3.9-.3 1.7-1.1 1.7z" />
+    <circle cx="7.5" cy="10.5" r="1" />
+    <circle cx="12" cy="7.5" r="1" />
+    <circle cx="16.5" cy="10.5" r="1" />
+  </svg>
+}
+
 /** Mount cards in the official settings shell with their original plugin services. */
 export function installDesktopNativeSettings(ctx: Context): () => void {
   const locale = 'desktop-native-settings'
@@ -271,7 +287,16 @@ export function installDesktopNativeSettings(ctx: Context): () => void {
       inject: () => ({ id }),
     }, BuiltinSettings)))
   })
+  const navIcons = [
+    ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
+      name: 'settings.section.icon', id: PERSONAL_SECTION, label: () => ctx.locale.bind(locale)('personal'),
+    }, PersonalNavIcon)),
+    ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
+      name: 'settings.section.icon', id: 'skin-center', label: () => '外观',
+    }, AppearanceNavIcon)),
+  ]
   return () => {
+    for (const dispose of navIcons) dispose()
     for (const dispose of builtin) dispose()
     models()
     personal()

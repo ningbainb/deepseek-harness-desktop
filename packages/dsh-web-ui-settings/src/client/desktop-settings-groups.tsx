@@ -66,7 +66,7 @@ export function DesktopSettingsGroup({ group, activeId, onSelect, renderSection 
           if (item && onSelect(item.id)) event.currentTarget.ownerDocument.getElementById(tabId(item.id))?.focus()
         }}>{label}</button>)}
     </div>
-    {group.sections.map(({ id }) => <div key={id} role="tabpanel" id={panelId(id)} aria-labelledby={tabId(id)} hidden={id !== active.id}>
+    {group.sections.map(({ id }) => <div key={id} role="tabpanel" id={panelId(id)} aria-labelledby={tabId(id)} data-desktop-settings-panel={id} hidden={id !== active.id}>
       {id === active.id ? renderSection(id) : null}
     </div>)}
   </div>
