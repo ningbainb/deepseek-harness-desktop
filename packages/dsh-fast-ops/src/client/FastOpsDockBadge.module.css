@@ -88,6 +88,8 @@
   color: var(--dsw-alias-label-primary, #1d2129);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
   text-align: start;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .popoverHeader {
@@ -171,4 +173,6 @@
   font-size: 11px;
   line-height: 16px;
   color: var(--dsw-alias-label-tertiary, #647084);
+  white-space: normal;
+  overflow-wrap: break-word;
 }

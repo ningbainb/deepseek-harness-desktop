@@ -26,11 +26,13 @@ html[data-dsh-desktop-window-chrome="true"] body [data-phase="active"] [data-slo
   white-space: nowrap !important;
 }
 
-[data-phase="active"] [data-composer-dock] [data-dsh-live-stats] {
+[data-phase="active"] [data-composer-dock] [data-dsh-live-stats],
+[data-phase="active"] [data-composer-dock] [data-dsh-fast-ops-dock] {
   white-space: normal !important;
 }
 
-[data-phase="active"] [data-composer-dock] [data-dsh-live-stats] > summary {
+[data-phase="active"] [data-composer-dock] [data-dsh-live-stats] > summary,
+[data-phase="active"] [data-composer-dock] [data-dsh-fast-ops-dock] > button {
   white-space: nowrap !important;
 }
 
