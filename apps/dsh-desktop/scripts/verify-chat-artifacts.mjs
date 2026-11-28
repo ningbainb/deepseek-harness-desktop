@@ -8,7 +8,8 @@ import { zstdCompressSync, zstdDecompressSync } from 'node:zlib'
 import electronPath from 'electron'
 import { _electron as electron } from 'playwright'
 import { createFixtureWorkspace, createSessionInWorkspace } from './agent-workspace-navigation-fixture.mjs'
-import { useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, useChineseFixtureLocale } from './dock-settings-fixture.mjs'
+import { closeIsolatedElectron } from './electron-cleanup-fixture.mjs'
 import { seedPrimaryRuntimePermissionForTest } from './primary-runtime-permission-fixture.mjs'
 import { waitForSessionLog } from './session-log-fixture.mjs'
 import { STAR_PROMPT_VERSION } from '../src/star-prompt.mjs'
@@ -217,6 +218,7 @@ async function launch() {
   page = await app.firstWindow({ timeout: 600_000 })
   page.on('pageerror', error => console.error('Renderer:', error.message))
   await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: 600_000 })
+  await dismissFirstRunModelChooserWhenShown(page)
   await page.locator('[data-conversation-content][data-conversation-session] [data-composer-card] button[data-dsh-relay-model-entry]').waitFor({ timeout })
   const nudge = page.locator('#dsh-extension-dock-nudge button')
   if (await nudge.isVisible()) await nudge.click()
@@ -425,14 +427,38 @@ try {
     await fenceBlock.frameLocator(previewSelector).getByText(content, { exact: true }).waitFor({ timeout })
     await fenceBlock.getByRole('button', { name: /返回代码|Back to code/u }).click({ timeout })
   }
-  await app.close()
+  await closeIsolatedElectron(app)
   app = undefined
   await seedLegacyPresentationMeta(sessionId)
 
   await launch()
   const restored = page.locator('[data-conversation-content][data-conversation-session="' + sessionId + '"]')
-  if (!await restored.isVisible()) {
-    await page.locator('[data-row-key="session:' + sessionId + '"]').click({ timeout })
+  const targetRow = page.locator('[data-row-key="session:' + sessionId + '"]')
+  const reopenDeadline = Date.now() + timeout
+  while (!await restored.isVisible().catch(() => false)) {
+    if (Date.now() >= reopenDeadline) {
+      const activeSession = await page.locator('[data-conversation-content][data-conversation-session]')
+        .first().getAttribute('data-conversation-session').catch(() => null)
+      const rowKeys = await page.locator('[data-row-key]').evaluateAll(elements =>
+        elements.map(el => `${el.getAttribute('data-row-key')}:${el.getAttribute('aria-expanded') ?? ''}`)).catch(() => [])
+      throw new Error(`Timed out reopening session ${sessionId} after restart (active=${activeSession}, rows=${JSON.stringify(rowKeys)})`)
+    }
+    if (await targetRow.isVisible().catch(() => false)) {
+      await targetRow.click({ timeout: Math.max(5_000, reopenDeadline - Date.now()) })
+      await restored.waitFor({ state: 'visible', timeout: Math.max(5_000, reopenDeadline - Date.now()) })
+      break
+    }
+    const collapsedGroups = page.locator('[role="treeitem"][data-row-key^="workspace:"][aria-expanded="false"]')
+    const collapsedCount = await collapsedGroups.count().catch(() => 0)
+    if (collapsedCount > 0) {
+      await collapsedGroups.first().click({ force: true }).catch(() => {})
+    } else {
+      const sidebarToggle = page.locator('button[aria-label*="展开侧边栏"], button[aria-label*="Expand sidebar" i], button[aria-label*="打开侧边栏"], button[aria-label*="Open sidebar" i]').first()
+      if (await sidebarToggle.isVisible().catch(() => false)) {
+        await sidebarToggle.click({ force: true }).catch(() => {})
+      }
+    }
+    await page.waitForTimeout(250)
   }
   const reloaded = restored.locator('[data-artifact-turn-tail] [data-artifact-id]').filter({ hasText: title })
   await reloaded.scrollIntoViewIfNeeded({ timeout })

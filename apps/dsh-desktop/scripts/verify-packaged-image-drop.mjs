@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { dismissStartupContinuationDialogs } from './dismiss-onboarding-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown } from './dock-settings-fixture.mjs'
 import { createFixtureWorkspace } from './agent-workspace-navigation-fixture.mjs'
 import { rpc } from './runtime-rpc-fixture.mjs'
 import { execFile } from 'node:child_process'
@@ -404,6 +405,7 @@ try {
       state: 'attached',
       timeout: runtimeReadyTimeoutMs,
     })
+    await dismissFirstRunModelChooserWhenShown(page)
     await dismissStartupContinuationDialogs(page)
   } catch (error) {
     const runtimeLog = await readFile(join(userData, 'logs', 'runtime.log'), 'utf8').catch(() => '')

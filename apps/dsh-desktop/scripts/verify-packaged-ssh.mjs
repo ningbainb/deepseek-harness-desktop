@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { dismissStartupContinuationDialogs } from './dismiss-onboarding-fixture.mjs'
 import { expandSidebarTools } from './sidebar-tools-fixture.mjs'
-import { openDockTools } from './dock-settings-fixture.mjs'
+import { dismissFirstRunModelChooserWhenShown, openDockTools } from './dock-settings-fixture.mjs'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -56,6 +56,7 @@ async function launchDesktop() {
   page.on('pageerror', error => rendererErrors.push(error.message))
   try {
     await page.waitForURL(/^dsh-runtime:\/\/app\//u, { timeout: runtimeReadyTimeoutMs })
+    await dismissFirstRunModelChooserWhenShown(page)
     await dismissStartupContinuationDialogs(page)
     await expandSidebarTools(page)
     await page.getByRole('button', { name: /打开拓展坞|Open Extension Dock/u }).waitFor({ state: 'visible', timeout: runtimeReadyTimeoutMs })
