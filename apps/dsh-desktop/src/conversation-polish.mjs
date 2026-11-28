@@ -8,6 +8,32 @@ html[data-dsh-desktop-window-chrome="true"] body [data-phase="active"] [data-slo
   backdrop-filter: none !important;
 }
 
+[data-phase="active"] [data-composer-dock] {
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  align-items: center !important;
+  row-gap: 4px !important;
+  column-gap: 10px !important;
+}
+
+[data-phase="active"] [data-composer-dock] [data-composer-stat],
+[data-phase="active"] [data-composer-dock] [data-dsh-prompt-shortcut],
+[data-phase="active"] [data-composer-dock] [data-dsh-live-stats],
+[data-phase="active"] [data-composer-dock] [data-dsh-fast-ops-dock],
+[data-phase="active"] [data-composer-dock] > div > *,
+[data-phase="active"] [data-composer-dock] > span {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+}
+
+[data-phase="active"] [data-composer-dock] [data-dsh-live-stats] {
+  white-space: normal !important;
+}
+
+[data-phase="active"] [data-composer-dock] [data-dsh-live-stats] > summary {
+  white-space: nowrap !important;
+}
+
 [data-variant="think"] > [data-open] > [data-disclosure-row] {
   position: sticky;
   z-index: 20;

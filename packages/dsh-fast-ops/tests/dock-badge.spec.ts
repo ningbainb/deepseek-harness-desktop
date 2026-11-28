@@ -20,12 +20,12 @@ describe('FastOpsDockBadge & client registration', () => {
     expect(summarizeFastOpsBadge({}, tZh)).toEqual({
       active: false,
       totalSaved: 0,
-      label: 'nbfast 就绪',
+      label: 'nbfast 省钱引擎',
     })
     expect(summarizeFastOpsBadge({}, tEn)).toEqual({
       active: false,
       totalSaved: 0,
-      label: 'nbfast ready',
+      label: 'nbfast Cost Saver',
     })
 
     expect(summarizeFastOpsBadge({ denoiseTokensSaved: 8420, spillTokensSaved: 6380, filesReadInBatches: 18 }, tZh)).toEqual({

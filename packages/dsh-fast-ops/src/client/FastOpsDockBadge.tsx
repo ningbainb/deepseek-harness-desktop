@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fetchFastOpsState, type FastOpsStateResponse } from './api.ts'
 import { zh, type FastOpsLocaleKey } from './locales.ts'
 import css from './FastOpsDockBadge.module.css'
@@ -89,8 +89,11 @@ export const FastOpsDockBadge = memo(function FastOpsDockBadge({
   const [state, setState] = useState<FastOpsStateResponse | null>(null)
   const [pinned, setPinned] = useState(false)
   const [hovered, setHovered] = useState(false)
+  const [popoverShiftX, setPopoverShiftX] = useState(0)
 
   const rootRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const shiftRef = useRef(0)
   const hoverCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const lastFetchedAtRef = useRef(0)
   const mountedRef = useRef(true)
@@ -141,6 +144,38 @@ export const FastOpsDockBadge = memo(function FastOpsDockBadge({
     if (!isOpen) return
     void loadState(false)
   }, [isOpen, loadState])
+
+  useLayoutEffect(() => {
+    if (!isOpen || typeof window === 'undefined') {
+      shiftRef.current = 0
+      setPopoverShiftX(0)
+      return undefined
+    }
+    const updateClamp = () => {
+      const popoverEl = popoverRef.current
+      if (!popoverEl) return
+      const rect = popoverEl.getBoundingClientRect()
+      const baseLeft = rect.left - shiftRef.current
+      const baseRight = rect.right - shiftRef.current
+      const paneRect = rootRef.current?.closest('[data-pane="conversation"], main')?.getBoundingClientRect()
+      const minLeft = Math.max(12, (paneRect?.left ?? 0) + 12)
+      const maxRight = Math.min(window.innerWidth - 12, (paneRect?.right ?? window.innerWidth) - 12)
+      let delta = 0
+      if (baseLeft < minLeft) {
+        delta = Math.min(minLeft - baseLeft, Math.max(0, maxRight - baseRight))
+      } else if (baseRight > maxRight) {
+        delta = maxRight - baseRight
+      }
+      const rounded = Math.round(delta)
+      if (rounded !== shiftRef.current) {
+        shiftRef.current = rounded
+        setPopoverShiftX(rounded)
+      }
+    }
+    updateClamp()
+    window.addEventListener('resize', updateClamp)
+    return () => window.removeEventListener('resize', updateClamp)
+  }, [isOpen, state])
 
   useEffect(() => {
     if (!pinned || typeof document === 'undefined') return undefined
@@ -227,7 +262,13 @@ export const FastOpsDockBadge = memo(function FastOpsDockBadge({
       </button>
 
       {isOpen && (
-        <div className={css.popover} role="dialog" aria-label={t('dockPopoverTitle')}>
+        <div
+          ref={popoverRef}
+          className={css.popover}
+          role="dialog"
+          aria-label={t('dockPopoverTitle')}
+          style={popoverShiftX !== 0 ? { transform: `translateX(${popoverShiftX}px)` } : undefined}
+        >
           <div className={css.popoverHeader}>
             <span className={css.popoverTitleWrap}>
               <svg
