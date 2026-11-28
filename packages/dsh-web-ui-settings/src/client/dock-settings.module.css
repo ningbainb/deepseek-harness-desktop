@@ -130,7 +130,7 @@
   margin-top: 24px;
   margin-bottom: -24px;
   padding: 12px 0 22px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: 0 -1px 0 var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-layer-1);
 }
 .browserCard { display: grid; gap: 12px; padding: 4px 0 16px; }

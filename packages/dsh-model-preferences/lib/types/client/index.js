@@ -132,6 +132,10 @@ export function apply(ctx) {
             name: 'conversation.input.model',
             priority: -10,
             locale: 'model-preferences',
+            children: {
+                'model-preferences.menu.options': { kind: 'list', scope: 'session' },
+                'model-preferences.menu.pane': { kind: 'keyed', scope: 'session' },
+            },
             inject: (sessionId) => {
                 const directory = models.directoryFor(sessionId);
                 const available = sessions.subagentAddress(sessionId) === undefined;

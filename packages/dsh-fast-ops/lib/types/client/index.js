@@ -1,6 +1,8 @@
 import { FastOpsCard } from "./FastOpsCard.js";
+import { FastOpsDockBadge } from "./FastOpsDockBadge.js";
 import { en, zh } from "./locales.js";
 export { FastOpsCard } from "./FastOpsCard.js";
+export { FastOpsDockBadge, formatCompactTokens, summarizeFastOpsBadge } from "./FastOpsDockBadge.js";
 export { en, zh } from "./locales.js";
 export const inject = ['slots', 'locale'];
 const NAMESPACE = 'fast-ops';
@@ -20,4 +22,11 @@ export function apply(ctx) {
         locale: NAMESPACE,
         inject: () => ({}),
     }, FastOpsCard)), 'fast-ops: settings card');
+    accessor.effect(() => slots.inject('conversation.composer.dock', () => slots.register({
+        name: 'conversation.composer.dock',
+        id: 'fast-ops-dock',
+        order: 105,
+        locale: NAMESPACE,
+        inject: () => ({}),
+    }, FastOpsDockBadge)), 'fast-ops: composer dock badge');
 }

@@ -33,6 +33,7 @@ export class FastOpsController {
         toolsActivated: 0,
         astCalls: 0,
         denoiseTokensSaved: 0,
+        spillTokensSaved: 0,
     };
     activated = new WeakMap();
     applied = new WeakMap();
@@ -112,6 +113,13 @@ export class FastOpsController {
         const text = `${compact}\n[compressed ${rawBytes} B -> ${projectedBytes} B, saved ~${percent}%; full raw output: ${ref.refId} via fast_result]`;
         this.counters.denoiseTokensSaved += Math.max(0, Math.floor((original.text.length - text.length) / 4));
         return { ...decision, content: [{ ...original, text }] };
+    }
+    recordSpillSavings(spilledBytes, inlinePayload) {
+        if (spilledBytes <= 0)
+            return;
+        const serialized = typeof inlinePayload === 'string' ? inlinePayload : JSON.stringify(inlinePayload);
+        const inlineBytes = Buffer.byteLength(serialized ?? '', 'utf8');
+        this.counters.spillTokensSaved += Math.floor(Math.max(0, spilledBytes - inlineBytes) / 4);
     }
     resolveWorkspaceRoot(agent) {
         if (agent?.workspace?.path)
@@ -349,8 +357,10 @@ export class FastOpsController {
                         ttlMs: settings.resultCacheTtlMs,
                         cache: this.cache,
                     });
-                    if (result.spilled)
+                    if (result.spilled) {
                         this.counters.cacheSpills++;
+                        this.recordSpillSavings(result.ref?.totalBytes ?? 0, result);
+                    }
                     return result;
                 },
             });
@@ -384,8 +394,12 @@ export class FastOpsController {
                         ttlMs: settings.resultCacheTtlMs,
                         cache: this.cache,
                     });
-                    if ('spilled' in res && res.spilled)
+                    if ('spilled' in res && res.spilled) {
                         this.counters.cacheSpills++;
+                        const refBytes = 'ref' in res ? (res.ref?.totalBytes ?? 0) : 0;
+                        const contextRefBytes = 'contextRef' in res ? (res.contextRef?.totalBytes ?? 0) : 0;
+                        this.recordSpillSavings(refBytes + contextRefBytes, res);
+                    }
                     return res;
                 },
             });
@@ -520,8 +534,11 @@ export class FastOpsController {
                         ttlMs: settings.resultCacheTtlMs,
                         cache: this.cache,
                     });
-                    if ('spilled' in res && res.spilled)
+                    if ('spilled' in res && res.spilled) {
                         this.counters.cacheSpills++;
+                        const refBytes = 'ref' in res ? (res.ref?.totalBytes ?? 0) : 0;
+                        this.recordSpillSavings(refBytes, res);
+                    }
                     return res;
                 },
             });
@@ -564,6 +581,9 @@ export class FastOpsController {
                     if (Buffer.byteLength(text, 'utf8') <= this.getSettings().maxInlineBytes)
                         return result;
                     const contextRef = this.putText({ agent: exec?.agent, producerTool: 'fast_ast_search', text });
+                    if (contextRef) {
+                        this.recordSpillSavings(Buffer.byteLength(text, 'utf8'), contextRef);
+                    }
                     return contextRef ? { ...result, context: [], contextRef, contextEncoding: 'json-text' } : result;
                 },
             });

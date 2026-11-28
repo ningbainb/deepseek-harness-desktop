@@ -28,6 +28,15 @@ export declare const zh: {
     readonly 'search.reason.tags': "标签匹配";
     readonly 'search.reason.pinned': "置顶";
     readonly 'search.score': "相关性得分";
+    readonly 'search.quickOpen': "搜索历史对话";
+    readonly 'search.quickHint': "Ctrl+K 搜索全部分组对话与知识库";
+    readonly 'search.quickPlaceholder': "输入关键词、文件名或代码标识符...";
+    readonly 'search.kbSectionTitle': "工作区知识库";
+    readonly 'search.kbAddCurrentDir': "加入知识库";
+    readonly 'search.kbAddedToast': "已加入工作区知识库";
+    readonly 'search.kbFailedToast': "无法加入工作区知识库";
+    readonly 'search.kbEmpty': "当前工作区尚未添加知识库来源。";
+    readonly 'search.close': "关闭";
     readonly "settings.all": "全部记忆";
     readonly "settings.advanced": "更多选项：标签、置顶和有效期";
     readonly "settings.scopeFilter": "查看范围";

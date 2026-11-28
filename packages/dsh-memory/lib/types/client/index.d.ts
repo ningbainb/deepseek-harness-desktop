@@ -8,6 +8,8 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import { type MemoryLocaleKey } from './locales.ts';
 export * from './locales.ts';
 export { MemorySettingsCard } from './MemorySettingsCard.tsx';
+export { QuickSearchDialog, QuickSearchSidebarEntry, openQuickSearch, toggleQuickSearch } from './QuickSearchDialog.tsx';
+export { FilesTreeKnowledgeButton, WorkspaceKnowledgeCount, WorkspaceKnowledgeSection } from './WorkspaceKnowledgeSection.tsx';
 declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface LocaleNamespaceMap {
         memory: MemoryLocaleKey;
@@ -18,6 +20,32 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
             scope: 'root';
             owner: {
                 children?: never;
+            };
+        };
+        'shell.overlay': {
+            kind: 'list';
+            scope: 'root';
+            owner: {
+                children?: never;
+            };
+        };
+        'conversation.session.panel.section': {
+            kind: 'list';
+            scope: 'session';
+            owner: {
+                readonly presentation: 'docked' | 'overlay';
+                readonly dismissOverlay: () => void;
+            };
+        };
+        'conversation.session.panel.section.actions': {
+            kind: 'keyed';
+            scope: 'session';
+        };
+        'sidebar.right.tab.files.actions': {
+            kind: 'list';
+            scope: 'session';
+            owner: {
+                readonly absolutePath: string;
             };
         };
     }

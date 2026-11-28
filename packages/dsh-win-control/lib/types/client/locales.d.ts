@@ -4,6 +4,8 @@ export declare const zh: {
     pillOff: string;
     pillUnavailable: string;
     pillTooltip: string;
+    menuToggle: string;
+    menuToggleHint: string;
     cardTitle: string;
     cardDescription: string;
     statusReady: string;

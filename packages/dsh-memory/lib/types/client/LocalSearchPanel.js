@@ -1,16 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useRef, useState } from 'react';
+import { postLocalSearch } from "./local-search-api.js";
 import styles from './memory.module.css';
-async function post(operation, body, signal) {
-    const response = await fetch('/api/dsh-local-search/' + operation, {
-        method: 'POST', cache: 'no-store', signal,
-        headers: { 'content-type': 'application/json', 'x-dsh-local-search': '1' },
-        body: JSON.stringify(body),
-    });
-    if (!response.ok)
-        throw new Error('Local search is unavailable');
-    return await response.json();
-}
 export function LocalSearchPanel({ t, onSuggest, onOpenSession }) {
     const [open, setOpen] = useState(false);
     const [status, setStatus] = useState();
@@ -33,7 +24,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }) {
         let timer;
         const refresh = async () => {
             try {
-                const snapshot = await post('status', { workspaceId: workspaceId || undefined }, abort.signal);
+                const snapshot = await postLocalSearch('status', { workspaceId: workspaceId || undefined }, abort.signal);
                 if (!abort.signal.aborted) {
                     setStatus(snapshot);
                     if (snapshot.indexing)
@@ -73,7 +64,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }) {
         if (!query.trim())
             return;
         void perform(async (signal) => {
-            const result = await post('sessions', {
+            const result = await postLocalSearch('sessions', {
                 query: query.trim(), workspaceId: workspaceId || undefined,
                 after: after ? new Date(after + 'T00:00:00').getTime() : undefined,
                 before: before ? new Date(before + 'T23:59:59.999').getTime() : undefined,
@@ -89,7 +80,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }) {
         if (!workspaceId || !path.trim())
             return;
         void perform(async (signal) => {
-            await post('sources', { workspaceId, path: path.trim(), operation }, signal);
+            await postLocalSearch('sources', { workspaceId, path: path.trim(), operation }, signal);
             if (!signal.aborted) {
                 if (operation === 'add')
                     setSourcePath('');
@@ -98,7 +89,7 @@ export function LocalSearchPanel({ t, onSuggest, onOpenSession }) {
         });
     };
     return _jsxs("details", { className: styles.details, "data-memory-local-search": "true", onToggle: event => setOpen(event.currentTarget.open), children: [_jsx("summary", { children: t('search.title') }), _jsxs("div", { className: styles.searchBody, children: [status && _jsxs("div", { className: styles.searchStatus, "aria-live": "polite", children: [_jsx("span", { children: status.status.vectorCount > 0 ? 'BM25 + ' + t('search.vector') : 'BM25' }), _jsxs("span", { children: [t('search.memoryCount'), " ", status.status.counts.memory] }), _jsxs("span", { children: [t('search.sessionCount'), " ", status.status.counts.sessions] }), _jsxs("span", { children: [t('search.chunkCount'), " ", status.status.counts.knowledge] }), status.indexing && _jsx("span", { children: t('search.indexing') })] }), error && _jsx("p", { className: styles.error, role: "alert", children: t('search.unavailable') }), status && _jsx("div", { className: styles.actions, children: _jsx("button", { type: "button", className: styles.button, disabled: busy || status.indexing, onClick: () => void perform(async (signal) => {
-                                await post('rebuild', {}, signal);
+                                await postLocalSearch('rebuild', {}, signal);
                                 if (!signal.aborted)
                                     setRevision(value => value + 1);
                             }), children: t('search.rebuild') }) }), _jsxs("label", { className: styles.field, children: [t('settings.workspace'), _jsxs("select", { value: workspaceId, onChange: event => { setWorkspaceId(event.target.value); setHits(undefined); }, disabled: busy, children: [_jsx("option", { value: "", children: t('search.allWorkspaces') }), status?.workspaces.map(workspace => _jsx("option", { value: workspace.id, children: workspace.title }, workspace.id))] })] }), _jsxs("form", { onSubmit: search, className: styles.searchForm, children: [_jsxs("label", { className: styles.field, children: [t('search.history'), _jsx("input", { type: "search", value: query, maxLength: 1200, onChange: event => setQuery(event.target.value) })] }), _jsxs("div", { className: styles.searchDates, children: [_jsxs("label", { className: styles.field, children: [t('search.after'), _jsx("input", { type: "date", value: after, onChange: event => setAfter(event.target.value) })] }), _jsxs("label", { className: styles.field, children: [t('search.before'), _jsx("input", { type: "date", value: before, onChange: event => setBefore(event.target.value) })] })] }), _jsx("button", { type: "submit", className: styles.primary, disabled: busy || !query.trim(), children: t('search.submit') })] }), hits && hits.length === 0 && _jsx("p", { className: styles.muted, role: "status", children: t(searchIndexing ? 'search.indexing' : 'search.noMatches') }), hits && hits.length > 0 && _jsx("ul", { className: styles.searchHits, "aria-label": t('search.history'), children: hits.map(hit => _jsxs("li", { className: styles.activityItem, children: [_jsx("strong", { children: hit.title || hit.sessionId }), _jsx("p", { children: hit.excerpt }), _jsxs("p", { className: styles.muted, children: [t('search.turn'), " ", hit.turn, " \u00B7 ", new Date(hit.timestamp).toLocaleString()] }), _jsx("div", { className: styles.searchStatus, children: hit.reasons.map(reason => _jsx("span", { children: t(('search.reason.' + reason)) }, reason)) }), _jsxs("div", { className: styles.actions, children: [onOpenSession && _jsx("button", { type: "button", className: styles.button, onClick: () => onOpenSession(hit.sessionId), children: t('search.openSession') }), _jsx("button", { type: "button", className: styles.button, onClick: () => onSuggest(hit.sessionId), children: t('search.suggestTurn') })] })] }, hit.sessionId + ':' + hit.seq + ':' + hit.excerpt)) }), _jsxs("details", { className: styles.details, children: [_jsx("summary", { children: t('search.sources') }), _jsxs("form", { className: styles.searchForm, onSubmit: event => { event.preventDefault(); change('add', sourcePath); }, children: [_jsxs("label", { className: styles.field, children: [t('search.sourcePath'), " ", _jsx("input", { value: sourcePath, maxLength: 4096, onChange: event => setSourcePath(event.target.value), disabled: !workspaceId || busy })] }), _jsx("button", { type: "submit", className: styles.button, disabled: !workspaceId || !sourcePath.trim() || busy, children: t('search.addSource') })] }), _jsx("ul", { className: styles.searchHits, children: status?.sources.map(source => _jsxs("li", { className: styles.actions, children: [_jsx("span", { className: styles.searchSource, children: source.path }), _jsx("button", { type: "button", className: styles.button, disabled: busy, onClick: () => change('remove', source.path), children: t('search.removeSource') })] }, source.path)) })] })] })] });

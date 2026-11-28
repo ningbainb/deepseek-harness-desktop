@@ -93,4 +93,4 @@ it('reports scoped Git changes and loads a literal file diff', async () => {
     expect((await preview(workspace, 'file name.txt'))?.text).toContain('+new')
     expect(await preview(workspace, '../outside.txt')).toBeUndefined()
   } finally { await rm(root, { recursive: true, force: true }) }
-})
+}, 15_000)

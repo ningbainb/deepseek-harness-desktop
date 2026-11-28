@@ -12,6 +12,7 @@ export interface FastOpsCounters {
     toolsActivated: number;
     astCalls: number;
     denoiseTokensSaved: number;
+    spillTokensSaved: number;
 }
 export declare const FAST_OPS_RESULTS_SERVICE = "fastOpsResults";
 export interface FastOpsResultsService {
@@ -39,6 +40,7 @@ export declare class FastOpsController implements FastOpsResultsService {
     isAstAvailable(): Promise<boolean>;
     putText(input: Parameters<FastOpsResultsService['putText']>[0]): StorageReference | undefined;
     private projectCommandResult;
+    private recordSpillSavings;
     private resolveWorkspaceRoot;
     private resolveCodeWorkspace;
     private canRewriteWorkspace;

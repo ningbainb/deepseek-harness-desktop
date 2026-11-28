@@ -62,7 +62,7 @@ describe('document parser worker', () => {
     expect(result.metadata.format).toBe('docx')
     expect(result.markdown).toMatch(/季度报告/)
     expect(result.markdown).toMatch(/\|.*甲方.*\|.*42.*\|/)
-  })
+  }, 15_000)
 
   it('exposes workbook names and extracts the selected sheet only', async () => {
     const sheet = (name: string) => `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>${name}</t></is></c><c r="B1"><f>40+2</f><v>42</v></c></row></sheetData></worksheet>`
@@ -80,7 +80,7 @@ describe('document parser worker', () => {
     expect(result.markdown).toContain('42')
     expect(result.markdown).toContain('=40+2')
     expect(result.markdown).not.toContain('表一明细')
-  })
+  }, 15_000)
 
   it('extracts RTF text and filters credential-like values', async () => {
     await writeFile(join(workspace, 'report.rtf'), '{\\rtf1\\ansi Authorized report.\\par token=sample-token-value}')

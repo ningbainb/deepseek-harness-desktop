@@ -34,7 +34,7 @@ export declare const zh: {
     readonly 'status.providerFailure': "部分供应商加载失败，已加载的模型仍可选择。";
     readonly 'error.load': "模型目录加载失败。";
     readonly 'error.select': "模型切换失败，请重试。";
-    readonly 'effort.default': "供应商默认";
+    readonly 'effort.default': "默认";
     readonly 'settings.nav': "模型偏好";
     readonly 'settings.title': "模型偏好";
     readonly 'settings.description': "自定义模型置顶、供应商顺序和供应商启用状态。不会删除凭据，也不会中断当前请求。";

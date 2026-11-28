@@ -1,8 +1,8 @@
 import { WinControlCard } from "./WinControlCard.js";
-import { WinControlPill } from "./WinControlPill.js";
+import { WinControlMenuOption, WinControlPill } from "./WinControlPill.js";
 import { en, zh } from "./locales.js";
 export { WinControlCard } from "./WinControlCard.js";
-export { WinControlPill } from "./WinControlPill.js";
+export { WinControlMenuOption, WinControlPill } from "./WinControlPill.js";
 export { en, zh } from "./locales.js";
 export const inject = ['slots', 'locale'];
 const NAMESPACE = 'win-control';
@@ -22,6 +22,20 @@ export function apply(ctx) {
         locale: NAMESPACE,
         inject: (sessionId) => ({ sessionId }),
     }, WinControlPill)), 'win-control: composer pill');
+    accessor.effect(() => slots.inject('conversation.input.model.options', () => slots.register({
+        name: 'conversation.input.model.options',
+        id: 'win-control-option',
+        order: 70,
+        locale: NAMESPACE,
+        inject: (sessionId) => ({ sessionId }),
+    }, WinControlMenuOption)), 'win-control: model menu option');
+    accessor.effect(() => slots.inject('model-preferences.menu.options', () => slots.register({
+        name: 'model-preferences.menu.options',
+        id: 'win-control-option',
+        order: 70,
+        locale: NAMESPACE,
+        inject: (sessionId) => ({ sessionId }),
+    }, WinControlMenuOption)), 'win-control: model-preferences menu option');
     accessor.effect(() => slots.inject('web-ui.plugin.item', () => slots.register({
         name: 'web-ui.plugin.item',
         id: 'win-control',

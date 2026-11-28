@@ -1,7 +1,7 @@
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client';
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
+import type { PropsLocale, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import { type ModelPreferencesConfig } from './model-projection.ts';
-export type ModelSelectProps = PropsRuntime<'conversation.input.model'> & PropsLocale<'model-preferences'> & ModelSelectInjected & {
+export type ModelSelectProps = PropsRuntime<'conversation.input.model'> & PropsLocale<'model-preferences'> & ModelSelectInjected & Partial<PropsRenderSlots<'model-preferences.menu.options' | 'model-preferences.menu.pane'>> & {
     modelSessionId: string;
     sessionCwd?: string;
     getSessionCwd?: () => string | undefined;

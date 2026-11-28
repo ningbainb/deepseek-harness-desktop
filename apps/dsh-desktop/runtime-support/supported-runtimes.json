@@ -98,6 +98,8 @@
           "root",
           "settings.models.footer",
           "settings.section",
+          "settings.section.icon",
+          "shell.overlay",
           "sidebar.footer.action",
           "sidebar.remote",
           "sidebar.right.pane.tab",

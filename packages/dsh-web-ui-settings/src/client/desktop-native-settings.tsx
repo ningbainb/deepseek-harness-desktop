@@ -75,7 +75,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'desktop-native.settings.im-hub': BuiltinSlotEntry
     'desktop-native.settings.personal': { kind: 'list'; scope: 'root'; owner: {} }
     'desktop-native.settings.models': { kind: 'list'; scope: 'root'; owner: {} }
-    'settings.section.icon': { kind: 'list'; scope: 'root'; inline: true; owner: { children?: never } }
   }
 }
 

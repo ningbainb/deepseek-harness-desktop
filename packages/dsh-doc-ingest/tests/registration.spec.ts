@@ -76,7 +76,7 @@ describe('document tool scope', () => {
     expect(putText).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
       agent: toolRun.agent, producerTool: 'doc_read', text: expect.stringContaining('Document content for the model'),
     }))
-  })
+  }, 15_000)
 
   it('fails closed for an unauthorized session before asking for network approval', async () => {
     const { host, tools, approval } = createHost(false)

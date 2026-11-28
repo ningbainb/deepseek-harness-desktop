@@ -25,6 +25,28 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
             scope: 'root';
             owner: ModelPreferencesOnboardingOwnerProps;
         };
+        'model-preferences.menu.options': {
+            kind: 'list';
+            scope: 'session';
+            owner: {
+                locked: boolean;
+                dismiss: () => void;
+                reportFailure: (message: string) => void;
+                openPane: (pane: {
+                    key: string;
+                    title: string;
+                }) => void;
+            };
+        };
+        'model-preferences.menu.pane': {
+            kind: 'keyed';
+            scope: 'session';
+            owner: {
+                locked: boolean;
+                dismiss: () => void;
+                reportFailure: (message: string) => void;
+            };
+        };
     }
 }
 export interface ModelPreferencesOnboardingOwnerProps {
